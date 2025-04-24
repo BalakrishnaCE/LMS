@@ -11,6 +11,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFrappeAuth } from "frappe-react-sdk"
+import { toast } from "sonner"
+
 
 export function LoginForm({
   className,
@@ -19,16 +21,16 @@ export function LoginForm({
   const [username, setUsername] = React.useState("")
   const [password, setPassword] = React.useState("")
   const { login, error, isLoading } = useFrappeAuth()
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
 
     try {
       await login({ username: username, password: password })
+      toast("Login Success")
       location.href = "/" // redirect on success
     } catch (err) {
       console.error("Login failed", err)
-      alert("Login failed: " + (error?.message || "Unknown error"))
+      toast("Login Failed")
     }
   }
   return (

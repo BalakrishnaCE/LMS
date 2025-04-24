@@ -1,5 +1,5 @@
 import { IconCirclePlusFilled, IconPlus, type Icon } from "@tabler/icons-react"
-
+import { useLocation } from "wouter"
 import { Button } from "@/components/ui/button"
 import {
   SidebarGroup,
@@ -8,6 +8,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { navigate } from "wouter/use-browser-location"
 
 export function NavMain({
   items,
@@ -16,8 +17,10 @@ export function NavMain({
     title: string
     url: string
     icon?: Icon
+    tooltip?: string
   }[]
 }) {
+  const [location] = useLocation();
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
@@ -34,21 +37,38 @@ export function NavMain({
               size="icon"
               className="size-8 group-data-[collapsible=icon]:opacity-0 hover:text-white"
               variant="outline"
+              onClick={() => console.log("create")}
             >
-              <IconPlus className="size-4 " />
+              <IconPlus className="size-4" />
               <span className="sr-only">Inbox</span>
             </Button>
           </SidebarMenuItem>
         </SidebarMenu>
+
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title} className="hover:text-white">
-                {item.icon && <item.icon />}
-                <span>{item.title}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {items.map((item) => {
+            const isActive = location === item.url;
+            return (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  tooltip={item.tooltip}
+                  className={
+                    isActive
+                      ? "hover:text-white bg-primary/90"
+                      : "active:bg-primary/90 active:text-primary-foreground"
+                  }
+                  onClick={() => {
+                    if (item.url !== location) {
+                      navigate(item.url);
+                    }
+                  }}
+                >
+                  {item.icon && <item.icon />}
+                  <span>{item.title}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

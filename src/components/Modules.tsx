@@ -7,168 +7,62 @@ import {
     CardHeader,
     CardTitle,
   } from "@/components/ui/card"
-  import { IconPointFilled } from "@tabler/icons-react"
-
+import { IconPointFilled } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
-  import { Button } from "@/components/ui/button"
-// import { Toaster } from "./ui/sonner"
+import { Button } from "@/components/ui/button"
+import {  useFrappeGetDocList } from "frappe-react-sdk"
+import { Progress } from "@/components/ui/progress"
+import { Link } from "wouter"
 
-
-function Modules() {
-    function handleClick() {
-        // toast.success("Module added successfully!")
-        // toast.message("Module added successfully!")
-        // toast.warning("Module added successfully!")
-        // toast.info("Module added successfully!")
-       
-        // toast.error("Module added successfully!")
-        // toast.promise(
-        //     new Promise((resolve) => setTimeout(resolve, 2000)),
-        //     {
-        //         loading
-        //         : "Adding module...",
-        //         success: "Module added successfully!",
-        //         error: "Module added successfully!",
-        //     }
-        // )
-        
-      }
+function Modules (  ) {
+    const { data: module_data, error: module_error, isValidating } = useFrappeGetDocList("LMS Module",
+        {
+          fields: ["name", "name1", "description", "is_published", "image"],
+        }
+      )
+    const module_list = module_data?.map((module: { name: string; name1: string; description: string; is_published: number; image: string; }) => ({
+        name: module.name,
+        name1: module.name1,
+        description: module.description,
+        is_published: module.is_published,
+        image: module.image,
+      }))
+    console.log(module_list)
   return (
-    <div >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        <Card className="@container/card">
-            
+    <div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 max-w-300 p-4">
+        {module_list?.map((module) => (
+          <Card className="@container/card border-t-2 " key={module.name}>
             <CardHeader>
-                <CardTitle className="text-xl ont-semibold ">Modern React Development </CardTitle>
-                <CardAction>
-                    <Badge variant="outline" >
-                        <IconPointFilled />
+              <CardTitle className="text-sm ont-semibold ">
+                {module.name1}
+              </CardTitle>
+              <CardAction>
+                    {module.is_published === 1 ? (
+                        <Badge variant="outline" >
+                            <IconPointFilled className="text-primary" />
+                            <p className="">Published</p>
+                        </Badge>
+                    ) : (
+                        <Badge variant="outline" >
+                            <IconPointFilled className="text-accent-foreground" />
                             <p className="">Draft</p>
-                    </Badge>
+                        </Badge>
+                    )}
                 </CardAction>
             </CardHeader>
-                
-           
-            <CardContent className="flex flex-col gap-4 justify-center items-center">
-            <CardDescription className=" "> Learn to build modern React applications with hooks and context </CardDescription>
-                {/* <img src="https://picsum.photos/200/200" alt="Module 1" className="rounded-md shadow-md hover:scale-105 transition-transform duration-300 ease-in-out" /> */}
+            <CardContent>
+            <CardDescription>{module.description}</CardDescription>
             </CardContent>
-            
-            <CardFooter className=" justify-center">
-                <Button variant="outline" className="hover:text-white" onClick={handleClick}>View Progress</Button>
-        </CardFooter>
-        </Card>
-        <Card className="@container/card">
-            
-            <CardHeader>
-                <CardTitle className="text-xl ont-semibold ">Modern React Development </CardTitle>
-                <CardAction>
-                    <Badge variant="outline" >
-                        <IconPointFilled />
-                            <p className="">Draft</p>
-                    </Badge>
-                </CardAction>
-            </CardHeader>
-                
-           
-            <CardContent className="flex flex-col gap-4 justify-center items-center">
-            <CardDescription className=" "> Learn to build modern React applications with hooks and context </CardDescription>
-                {/* <img src="https://picsum.photos/200/200" alt="Module 1" className="rounded-md shadow-md hover:scale-105 transition-transform duration-300 ease-in-out" /> */}
-            </CardContent>
-            
-            <CardFooter className=" justify-center">
-                <Button variant="outline" className="hover:text-white" onClick={handleClick}>View Progress</Button>
-        </CardFooter>
-        </Card>
-        <Card className="@container/card">
-            
-            <CardHeader>
-                <CardTitle className="text-xl ont-semibold ">Modern React Development </CardTitle>
-                <CardAction>
-                    <Badge variant="outline" >
-                        <IconPointFilled />
-                            <p className="">Draft</p>
-                    </Badge>
-                </CardAction>
-            </CardHeader>
-                
-           
-            <CardContent className="flex flex-col gap-4 justify-center items-center">
-            <CardDescription className=" "> Learn to build modern React applications with hooks and context </CardDescription>
-                {/* <img src="https://picsum.photos/200/200" alt="Module 1" className="rounded-md shadow-md hover:scale-105 transition-transform duration-300 ease-in-out" /> */}
-            </CardContent>
-            
-            <CardFooter className=" justify-center">
-                <Button variant="outline" className="hover:text-white" onClick={handleClick}>View Progress</Button>
-        </CardFooter>
-        </Card>
-        <Card className="@container/card">
-            
-            <CardHeader>
-                <CardTitle className="text-xl ont-semibold ">Modern React Development </CardTitle>
-                <CardAction>
-                    <Badge variant="outline" >
-                        <IconPointFilled />
-                            <p className="">Draft</p>
-                    </Badge>
-                </CardAction>
-            </CardHeader>
-                
-           
-            <CardContent className="flex flex-col gap-4 justify-center items-center">
-            <CardDescription className=" "> Learn to build modern React applications with hooks and context </CardDescription>
-                {/* <img src="https://picsum.photos/200/200" alt="Module 1" className="rounded-md shadow-md hover:scale-105 transition-transform duration-300 ease-in-out" /> */}
-            </CardContent>
-            
-            <CardFooter className=" justify-center">
-                <Button variant="outline" className="hover:text-white" onClick={handleClick}>View Progress</Button>
-        </CardFooter>
-        </Card>
-        <Card className="@container/card">
-            
-            <CardHeader>
-                <CardTitle className="text-xl ont-semibold ">Modern React Development </CardTitle>
-                <CardAction>
-                    <Badge variant="outline" >
-                        <IconPointFilled />
-                            <p className="">Draft</p>
-                    </Badge>
-                </CardAction>
-            </CardHeader>
-                
-           
-            <CardContent className="flex flex-col gap-4 justify-center items-center">
-            <CardDescription className=" "> Learn to build modern React applications with hooks and context </CardDescription>
-                {/* <img src="https://picsum.photos/200/200" alt="Module 1" className="rounded-md shadow-md hover:scale-105 transition-transform duration-300 ease-in-out" /> */}
-            </CardContent>
-            
-            <CardFooter className=" justify-center">
-                <Button variant="outline" className="hover:text-white" onClick={handleClick}>View Progress</Button>
-        </CardFooter>
-        </Card>
-        <Card className="@container/card">
-            
-            <CardHeader>
-                <CardTitle className="text-xl ont-semibold ">Modern React Development </CardTitle>
-                <CardAction>
-                    <Badge variant="outline" >
-                        <IconPointFilled />
-                            <p className="">Draft</p>
-                    </Badge>
-                </CardAction>
-            </CardHeader>
-                
-           
-            <CardContent className="flex flex-col gap-4 justify-center items-center">
-            <CardDescription className=" "> Learn to build modern React applications with hooks and context </CardDescription>
-                {/* <img src="https://picsum.photos/200/200" alt="Module 1" className="rounded-md shadow-md hover:scale-105 transition-transform duration-300 ease-in-out" /> */}
-            </CardContent>
-            
-            <CardFooter className=" justify-center">
-                <Button variant="outline" className="hover:text-white" onClick={handleClick}>View Progress</Button>
-        </CardFooter>
-        </Card>
-      </div>
+            <CardFooter className="flex justify-between flex-col gap-4">
+                <Progress value={10} className="text-sm" />
+                <Link href={`/module/${module.name}`} className="w-full">
+                    <Button variant="outline" className="hover:text-white w-full">View</Button>
+                </Link>
+            </CardFooter>
+          </Card>
+        ))}
+        </div>
     </div>
   );
 }

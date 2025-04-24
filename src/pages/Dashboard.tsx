@@ -1,25 +1,51 @@
+import * as React from "react"
+import { useState } from "react"
 import { SectionCards } from "@/components/section-cards"
 import Module from "@/components/Modules"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Learners from "@/components/Learners"
-import { useFrappeAuth } from "frappe-react-sdk"
+import { useFrappeAuth, useFrappeGetDoc } from "frappe-react-sdk"
 
 
 function Dashboard() {
-  const { currentUser,  error, isLoading } = useFrappeAuth()
-  if (isLoading) {
-    return <div>Loading...</div>
-  }
-  if (error) {
-    return <div>Error: {error.message}</div>
-  }
-  if (!currentUser) {
-    return <div>Not logged in</div>
-  }
-  console.log(currentUser)
+    const [userName, setUserName] = React.useState("")
+    const [isLoading, setIsLoading] = React.useState(true)
+      const { currentUser} = useFrappeAuth()
+      const { data, error: docError, isValidating } = useFrappeGetDoc(
+        "User",
+        currentUser ?? undefined,
+        {
+          fields: ["name", "full_name", "email", "image", "role"],
+        }
+      )
+       // async function to get user detials
+      async function getUserDetails() {
+        if (isValidating) {
+          setIsLoading(true)
+        }
+        if (data) {
+          const roles = data.roles
+          const isLMSAdmin = roles.some((role: { role: string }) => role.role === "LMS Student");        
+          // console.log(isLMSAdmin)
+          setUserName(data.first_name)
+          setIsLoading(false)
+        }
+        if (docError) {
+          console.log(docError)
+        }
+      }  
+    const [activeTab, setActiveTab] = useState("module")
   
+  React.useEffect(() => {
+    getUserDetails()
+  }, [data, isValidating])
   return (
     <div className="flex flex-1 flex-col">
+      {isLoading ? (
+      <div className="flex justify-center items-center h-full">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    ) : (
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <SectionCards />
@@ -33,10 +59,9 @@ function Dashboard() {
                 <TabsContent value="learners"><Learners/></TabsContent>
               </Tabs>
               </div>
-
-              
             </div>
           </div>
+          )}
         </div>
   )
 }

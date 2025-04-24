@@ -1,25 +1,13 @@
 import * as React from "react"
 import {
-  IconCamera,
   IconChartBar,
   IconDashboard,
-  IconDatabase,
-  IconFileAi,
-  IconFileDescription,
-  IconFileWord,
   IconFolder,
-  IconHelp,
   IconBook,
   IconListDetails,
-  IconReport,
-  IconSearch,
-  IconSettings,
   IconUsers,
 } from "@tabler/icons-react"
-
-import { NavDocuments } from "@/components/nav-documents"
 import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -30,10 +18,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useFrappeAuth, useFrappeGetDoc } from "frappe-react-sdk"
 
-import {getCurrentFrappeUser} from "@/lib/frappe-auth"
-
-const data = {
+const navData = {
   user: {
     name: "Bala",
     email: "bala@novel.com",
@@ -42,123 +29,74 @@ const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
+      url: "/",
       icon: IconDashboard,
+      tooltip: "Dashboard",
     },
     {
-      title: "Lifecycle",
-      url: "#",
+      title: "Modules",
+      url: "/modules",
       icon: IconListDetails,
+      tooltip: "Modules",
     },
     {
       title: "Analytics",
       url: "#",
       icon: IconChartBar,
+      tooltip: "Analytics",
     },
     {
       title: "Projects",
       url: "#",
       icon: IconFolder,
+      tooltip: "Projects",
     },
     {
       title: "Team",
       url: "#",
       icon: IconUsers,
-    },
-  ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: IconCamera,
-      isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Proposal",
-      icon: IconFileDescription,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: IconFileAi,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Settings",
-      url: "#",
-      icon: IconSettings,
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: IconHelp,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconSearch,
-    },
-  ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: IconDatabase,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
+      tooltip: "Team",
     },
   ],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const user = getCurrentFrappeUser()
-  if (!user) {
-    return null
-  } else {
-    console.log(user)
-  }
+
+  const [userName, setUserName] = React.useState("")
+  const [isLoading, setIsLoading] = React.useState(true)
+  
+    const { currentUser} = useFrappeAuth()
+  
+    const { data, error: docError, isValidating } = useFrappeGetDoc(
+      "User",
+      currentUser ?? undefined,
+      {
+        fields: ["name", "full_name", "email", "image", "role"],
+      }
+    )
+     // async function to get user detials
+     async function getUserDetails() {
+      if (isValidating) {
+        setIsLoading(true)
+      }
+      if (data) {
+        const roles = data.roles
+        const isLMSAdmin = roles.some((role: { role: string }) => role.role === "LMS Student");        
+        // console.log(isLMSAdmin)
+        setUserName(data?.first_name)
+        setIsLoading(false)
+      }
+      if (docError) {
+        console.log(docError)
+      }
+      
+     }  
+    React.useEffect(() => {
+      getUserDetails()
+    }, [data, isValidating])
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
+    <div>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -175,14 +113,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+      {isLoading ? (
+      <div className="flex justify-center items-center h-full">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    ) : (
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={navData.navMain} />
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={data.user} />
-      </SidebarFooter>
+    )}
+    {!isLoading ? (
+          <SidebarFooter>
+          <NavUser user={navData.user} />
+        </SidebarFooter>
+    ) : (
+       <div></div>
+    )}
     </Sidebar>
+  </div>
   )
 }
