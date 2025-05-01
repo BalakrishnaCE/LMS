@@ -14,7 +14,7 @@ import {  useFrappeGetDocList } from "frappe-react-sdk"
 import { Progress } from "@/components/ui/progress"
 import { Link } from "wouter"
 
-function Modules (  ) {
+function Modules () {
     const { data: module_data, error: module_error, isValidating } = useFrappeGetDocList("LMS Module",
         {
           fields: ["name", "name1", "description", "is_published", "image"],

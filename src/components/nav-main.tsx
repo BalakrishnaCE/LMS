@@ -54,8 +54,8 @@ export function NavMain({
                   tooltip={item.tooltip}
                   className={
                     isActive
-                      ? "hover:text-white bg-primary/90"
-                      : "active:bg-primary/90 active:text-primary-foreground"
+                      ? "hover:text-white text-white bg-primary/90"
+                      : "active:bg-primary/90 active:text-primary-foreground hover:text-white"
                   }
                   onClick={() => {
                     if (item.url !== location) {

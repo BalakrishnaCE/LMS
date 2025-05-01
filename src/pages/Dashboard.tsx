@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useState } from "react"
 import { SectionCards } from "@/components/section-cards"
-import Module from "@/components/Modules"
+import Module from "@/pages/Modules"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Learners from "@/components/Learners"
 import { useFrappeAuth, useFrappeGetDoc } from "frappe-react-sdk"

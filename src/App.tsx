@@ -1,6 +1,6 @@
 import Layout from "@/app/layout"
 import Dashboard from "@/pages/Dashboard"
-import Modules from "./components/Modules";
+import Modules from "./pages/Modules";
 import ModuleDetail from "@/pages/ModuleDetail";
 import {LoginForm} from "@/components/LoginPage"
 import { NovelLMSFrappeProvider } from "./lib/frappe-provider";
