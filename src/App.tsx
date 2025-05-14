@@ -1,14 +1,13 @@
 import Layout from "@/app/layout"
-import Dashboard from "@/pages/Dashboard"
-import Modules from "./pages/Modules";
-import ModuleDetail from "@/pages/ModuleDetail";
+import Admindashboard from "@/pages/Dashboard/Admindashboard"
+import Module from "@/pages/Modules/Module";
+import ModuleDetail from "@/pages/Modules/ModuleDetail";
 import {LoginForm} from "@/components/LoginPage"
-import { NovelLMSFrappeProvider } from "./lib/frappe-provider";
-import {Switch, Link, Route} from "wouter"
+import { NovelLMSFrappeProvider } from "@/lib/frappe-provider";
+import {Switch, Route} from "wouter"
 import { Toaster } from "@/components/ui/sonner"
-
-
-
+import Learners from "@/pages/Learners/Learners";
+import ModuleEdit from "@/pages/ModuleEditor/ModuleEdit";
 
 function App() {
   return (
@@ -20,17 +19,28 @@ function App() {
         </Route>
         <Route path="/">
           <Layout>
-            <Dashboard />
+            <Admindashboard />
           </Layout>
         </Route>
         <Route path={"/modules"}>
           <Layout>
-            <Modules />
+            <Module />
           </Layout>
         </Route>
         <Route path="/module/:moduleName">
-          <Layout>
+          {/* <Layout> */}
             <ModuleDetail />
+          {/* </Layout> */}
+        </Route>
+        <Route path="/module/:moduleName/edit">
+          {/* <Layout> */}
+            <ModuleEdit />
+          {/* </Layout> */}
+        </Route>
+        
+        <Route path="/learners">
+          <Layout>
+            <Learners />
           </Layout>
         </Route>
         <Route path="/:rest*" >

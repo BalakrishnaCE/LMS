@@ -9,6 +9,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { navigate } from "wouter/use-browser-location"
+import { useFrappeGetDoc, useFrappeAuth } from "frappe-react-sdk"
+import { useState, useEffect } from "react"
 
 export function NavMain({
   items,
@@ -21,10 +23,16 @@ export function NavMain({
   }[]
 }) {
   const [location] = useLocation();
+  const { currentUser } = useFrappeAuth();
+  const { data: userData } = useFrappeGetDoc("User", currentUser || "", { fields: ["roles"] });
+  const isLMSAdmin = userData?.roles?.some((role: { role: string }) => role.role === "LMS Admin");
+  // console.log(isLMSStudent);
+
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
+          {isLMSAdmin && (
           <SidebarMenuItem className="flex items-center gap-2">
             <SidebarMenuButton
               tooltip="Quick Create"
@@ -43,6 +51,7 @@ export function NavMain({
               <span className="sr-only">Inbox</span>
             </Button>
           </SidebarMenuItem>
+          )}
         </SidebarMenu>
 
         <SidebarMenu>

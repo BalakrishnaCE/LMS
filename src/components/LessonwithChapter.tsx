@@ -1,12 +1,53 @@
-import { useFrappeGetDoc } from "frappe-react-sdk";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { useMemo } from "react";
 import { useEffect, useState } from "react";
+import Quiz from './Quiz';
+import { SlideContent } from "./SlideContent";
+import { useFrappeGetDoc } from "frappe-react-sdk";
+import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import QuestionAnswer from "@/components/QuestionAnswer";
+const contentStyles = `
+    .prose ul {
+        list-style-type: disc;
+        padding-left: 1.5em;
+        margin: 1em 0;
+    }
+    .prose ol {
+        list-style-type: disc;
+        padding-left: 1.5em;
+        margin: 1em 0;
+    }
+    .prose table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 1em 0;
+        overflow-x: auto;
+        display: block;
+    }
+    .prose table th,
+    .prose table td {
+        border: 1px solid #e2e8f0;
+        padding: 0.5em;
+        word-break: break-word;
+        white-space: normal;
+        max-width: 300px;
+    }
+    .prose table th {
+        background-color: #f8fafc;
+        font-weight: 600;
+    }
+`;
+
+export interface LessonWithChaptersProps {
+  lessonName: string;
+  onNext?: () => void;
+  onPrevious?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
+}
 
 export function useLessonDoc(lessonName: string) {
   const [data, setData] = useState<any>(null);
@@ -32,41 +73,112 @@ export function useLessonDoc(lessonName: string) {
   return { data, loading, error };
 }
 
+export function useChapterDoc(chapterName: string) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`http://10.80.4.72/api/resource/Chapter/${chapterName}`, {
+      credentials: 'include'
+    })
+      .then(res => res.json())
+      .then(res => {
+        setData(res.data);
+        setLoading(false);
+      })
+      .catch(e => {
+        setError(e);
+        setLoading(false);
+      });
+  }, [chapterName]);
+
+  return { data, loading, error };
+}
+
 function ContentRenderer({ contentType, contentReference }: { contentType: string, contentReference: string }) {
-  // Only fetch if both are present
   const { data: content, error, isValidating } = useFrappeGetDoc(contentType, contentReference);
 
   if (isValidating) return <div>Loading content...</div>;
   if (error) return <div>Error loading content</div>;
   if (!content) return null;
 
-  // Render based on type
-  switch (contentType) {
-    case "Text Content":
-      return (
-        <div
-          className="text-sm"
-          dangerouslySetInnerHTML={{ __html: content.body || content.value || "" }}
-        />
-      );
-    case "Image":
-      return <img src={content.image || content.url} alt="Content" className="max-w-full h-auto rounded-lg" />;
-    case "Video Content":
-      return <video src={"http://10.80.4.72"+content.video || content.url} controls className="max-w-full rounded-lg" />;
-    case "PDF":
-      return <iframe src={content.pdf || content.url} className="w-full h-96 rounded-lg" />;
-    // Add more cases as needed
-    default:
-      return <div>Unsupported content type: {contentType}</div>;
-  }
+  const renderContent = () => {
+    switch (contentType) {
+      case "Text Content":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn("text-sm prose")}
+            dangerouslySetInnerHTML={{ __html: content.body || content.value || "" }}
+          />
+        );
+      case "Image Content":
+        return (
+          <motion.img
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            src={"http://10.80.4.72"+content.attach}
+            alt="Content"
+            className="max-w-full h-auto rounded-lg shadow-lg"
+          />
+        );
+      case "Video Content":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative aspect-video"
+          >
+            <video
+              src={"http://10.80.4.72"+content.video || content.url}
+              controls
+              className="w-full h-full rounded-lg shadow-lg"
+            />
+          </motion.div>
+        );
+      case "PDF":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative aspect-[4/3]"
+          >
+            <iframe
+              src={content.pdf || content.url}
+              className="w-full h-full rounded-lg shadow-lg"
+            />
+          </motion.div>
+        );
+      case "Quiz":
+        return <Quiz quizReference={contentReference} />;
+      case "Slide Content":
+        return <SlideContent slideContentId={contentReference} />;
+      case "Question Answer":
+        return <QuestionAnswer questionAnswerId={contentReference} />;
+      default:
+        return <div>Unsupported content type: {contentType}</div>;
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="w-full"
+    >
+      {renderContent()}
+    </motion.div>
+  );
 }
 
-export function LessonWithChapters({ lessonName }: { lessonName: string }) {
-
+export function LessonWithChapters({ lessonName, onNext, onPrevious, isFirst, isLast }: LessonWithChaptersProps) {
   const { data: lesson, loading, error } = useLessonDoc(lessonName);
+  const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
 
-  console.log("LessonWithChapters", lessonName, lesson);
-  // Move useMemo BEFORE any return
   const sortedChapters = useMemo(
     () => (lesson?.chapters || []).sort((a: { order: number }, b: { order: number }) => a.order - b.order),
     [lesson?.chapters]
@@ -76,54 +188,130 @@ export function LessonWithChapters({ lessonName }: { lessonName: string }) {
   if (error) return <div>Error loading lesson</div>;
   if (!lesson) return null;
 
+  const currentChapter = sortedChapters[currentChapterIndex];
+  const isLastChapter = currentChapterIndex === sortedChapters.length - 1;
+  const isFirstChapter = currentChapterIndex === 0;
+
+  const handleNextChapter = () => {
+    if (!isLastChapter) {
+      setCurrentChapterIndex(prev => prev + 1);
+    } else if (onNext) {
+      onNext();
+    }
+  };
+
+  const handlePreviousChapter = () => {
+    if (!isFirstChapter) {
+      setCurrentChapterIndex(prev => prev - 1);
+    } else if (onPrevious) {
+      onPrevious();
+    }
+  };
+
   return (
-    <AccordionItem value={lesson.name}>
-      <AccordionTrigger>
-        <span>{lesson.lesson_name}</span>
-      </AccordionTrigger>
-      <AccordionContent>
-        <div className="mb-2 text-muted-foreground">{lesson.description}</div>
-        <Accordion type="single" collapsible className="w-full">
-          {sortedChapters.map((chapter: { chapter: string }) => (
-            <ChapterWithContents key={chapter.chapter} chapterName={chapter.chapter} />
-          ))}
-        </Accordion>
-      </AccordionContent>
-    </AccordionItem>
+    <div className="space-y-6">
+      <style>{contentStyles}</style>
+      
+      {/* Lesson Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold">{lesson.lesson_name}</CardTitle>
+            <div className="prose prose-sm mt-2 text-muted-foreground" dangerouslySetInnerHTML={{ __html: lesson.description }} />
+          </CardHeader>
+        </Card>
+      </motion.div>
+
+      {/* Current Chapter */}
+      <AnimatePresence>
+        {currentChapter && (
+          <motion.div
+            key={currentChapter.chapter}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChapterWithContents 
+              chapterName={currentChapter.chapter} 
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Navigation Buttons */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-between items-center mt-6"
+      >
+        <Button
+          variant="outline"
+          onClick={handlePreviousChapter}
+          disabled={isFirstChapter && isFirst}
+          className="gap-2 hover:bg-primary/10"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
+        <div className="text-sm text-muted-foreground">
+          Chapter {currentChapterIndex + 1} of {sortedChapters.length}
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleNextChapter}
+          disabled={isLastChapter && isLast}
+          className="gap-2 hover:bg-primary/10"
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </motion.div>
+    </div>
   );
 }
 
-// --- ChapterWithContents component ---
 function ChapterWithContents({ chapterName }: { chapterName: string }) {
-  const { data: chapter, error, isValidating } = useFrappeGetDoc("Chapter", chapterName, {
-    fields: ["name", "title", "scoring", "contents"],
-  });
+  const { data: chapter, loading, error } = useChapterDoc(chapterName);
 
-  if (isValidating) return <div>Loading chapter...</div>;
+  if (loading) return <div>Loading chapter...</div>;
   if (error) return <div>Error loading chapter</div>;
   if (!chapter) return null;
 
   const sortedContents = (chapter.contents || []).sort((a: { order: number }, b: { order: number }) => a.order - b.order);
 
   return (
-    <AccordionItem value={chapter.name}>
-      <AccordionTrigger>
-        <span>{chapter.title}</span>
-        {chapter.scoring ? <span className="ml-2 text-xs text-primary">{chapter.scoring} pts</span> : null}
-      </AccordionTrigger>
-      <AccordionContent>
-        <div className="space-y-4">
-          {sortedContents.map((content: any) => (
-            <div key={content.content_reference} >
+    <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold">
+          {chapter.title}
+          {/* {chapter.scoring && (
+            <span className="ml-2 text-sm text-primary ">{chapter.scoring} pts</span>
+          )} */}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <AnimatePresence>
+          {sortedContents.map((content: any, index: number) => (
+            <motion.div
+              key={content.content_reference}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="rounded-lg overflow-hidden"
+            >
               <ContentRenderer
                 contentType={content.content_type}
                 contentReference={content.content_reference}
               />
-            </div>
+            </motion.div>
           ))}
-        </div>
-      </AccordionContent>
-    </AccordionItem>
+        </AnimatePresence>
+      </CardContent>
+    </Card>
   );
 }
 

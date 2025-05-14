@@ -1,13 +1,14 @@
 import * as React from "react"
 import { useState } from "react"
-import { SectionCards } from "@/components/section-cards"
-import Module from "@/pages/Modules"
+import { AdminDashboardCards } from "@/components/AdminDashboardCards"
+import Module from "@/pages/Modules/Modules"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Learners from "@/components/Learners"
+import Learners from "@/pages/Learners/Learners"
+import { Spinner } from '@/components/ui/spinner';
 import { useFrappeAuth, useFrappeGetDoc } from "frappe-react-sdk"
 
 
-function Dashboard() {
+function Admindashboard() {
     const [userName, setUserName] = React.useState("")
     const [isLoading, setIsLoading] = React.useState(true)
       const { currentUser} = useFrappeAuth()
@@ -42,20 +43,22 @@ function Dashboard() {
   return (
     <div className="flex flex-1 flex-col">
       {isLoading ? (
-      <div className="flex justify-center items-center h-full">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-900"></div>
-      </div>
+      <div className="text-center flex justify-center items-center h-full ">
+      <Spinner size="small" />
+    {/* <Spinner size="medium" /> */}
+    {/* <Spinner size="large" /> */}
+    </div>
     ) : (
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              <SectionCards />
+              <AdminDashboardCards />
               <div className="px-4 lg:px-6 @xl/main:px-8 @5xl/main:px-10 @container/main:px-12 w-full mt-4">
               <Tabs defaultValue="module" >
                 <TabsList className="w-1/2 mb-2">
                   <TabsTrigger value="module" >Module</TabsTrigger>
                   <TabsTrigger value="learners" >Learners</TabsTrigger>
                 </TabsList>
-                <TabsContent value="module"><Module /></TabsContent>
+                <TabsContent value="module"><Module itemsPerPage={5} /></TabsContent>
                 <TabsContent value="learners"><Learners/></TabsContent>
               </Tabs>
               </div>
@@ -66,4 +69,4 @@ function Dashboard() {
   )
 }
 
-export default Dashboard
+export default Admindashboard

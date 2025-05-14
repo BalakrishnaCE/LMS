@@ -18,6 +18,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { Spinner } from '@/components/ui/spinner';
 import { useFrappeAuth, useFrappeGetDoc } from "frappe-react-sdk"
 
 const navData = {
@@ -52,10 +53,10 @@ const navData = {
       tooltip: "Projects",
     },
     {
-      title: "Team",
-      url: "#",
+      title: "Learners",
+      url: "/learners",
       icon: IconUsers,
-      tooltip: "Team",
+      tooltip: "Learners",
     },
   ],
 }
@@ -83,6 +84,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         const roles = data.roles
         const isLMSAdmin = roles.some((role: { role: string }) => role.role === "LMS Student");        
         // console.log(isLMSAdmin)
+        navData.user.name = data?.first_name
+        navData.user.email = data?.email
+        navData.user.avatar = data?.image
+        if (data?.image) {
+          navData.user.avatar = data?.image
+        } else {
+          navData.user.avatar = "/avatars/shadcn.jpg"
+        }
+
         setUserName(data?.first_name)
         setIsLoading(false)
       }
@@ -105,7 +115,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
               {/* on hover of this i want the text color to be white */}
-              <a href="#" className="hover:text-white">
+              <a href="/" className="hover:text-white">
                 <IconBook className="!size-5" />
                 <span className="text-base font-semibold">Novel LMS</span>
               </a>            
@@ -114,8 +124,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       {isLoading ? (
-      <div className="flex justify-center items-center h-full">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-900"></div>
+      <div className="text-center flex justify-center items-center h-full">
+        <Spinner size="small" />
+      {/* <Spinner size="medium" /> */}
+      {/* <Spinner size="large" /> */}
       </div>
     ) : (
       <SidebarContent>
