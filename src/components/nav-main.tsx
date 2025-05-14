@@ -9,8 +9,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { navigate } from "wouter/use-browser-location"
-import { useFrappeGetDoc, useFrappeAuth } from "frappe-react-sdk"
-import { useState, useEffect } from "react"
+import { useUser } from "@/hooks/use-user"
 
 export function NavMain({
   items,
@@ -23,10 +22,7 @@ export function NavMain({
   }[]
 }) {
   const [location] = useLocation();
-  const { currentUser } = useFrappeAuth();
-  const { data: userData } = useFrappeGetDoc("User", currentUser || "", { fields: ["roles"] });
-  const isLMSAdmin = userData?.roles?.some((role: { role: string }) => role.role === "LMS Admin");
-  // console.log(isLMSStudent);
+  const { isLMSAdmin } = useUser();
 
   return (
     <SidebarGroup>

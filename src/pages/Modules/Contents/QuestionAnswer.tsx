@@ -1,33 +1,11 @@
 import React, { useState, useEffect } from "react";
 import * as Dialog from '@radix-ui/react-dialog';
-import { Button } from "@/components/ui/button";
-import RichEditor from "@/components/RichEditor";
+import { Button } from '@/components/ui/button';
+import RichEditor from '@/components/RichEditor';
 
 interface QuestionAnswerProps {
   questionAnswerId: string;
 }
-
-// Example data structure (replace with real fetch in future)
-const exampleData = {
-  id: "nagjrolnjc",
-  title: "Test Question",
-  description: "<div class='ql-editor read-mode'><p>Describe something</p></div>",
-  max_score: 20,
-  questions: [
-    {
-      id: "nag43qbacj",
-      question: "How to do this?",
-      score: 10,
-      suggested_answer: "<div class='ql-editor read-mode'><p>this can be done like this</p></div>"
-    },
-    {
-      id: "ntd90270ve",
-      question: "what is this",
-      score: 10,
-      suggested_answer: "<div class='ql-editor read-mode'><p>this is that </p></div>"
-    }
-  ]
-};
 
 const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => {
   const [open, setOpen] = useState(false);

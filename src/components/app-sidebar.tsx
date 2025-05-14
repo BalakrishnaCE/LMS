@@ -19,7 +19,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { Spinner } from '@/components/ui/spinner';
-import { useFrappeAuth, useFrappeGetDoc } from "frappe-react-sdk"
+import { useUser } from "@/hooks/use-user"
 
 const navData = {
   user: {
@@ -62,48 +62,15 @@ const navData = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useUser();
+  React.useEffect(() => {
+    if (user) {
+      navData.user.name = user.full_name;
+      navData.user.email = user.email;
+      navData.user.avatar = user.image || "/avatars/shadcn.jpg";
+    }
+  }, [user]);
 
-  const [userName, setUserName] = React.useState("")
-  const [isLoading, setIsLoading] = React.useState(true)
-  
-    const { currentUser} = useFrappeAuth()
-  
-    const { data, error: docError, isValidating } = useFrappeGetDoc(
-      "User",
-      currentUser ?? undefined,
-      {
-        fields: ["name", "full_name", "email", "image", "role"],
-      }
-    )
-     // async function to get user detials
-     async function getUserDetails() {
-      if (isValidating) {
-        setIsLoading(true)
-      }
-      if (data) {
-        const roles = data.roles
-        const isLMSAdmin = roles.some((role: { role: string }) => role.role === "LMS Student");        
-        // console.log(isLMSAdmin)
-        navData.user.name = data?.first_name
-        navData.user.email = data?.email
-        navData.user.avatar = data?.image
-        if (data?.image) {
-          navData.user.avatar = data?.image
-        } else {
-          navData.user.avatar = "/avatars/shadcn.jpg"
-        }
-
-        setUserName(data?.first_name)
-        setIsLoading(false)
-      }
-      if (docError) {
-        console.log(docError)
-      }
-      
-     }  
-    React.useEffect(() => {
-      getUserDetails()
-    }, [data, isValidating])
   return (
     <div>
     <Sidebar collapsible="icon" {...props}>
@@ -123,24 +90,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      {isLoading ? (
-      <div className="text-center flex justify-center items-center h-full">
-        <Spinner size="small" />
-      {/* <Spinner size="medium" /> */}
-      {/* <Spinner size="large" /> */}
-      </div>
-    ) : (
       <SidebarContent>
         <NavMain items={navData.navMain} />
       </SidebarContent>
-    )}
-    {!isLoading ? (
-          <SidebarFooter>
-          <NavUser user={navData.user} />
-        </SidebarFooter>
-    ) : (
-       <div></div>
-    )}
+      <SidebarFooter>
+        <NavUser user={navData.user} />
+      </SidebarFooter>
     </Sidebar>
   </div>
   )

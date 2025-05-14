@@ -1,7 +1,7 @@
 import { useFrappeGetDoc } from "frappe-react-sdk";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 
-export function SlideContent({ slideContentId }: { slideContentId: string }) {
+function SlideContent({ slideContentId }: { slideContentId: string }) {
   const { data: slideContentData, error, isValidating } = useFrappeGetDoc("Slide Content", slideContentId);
 
   if (isValidating) return <div>Loading slides...</div>;
@@ -37,3 +37,5 @@ export function SlideContent({ slideContentId }: { slideContentId: string }) {
     </div>
   );
 }
+
+export default SlideContent;

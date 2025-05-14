@@ -1,14 +1,18 @@
 import { useMemo } from "react";
 import { useEffect, useState } from "react";
-import Quiz from './Quiz';
-import { SlideContent } from "./SlideContent";
+import Quiz from './Contents/Quiz';
+import QuestionAnswer from './Contents/QuestionAnswer';
+import SlideContent from './Contents/SlideContent';
+import FileAttachContent from './Contents/FileAttachContent';
 import { useFrappeGetDoc } from "frappe-react-sdk";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import QuestionAnswer from "@/components/QuestionAnswer";
+import StepsContent from './Contents/StepsContent';
+import CheckListContent from './Contents/CheckListContent';
+import AccordionContent from './Contents/AccordionContent';
 const contentStyles = `
     .prose ul {
         list-style-type: disc;
@@ -47,6 +51,7 @@ export interface LessonWithChaptersProps {
   onPrevious?: () => void;
   isFirst?: boolean;
   isLast?: boolean;
+  activeChapterId?: string | null;
 }
 
 export function useLessonDoc(lessonName: string) {
@@ -139,25 +144,34 @@ function ContentRenderer({ contentType, contentReference }: { contentType: strin
             />
           </motion.div>
         );
-      case "PDF":
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative aspect-[4/3]"
-          >
-            <iframe
-              src={content.pdf || content.url}
-              className="w-full h-full rounded-lg shadow-lg"
-            />
-          </motion.div>
-        );
       case "Quiz":
         return <Quiz quizReference={contentReference} />;
       case "Slide Content":
         return <SlideContent slideContentId={contentReference} />;
       case "Question Answer":
         return <QuestionAnswer questionAnswerId={contentReference} />;
+      case "Steps":
+        return <StepsContent content={content} />;
+      case "Check List":
+        return <CheckListContent content={content} />;
+      case "File Attach":
+        return <FileAttachContent content={content} />;
+      case "Iframe Content":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative aspect-[4/3]"
+          >
+            <div className="font-semibold text-lg mb-2 text-center">{content.title}</div>
+            <iframe
+              src={content.url}
+              className="w-full h-full rounded-lg shadow-lg"
+            />
+          </motion.div>
+        );
+      case "Accordion Content":
+        return <AccordionContent content={content} />;
       default:
         return <div>Unsupported content type: {contentType}</div>;
     }
@@ -175,7 +189,7 @@ function ContentRenderer({ contentType, contentReference }: { contentType: strin
   );
 }
 
-export function LessonWithChapters({ lessonName, onNext, onPrevious, isFirst, isLast }: LessonWithChaptersProps) {
+export function LessonWithChapters({ lessonName, onNext, onPrevious, isFirst, isLast, activeChapterId }: LessonWithChaptersProps) {
   const { data: lesson, loading, error } = useLessonDoc(lessonName);
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
 
@@ -183,6 +197,15 @@ export function LessonWithChapters({ lessonName, onNext, onPrevious, isFirst, is
     () => (lesson?.chapters || []).sort((a: { order: number }, b: { order: number }) => a.order - b.order),
     [lesson?.chapters]
   );
+
+  useEffect(() => {
+    if (activeChapterId && sortedChapters) {
+      const index = sortedChapters.findIndex((chapter: any) => chapter.chapter === activeChapterId);
+      if (index !== -1) {
+        setCurrentChapterIndex(index);
+      }
+    }
+  }, [activeChapterId, sortedChapters]);
 
   if (loading) return <div>Loading lesson...</div>;
   if (error) return <div>Error loading lesson</div>;

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useFrappeGetDoc } from 'frappe-react-sdk';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 // import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Label } from './ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import * as Dialog from '@radix-ui/react-dialog';
 
 interface QuizProps {

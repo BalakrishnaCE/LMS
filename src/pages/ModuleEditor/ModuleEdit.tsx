@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import RichEditor from "@/components/RichEditor";
 import { ArrowLeft, BookOpen } from "lucide-react";
-import { useLessonDoc, useChapterDoc } from "@/components/LessonwithChapter";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ModuleSidebar from "./ModuleSidebar";
 import ModuleMainEditor from "./ModuleMainEditor";
@@ -57,14 +56,14 @@ export default function ModuleEdit() {
     const lessons = useMemo(() => editModule?.lessons || [], [editModule]);
     const selectedLesson = lessons[selectedLessonIdx];
 
-    // Fetch lesson details using useLessonDoc
+    // Fetch lesson details using useFrappeGetDoc
     const lessonName = selectedLesson?.lesson;
-    const { data: lessonDetailsData, loading: lessonLoading, error: lessonError } = useLessonDoc(lessonName);
+    const { data: lessonDetailsData, isLoading: lessonLoading, error: lessonError } = useFrappeGetDoc('Lesson', lessonName);
     const chapters = lessonDetailsData?.chapters || [];
 
     // Fetch chapter details for the first chapter as an example
     const firstChapterName = chapters[0]?.chapter;
-    const { data: chapterDetails, loading: chapterLoading, error: chapterError } = useChapterDoc(firstChapterName);
+    const { data: chapterDetails, isLoading: chapterLoading, error: chapterError } = useFrappeGetDoc('Chapter', firstChapterName);
     const contents = chapterDetails?.contents || [];
 
     // Fetch lesson details when lessons change
@@ -136,8 +135,94 @@ export default function ModuleEdit() {
         setUnsaved(true);
     };
 
-    // Placeholder: Add, Edit, Delete, Reorder logic for lessons/chapters/content
-    // These would open modals or use drag-and-drop in a full implementation
+    // Handle lesson reordering
+    const handleReorderLessons = (fromIdx: number, toIdx: number) => {
+        if (!editModule) return;
+        const newLessons = [...editModule.lessons];
+        const [movedLesson] = newLessons.splice(fromIdx, 1);
+        newLessons.splice(toIdx, 0, movedLesson);
+        
+        // Update order numbers
+        const updatedLessons = newLessons.map((lesson, idx) => ({
+            ...lesson,
+            order: idx + 1
+        }));
+
+        setEditModule({ ...editModule, lessons: updatedLessons });
+        setUnsaved(true);
+    };
+
+    // Handle chapter reordering
+    const handleReorderChapters = async (lessonId: string, fromIdx: number, toIdx: number) => {
+        if (!editModule) return;
+        
+        try {
+            // Get the current lesson details from state
+            const currentLessonDetails = lessonDetails[lessonId];
+            if (!currentLessonDetails) return;
+
+            // Create a new array of chapters and reorder
+            const chapters = [...currentLessonDetails.chapters];
+            const [movedChapter] = chapters.splice(fromIdx, 1);
+            chapters.splice(toIdx, 0, movedChapter);
+
+            // Update order numbers
+            const updatedChapters = chapters.map((chapter: any, idx: number) => ({
+                ...chapter,
+                order: idx + 1
+            }));
+
+            // Update the lesson with new chapter order
+            await updateDoc("Lesson", lessonId, {
+                chapters: updatedChapters
+            });
+
+            // Update local state immediately for better UX
+            const updatedLessonDetails = {
+                ...currentLessonDetails,
+                chapters: updatedChapters
+            };
+
+            setLessonDetails(prev => ({
+                ...prev,
+                [lessonId]: updatedLessonDetails
+            }));
+
+            // Update chapter details in sidebar
+            const updatedChapterDetails = { ...chapterDetailsSidebar };
+            for (const chapter of updatedChapters) {
+                if (updatedChapterDetails[chapter.chapter]) {
+                    updatedChapterDetails[chapter.chapter] = {
+                        ...updatedChapterDetails[chapter.chapter],
+                        order: chapter.order
+                    };
+                }
+            }
+            setChapterDetailsSidebar(updatedChapterDetails);
+
+            // If the moved chapter was the active one, update its index
+            if (activeChapterId === movedChapter.chapter) {
+                setSelectedChapterIdx(toIdx);
+            }
+
+            // Refresh lesson details from server to ensure consistency
+            const serverLessonDetails = await fetch(`http://10.80.4.72/api/resource/Lesson/${lessonId}`, {
+                credentials: 'include'
+            }).then(res => res.json());
+            
+            if (serverLessonDetails.data) {
+                setLessonDetails(prev => ({
+                    ...prev,
+                    [lessonId]: serverLessonDetails.data
+                }));
+            }
+
+            setUnsaved(true);
+        } catch (error) {
+            console.error('Error updating chapter order:', error);
+            // Optionally show an error toast here
+        }
+    };
 
     // Save handler using frappe-react-sdk
     const handleSave = async () => {
@@ -149,6 +234,7 @@ export default function ModuleEdit() {
                 description: editModule.description,
                 is_published: editModule.is_published,
                 image: editModule.image,
+                lessons: editModule.lessons
             });
             setUnsaved(false);
         } catch (e) {
@@ -218,6 +304,7 @@ export default function ModuleEdit() {
                 chapterDetailsSidebar={chapterDetailsSidebar}
                 handleChapterClick={handleChapterClick}
                 setShowLessonModal={setShowLessonModal}
+                onReorderLessons={handleReorderLessons}
             />
             {/* Main Content: Chapter Editor */}
             <main className="flex-1 p-8 overflow-y-auto">

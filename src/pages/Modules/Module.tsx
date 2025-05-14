@@ -1,4 +1,4 @@
-import { useFrappeGetDocList } from "frappe-react-sdk"
+import { useFrappeGetDocList, useFrappeGetDocCount } from "frappe-react-sdk"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Link } from "wouter"
@@ -10,28 +10,65 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend
+  Cell
 } from 'recharts';
 import Modules from "@/pages/Modules/Modules";
+import { useEffect, useState } from "react";
 
 function Module() {
     const { data: modules, error, isValidating } = useFrappeGetDocList("LMS Module", {
         fields: ["name", "name1", "description", "is_published", "image"],
     });
 
+    // Get total count of modules
+    const { data: totalCount } = useFrappeGetDocCount("LMS Module");
+    
+    // Get count of published modules
+    const { data: publishedCount } = useFrappeGetDocCount("LMS Module", [
+        ["is_published", "=", 1]
+    ]);
+    
+    // Get count of draft modules
+    const { data: draftCount } = useFrappeGetDocCount("LMS Module", [
+        ["is_published", "=", 0]
+    ]);
+
+    // Dynamically get CSS variable colors
+    const [colors, setColors] = useState({
+        primary: '#0ea5e9', // fallback Tailwind blue-500
+        published: '#22c55e', // fallback Tailwind green-500 for published
+        draft: '#9ca3af'    // Tailwind gray-400 for draft
+    });
+
+    useEffect(() => {
+        setColors({
+            primary: getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#0ea5e9',
+            published: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#22c55e',
+            draft: '#9ca3af'
+        });
+    }, []);
+
     // Prepare data for the chart
     const chartData = [
         {
+            name: 'Total',
+            value: totalCount || 0,
+            fill: colors.primary,
+        },
+        {
             name: 'Published',
-            value: modules?.filter(m => m.is_published === 1).length || 0,
-            fill: '#22c55e'
+            value: publishedCount || 0,
+            fill: colors.published,
         },
         {
             name: 'Draft',
-            value: modules?.filter(m => m.is_published === 0).length || 0,
-            fill: '#64748b'
+            value: draftCount || 0,
+            fill: colors.draft,
         }
     ];
+
+    if (error) return <div>Error loading modules</div>;
+    if (isValidating) return <div>Loading...</div>;
 
     return (
         <div className="p-4">
@@ -59,13 +96,25 @@ function Module() {
                                         left: 20,
                                         bottom: 5,
                                     }}
+                                    barCategoryGap={30}
                                 >
                                     <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Bar dataKey="value" fill="#8884d8" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 16 }} />
+                                    <YAxis tick={{ fontSize: 16 }} />
+                                    <Tooltip
+                                        contentStyle={{ fontSize: 16, borderRadius: 8 }}
+                                        labelStyle={{ fontWeight: 'bold' }}
+                                    />
+                                    <Bar
+                                        dataKey="value"
+                                        radius={[8, 8, 0, 0]}
+                                        label={{ position: 'top', fontSize: 16, fill: '#333' }}
+                                        isAnimationActive={true}
+                                    >
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -81,18 +130,20 @@ function Module() {
                         <div className="space-y-4">
                             <div>
                                 <h3 className="text-sm font-medium">Total Modules</h3>
-                                <p className="text-2xl font-bold">{modules?.length || 0}</p>
+                                <p className="text-2xl font-bold" style={{ color: colors.primary }}>
+                                    {totalCount || 0}
+                                </p>
                             </div>
                             <div>
                                 <h3 className="text-sm font-medium">Published Modules</h3>
-                                <p className="text-2xl font-bold text-green-600">
-                                    {modules?.filter(m => m.is_published === 1).length || 0}
+                                <p className="text-2xl font-bold" style={{ color: colors.published }}>
+                                    {publishedCount || 0}
                                 </p>
                             </div>
                             <div>
                                 <h3 className="text-sm font-medium">Draft Modules</h3>
-                                <p className="text-2xl font-bold text-gray-600">
-                                    {modules?.filter(m => m.is_published === 0).length || 0}
+                                <p className="text-2xl font-bold" style={{ color: colors.draft }}>
+                                    {draftCount || 0}
                                 </p>
                             </div>
                         </div>

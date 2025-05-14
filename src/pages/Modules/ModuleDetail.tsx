@@ -7,12 +7,13 @@ import {
     CardTitle,
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { LessonWithChapters } from "@/components/LessonwithChapter"
+import { LessonWithChapters } from "@/pages/Modules/LessonwithChapter"
 import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button"
 import { ChevronRight, ChevronLeft, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
+import { useUser } from "@/hooks/use-user"
 
 // Add custom styles for the content
 const contentStyles = `
@@ -52,6 +53,10 @@ interface Lesson {
     order: number;
     lessonDetails?: {
         lesson_name: string;
+        chapters?: Array<{
+            chapter: string;
+            order: number;
+        }>;
     };
 }
 
@@ -65,26 +70,17 @@ export default function ModuleDetail() {
     const [enableEditing, setEnableEditing] = useState(false);
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const [lessonDetails, setLessonDetails] = useState<Record<string, any>>({});
+    const [chapterDetailsSidebar, setChapterDetailsSidebar] = useState<Record<string, any>>({});
+    const [selectedChapterIdx, setSelectedChapterIdx] = useState<number | null>(null);
+    const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
     const params = useParams();
     const moduleName = params.moduleName;
 
-    const { currentUser } = useFrappeAuth();
-
-    const { data: userData } = useFrappeGetDoc(
-        "User",
-        currentUser ?? undefined,
-        {
-            fields: ["name", "full_name", "email", "image", "role"],
-        }
-    );
+    const { isLMSAdmin, isLMSContentEditor } = useUser();
 
     useEffect(() => {
-        if (userData) {
-            const roles = userData.roles;
-            const isLMSAdmin = roles.some((role: { role: string }) => role.role === "LMS Student");
-            setEnableEditing(isLMSAdmin);
-        }
-    }, [userData]);
+        setEnableEditing(isLMSAdmin || isLMSContentEditor);
+    }, [isLMSAdmin, isLMSContentEditor]);
 
     const { data: module, error, isValidating } = useFrappeGetDoc("LMS Module", moduleName, {
         fields: ["name", "name1", "description", "is_published", "image", "lessons", "total_score", "has_scoring", "has_progress"]
@@ -93,6 +89,18 @@ export default function ModuleDetail() {
     const sortedLessons = useMemo(() => {
         return (module?.lessons || []).sort((a: ModuleLesson, b: ModuleLesson) => a.order - b.order);
     }, [module?.lessons]);
+
+    const currentLesson = sortedLessons[currentLessonIndex];
+    const isLastLesson = currentLessonIndex === sortedLessons.length - 1;
+    const isFirstLesson = currentLessonIndex === 0;
+
+    // Combine lesson data with their details
+    const lessonsWithDetails = useMemo(() => {
+        return sortedLessons.map((lesson: ModuleLesson) => ({
+            ...lesson,
+            lessonDetails: lessonDetails[lesson.lesson]
+        }));
+    }, [sortedLessons, lessonDetails]);
 
     // Fetch lesson details when sortedLessons changes
     useEffect(() => {
@@ -117,21 +125,60 @@ export default function ModuleDetail() {
         }
     }, [sortedLessons]);
 
-    // Combine lesson data with their details
-    const lessonsWithDetails = useMemo(() => {
-        return sortedLessons.map((lesson: ModuleLesson) => ({
-            ...lesson,
-            lessonDetails: lessonDetails[lesson.lesson]
-        }));
-    }, [sortedLessons, lessonDetails]);
+    // Fetch chapter details for the selected lesson
+    useEffect(() => {
+        let isCurrent = true;
+        if (!currentLesson || !currentLesson.lesson) {
+            setChapterDetailsSidebar({});
+            setActiveChapterId(null);
+            return;
+        }
+        const fetchChapterDetails = async () => {
+            const chapters = lessonDetails[currentLesson.lesson]?.chapters;
+            if (!chapters) {
+                setChapterDetailsSidebar({});
+                setActiveChapterId(null);
+                return;
+            }
+            const details: Record<string, any> = {};
+            for (const chapter of chapters) {
+                try {
+                    const response = await fetch(`http://10.80.4.72/api/resource/Chapter/${chapter.chapter}`, {
+                        credentials: 'include'
+                    });
+                    const data = await response.json();
+                    if (!isCurrent) return;
+                    details[chapter.chapter] = data.data;
+                } catch (error) {}
+            }
+            if (isCurrent) setChapterDetailsSidebar(details);
+        };
+        fetchChapterDetails();
+        return () => { isCurrent = false; };
+    }, [currentLesson, lessonDetails]);
+
+    // Auto-select first chapter when lessonDetails for selected lesson is loaded
+    useEffect(() => {
+        if (currentLesson && lessonDetails[currentLesson.lesson]?.chapters?.length > 0) {
+            const firstChapter = lessonDetails[currentLesson.lesson].chapters[0];
+            setActiveChapter(firstChapter.chapter, 0);
+        }
+    }, [currentLesson, lessonDetails]);
+
+    // Helper to set both active chapter and selected chapter index
+    const setActiveChapter = (chapterId: string, cidx: number | null = null) => {
+        setActiveChapterId(chapterId);
+        if (cidx !== null) setSelectedChapterIdx(cidx);
+    };
+
+    // Sidebar chapter click handler
+    const handleChapterClick = (chapterId: string, cidx: number) => {
+        setActiveChapter(chapterId, cidx);
+    };
 
     if (error) return <div>Error loading module</div>;
     if (isValidating) return <div>Loading...</div>;
     if (!module) return <div>Module not found</div>;
-
-    const currentLesson = sortedLessons[currentLessonIndex];
-    const isLastLesson = currentLessonIndex === sortedLessons.length - 1;
-    const isFirstLesson = currentLessonIndex === 0;
 
     const handleNext = () => {
         if (!isLastLesson) {
@@ -244,7 +291,7 @@ export default function ModuleDetail() {
                     {/* Lesson Navigation */}
                     <div className="space-y-2">
                         <h2 className="text-sm font-semibold">Lessons</h2>
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                             {lessonsWithDetails.map((lesson: Lesson, index: number) => (
                                 <motion.div
                                     key={lesson.lesson}
@@ -252,14 +299,41 @@ export default function ModuleDetail() {
                                     animate={{ x: 0, opacity: 1 }}
                                     transition={{ delay: index * 0.1 }}
                                     className={cn(
-                                        "text-sm p-2 rounded-md cursor-pointer transition-all duration-200",
+                                        "rounded-lg transition-all duration-200",
                                         index === currentLessonIndex
-                                            ? "bg-primary/10 text-primary font-medium"
+                                            ? "bg-primary/10"
                                             : "hover:bg-muted/50"
                                     )}
-                                    onClick={() => setCurrentLessonIndex(index)}
                                 >
-                                    {lesson.lessonDetails?.lesson_name || `Lesson ${index + 1}`}
+                                    <div
+                                        className={cn(
+                                            "text-sm p-2 rounded-lg cursor-pointer font-medium",
+                                            index === currentLessonIndex
+                                                ? "text-primary"
+                                                : "text-foreground"
+                                        )}
+                                        onClick={() => setCurrentLessonIndex(index)}
+                                    >
+                                        {lesson.lessonDetails?.lesson_name || `Lesson ${index + 1}`}
+                                    </div>
+                                    {index === currentLessonIndex && lesson.lessonDetails?.chapters && (
+                                        <div className="pl-4 pb-2 space-y-1">
+                                            {lesson.lessonDetails.chapters.map((chapter: any, cidx: number) => (
+                                                <div
+                                                    key={chapter.chapter}
+                                                    className={cn(
+                                                        "text-sm p-2 rounded-md cursor-pointer transition-all duration-200",
+                                                        cidx === selectedChapterIdx
+                                                            ? "bg-primary/20 text-primary font-medium"
+                                                            : "text-muted-foreground hover:bg-primary/5 hover:text-foreground"
+                                                    )}
+                                                    onClick={() => handleChapterClick(chapter.chapter, cidx)}
+                                                >
+                                                    {chapterDetailsSidebar[chapter.chapter]?.title || `Chapter ${cidx + 1}`}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </motion.div>
                             ))}
                         </div>
@@ -297,6 +371,7 @@ export default function ModuleDetail() {
                                 onPrevious={handlePrevious}
                                 isFirst={isFirstLesson}
                                 isLast={isLastLesson}
+                                activeChapterId={activeChapterId}
                             />
                         </motion.div>
                     )}
