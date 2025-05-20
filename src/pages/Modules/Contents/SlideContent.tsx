@@ -1,5 +1,6 @@
 import { useFrappeGetDoc } from "frappe-react-sdk";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Link } from 'wouter';
 
 function SlideContent({ slideContentId }: { slideContentId: string }) {
   const { data: slideContentData, error, isValidating } = useFrappeGetDoc("Slide Content", slideContentId);
@@ -22,9 +23,9 @@ function SlideContent({ slideContentId }: { slideContentId: string }) {
                   {item.image && <img src={"http://10.80.4.72/"+item.image} alt={item.heading} className="my-2 max-w-full" />}
                   <p>{item.description}</p>
                   {item.url && (
-                    <a href={"http://10.80.4.72/"+item.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                    <Link href={"http://10.80.4.72/"+item.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
                       More
-                    </a>
+                    </Link>
                   )}
                 </div>
               </CarouselItem>

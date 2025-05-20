@@ -10,7 +10,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { Italic } from 'reactjs-tiptap-editor/italic';
 import { Link } from 'reactjs-tiptap-editor/link';
 import { Table } from 'reactjs-tiptap-editor/table';
-// import { TextBubble } from 'reactjs-tiptap-editor/textbubble'; 
+import { TextBubble } from 'reactjs-tiptap-editor/textbubble'; 
 import { FormatPainter } from 'reactjs-tiptap-editor/formatpainter'; 
 import { FontSize } from 'reactjs-tiptap-editor/fontsize'; 
 import { Highlight } from 'reactjs-tiptap-editor/highlight';
@@ -25,7 +25,11 @@ import { ColumnActionButton } from 'reactjs-tiptap-editor/multicolumn';
 import { OrderedList } from 'reactjs-tiptap-editor/orderedlist'; 
 import { Selection } from 'reactjs-tiptap-editor/selection'; 
 import { TextUnderline } from 'reactjs-tiptap-editor/textunderline'; 
-
+import { TextAlign } from 'reactjs-tiptap-editor/textalign'; 
+import { Mermaid } from 'reactjs-tiptap-editor/mermaid'; 
+import { BubbleMenuMermaid } from 'reactjs-tiptap-editor/bubble-extra'; 
+import { Excalidraw } from 'reactjs-tiptap-editor/excalidraw'; 
+import { BubbleMenuExcalidraw } from 'reactjs-tiptap-editor/bubble-extra'; 
 
 import 'reactjs-tiptap-editor/style.css';
 
@@ -44,19 +48,24 @@ const extensions = [
             limit: 50_000,
         },
     }),
-    History.configure(),
-    Bold.configure(),
+    History.configure({
+        depth: 100,
+        newGroupDelay: 500,
+    }),
+    Bold.configure(
+      toolbar: false,
+    ),
     Italic.configure(),
     TextUnderline.configure(),
-    FontSize.configure(),
-    BulletList.configure(),
-    ListItem.configure(),
-    OrderedList.configure(),
-    // TextBubble.configure(), //unknown feels like a bubble around the text
     Code.configure(),
     Heading.configure({
         levels: [1, 2, 3],
     }),
+    BulletList.configure(),
+    OrderedList.configure(),
+    // ListItem.configure(),
+    FontSize.configure(),
+    TextAlign.configure(toolbar: false,),
     Image.configure({
       upload: async (files: File) => {
         const formData = new FormData();
@@ -67,18 +76,16 @@ const extensions = [
             method: 'POST',
             headers: {
               'Accept': 'application/json',
-              'Authorization': 'token xxxx:yyyy',
             },
             body: formData,
+            credentials: 'include',
           });
 
           if (!response.ok) {
             throw new Error('Failed to upload file');
           }
-
           const data = await response.json();
-          console.log("File Upload complete");
-          return data.file_url;
+          return "http://10.80.4.72" + data.message.file_url
         } catch (e) {
           console.error(e);
           throw new Error('Failed to upload file');
@@ -102,16 +109,51 @@ const extensions = [
     LineHeight.configure(),
     MoreMark.configure(),
     ColumnActionButton.configure(),
-    Selection.configure()
-    
+    Mermaid.configure(),
+    Excalidraw.configure({
+        upload: async (files: File) => {
+        const formData = new FormData();
+        formData.append('file', files);
+
+        try {
+          const response = await fetch('http://10.80.4.72/api/method/upload_file', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': 'token xxxx:yyyy',
+            },
+            body: formData,
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to upload file');
+          }
+
+          const data = await response.json();
+          return data.file_url;
+        } catch (e) {
+          console.error(e);
+          throw new Error('Failed to upload file');
+        }
+      },
+    }),
 ];
 
 const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, disabled = false }) => {
     const [isMounted, setIsMounted] = useState(false);
+    // const [debouncedContent, setDebouncedContent] = useState(content);
 
     useEffect(() => {
         setIsMounted(true);
     }, []);
+
+    // useEffect(() => {
+    //     const timer = setTimeout(() => {
+    //         setDebouncedContent(content);
+    //     }, 300);
+    //     return () => clearTimeout(timer);
+    // }, [content]);
 
     if (!isMounted) {
         return null;
@@ -122,10 +164,32 @@ const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, disabled = f
             <RichTextEditor
                 output='html'
                 content={content || ''}
+                // content={debouncedContent || ''}
                 onChangeContent={onChange}
                 extensions={extensions}
                 minHeight="500px"
-            />
+                bubbleMenu={{
+                    render({ extensionsNames, editor, disabled }, bubbleDefaultDom) {
+                      return <>
+                        {bubbleDefaultDom}
+              
+                        {extensionsNames.includes('mermaid')  ? <BubbleMenuMermaid disabled={disabled}
+                          editor={editor}
+                          key="mermaid"
+                        /> : null}
+                        {extensionsNames.includes('excalidraw')  ? <BubbleMenuExcalidraw disabled={disabled}
+                            editor={editor}
+                            key="excalidraw"
+                        /> : null} 
+                      </>
+                    },
+                  }}
+                  toolbar={{
+                    render: (props, toolbarItems, dom, containerDom) => {
+                      return containerDom(dom)
+                    }
+                  }}
+           />
         </div>
     );
 };

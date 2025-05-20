@@ -1,5 +1,5 @@
 import { useParams, Link } from "wouter"
-import { useFrappeGetDoc, useFrappeAuth } from "frappe-react-sdk"
+import { useFrappeGetDoc } from "frappe-react-sdk"
 import {
     Card,
     CardContent,

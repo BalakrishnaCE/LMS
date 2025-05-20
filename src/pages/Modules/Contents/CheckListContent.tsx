@@ -7,7 +7,7 @@ function CheckListContent({ content }: { content: any }) {
   const items = content.check_list_item || [];
   return (
     <div className="bg-muted/30 rounded-lg p-4">
-      <div className="font-semibold text-lg mb-2 text-center">{content.title}</div>
+      <div className="font-semibold text-lg mb-2 text-center text-foreground">{content.title}</div>
       <ul className="space-y-4">
         {items.map((item: any, idx: number) => (
           <motion.li
@@ -24,8 +24,8 @@ function CheckListContent({ content }: { content: any }) {
               className="mt-1 h-5 w-5 border-2 border-primary data-[state=checked]:bg-primary data-[state=checked]:border-primary"
             />
             <div>
-              <div className="font-bold">{item.item}</div>
-              <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: item.content || "" }} />
+              <div className="font-bold text-foreground">{item.item}</div>
+              <div className="prose prose-sm dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground prose-blockquote:text-foreground" dangerouslySetInnerHTML={{ __html: item.content || "" }} />
             </div>
           </motion.li>
         ))}

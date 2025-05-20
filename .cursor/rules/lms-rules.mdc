@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+always check the package.json file to check if we have library that could be utilized,
+always make the import in the alias format exanple "@/something" instead "./something". 
+always use the theme specific  colors not static until and unless its the ned
+always directly apply the chaed code unless in ask you for any answer
+if there is any api intergartion thing then always referen the doctypeVisual.json thats inside src/pages

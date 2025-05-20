@@ -10,6 +10,7 @@ interface UserData {
   full_name: string;
   email: string;
   image: string;
+  user_image: string;
   roles: UserRole[];
 }
 
@@ -23,7 +24,7 @@ interface UseUserReturn {
 }
 
 export function useUser(): UseUserReturn {
-  const { currentUser } = useFrappeAuth();
+  const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -32,23 +33,42 @@ export function useUser(): UseUserReturn {
     "User",
     currentUser ?? undefined,
     {
-      fields: ["name", "full_name", "email", "image", "roles"],
+      fields: ["name", "full_name", "email", "image", "user_image", "roles"],
+      enabled: !!currentUser, // Only fetch if we have a currentUser
     }
   );
 
   useEffect(() => {
+    // If auth is still loading, keep loading state
+    if (isAuthLoading) {
+      setIsLoading(true);
+      return;
+    }
+
+    // If no current user, clear user data
+    if (!currentUser) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
+    // If fetching user data
     if (isValidating) {
       setIsLoading(true);
     }
+
+    // If we have user data
     if (data) {
       setUser(data);
       setIsLoading(false);
     }
+
+    // If there's an error
     if (docError) {
       setError(docError);
       setIsLoading(false);
     }
-  }, [data, isValidating, docError]);
+  }, [currentUser, data, isValidating, docError, isAuthLoading]);
 
   const isLMSAdmin = user?.roles?.some((role) => role.role === "LMS Admin") ?? false;
   const isLMSStudent = user?.roles?.some((role) => role.role === "LMS Student") ?? false;
@@ -56,7 +76,7 @@ export function useUser(): UseUserReturn {
 
   return {
     user,
-    isLoading,
+    isLoading: isLoading || isAuthLoading,
     error,
     isLMSAdmin,
     isLMSStudent,

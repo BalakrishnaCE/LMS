@@ -24,6 +24,9 @@ interface ModuleSidebarProps {
   handleChapterClick: (chapterId: string, cidx: number) => void;
   setShowLessonModal: (show: boolean) => void;
   onReorderLessons?: (fromIdx: number, toIdx: number) => void;
+  onSave: () => void;
+  isSaving?: boolean;
+  hasUnsavedChanges?: boolean;
 }
 
 // Chapter item component
@@ -42,12 +45,14 @@ function ChapterItem({
 }) {
   return (
     <li
-      className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition ${
-        isSelected ? 'bg-accent font-semibold text-primary-foreground' : 'hover:bg-muted hover:text-black text-primary-foreground'
+      className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
+        isSelected 
+          ? 'bg-primary text-primary-foreground font-medium shadow-sm' 
+          : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
       }`}
       onClick={onSelect}
     >
-      <BookOpen className="w-4 h-4" />
+      <BookOpen className={`w-4 h-4 ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
       <span>{chapterDetails?.title || `Chapter ${idx + 1}`}</span>
     </li>
   );
@@ -89,14 +94,14 @@ function SortableLessonItem({
       </div>
       <div className="pl-8">
         {isSelected ? (
-          <div className="bg-primary rounded-lg p-1">
+          <div className="bg-primary/5 rounded-lg p-2 border border-primary/20">
             <button
-              className="w-full text-left px-3 py-2 rounded font-medium text-primary-foreground"
+              className="w-full text-left px-3 py-2 rounded-md font-medium text-primary hover:bg-primary/10 transition-colors"
               onClick={onSelect}
             >
               {lessonDetails[lesson.lesson]?.lesson_name || `Lesson ${idx + 1}`}
             </button>
-            <ul className="pl-4 mt-1 space-y-1">
+            <ul className="pl-4 mt-2 space-y-1">
               {(lessonDetails[lesson.lesson]?.chapters || []).map((chapter: any, cidx: number) => (
                 chapter && chapter.chapter ? (
                   <ChapterItem
@@ -113,7 +118,7 @@ function SortableLessonItem({
           </div>
         ) : (
           <button
-            className="w-full text-left px-3 py-2 rounded font-medium transition hover:bg-muted"
+            className="w-full text-left px-3 py-2 rounded-md font-medium text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-colors"
             onClick={onSelect}
           >
             {lessonDetails[lesson.lesson]?.lesson_name || `Lesson ${idx + 1}`}
@@ -140,7 +145,10 @@ const ModuleSidebar: React.FC<ModuleSidebarProps> = ({
   chapterDetailsSidebar,
   handleChapterClick,
   setShowLessonModal,
-  onReorderLessons
+  onReorderLessons,
+  onSave,
+  isSaving = false,
+  hasUnsavedChanges = false
 }) => {
   // DnD-kit setup
   const sensors = useSensors(
@@ -160,10 +168,10 @@ const ModuleSidebar: React.FC<ModuleSidebarProps> = ({
   };
 
   return (
-    <aside className="w-80 border-r p-6 pt-16 overflow-y-auto">
-      <div className="space-y-6">
+    <aside className="w-80 border-r p-6 pt-16 overflow-y-auto bg-card/50 backdrop-blur-sm flex flex-col h-full">
+      <div className="space-y-6 flex-1">
         <div>
-          <Label>Module Name</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Module Name</Label>
           <Input
             value={moduleName}
             onChange={(e) => onModuleFieldChange("name1", e.target.value)}
@@ -172,16 +180,16 @@ const ModuleSidebar: React.FC<ModuleSidebarProps> = ({
         </div>
 
         <div>
-          <Label>Description</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Description</Label>
           <div className="mt-2">
-            <Button variant="outline" className="w-full" onClick={onEditDescription}>
+            <Button variant="outline" className="w-full hover:bg-primary/5 hover:text-primary" onClick={onEditDescription}>
               Edit Description
             </Button>
           </div>
         </div>
 
         <div>
-          <Label>Lessons</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Lessons</Label>
           <div className="space-y-2 mt-2">
             <DndContext 
               sensors={sensors}
@@ -209,9 +217,38 @@ const ModuleSidebar: React.FC<ModuleSidebarProps> = ({
                 ))}
               </SortableContext>
             </DndContext>
-            <Button variant="outline" className="w-full" onClick={() => setShowLessonModal(true)}>+ Add Lesson</Button>
+            <Button 
+              variant="outline" 
+              className="w-full hover:bg-primary/5 hover:text-primary" 
+              onClick={() => setShowLessonModal(true)}
+            >
+              + Add Lesson
+            </Button>
           </div>
         </div>
+      </div>
+
+      {/* Save Button Section */}
+      <div className="pt-6 border-t mt-6">
+        <Button 
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+          onClick={onSave}
+          disabled={isSaving || !hasUnsavedChanges}
+        >
+          {isSaving ? (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+              Saving...
+            </div>
+          ) : (
+            'Save Changes'
+          )}
+        </Button>
+        {hasUnsavedChanges && !isSaving && (
+          <p className="text-sm text-muted-foreground mt-2 text-center">
+            You have unsaved changes
+          </p>
+        )}
       </div>
     </aside>
   );

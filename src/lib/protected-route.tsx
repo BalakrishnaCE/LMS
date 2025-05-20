@@ -1,6 +1,7 @@
-import { useAuth } from "@/hooks/use-auth";
+import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
 import { Redirect, Route } from "wouter";
+import { useFrappeAuth } from "frappe-react-sdk";
 
 interface ProtectedRouteProps {
   path: string;
@@ -13,9 +14,11 @@ export function ProtectedRoute({
   component: Component,
   allowedRoles = [],
 }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isLMSAdmin, isLMSStudent, isLMSContentEditor } = useUser();
+  const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
 
-  if (isLoading) {
+  // Show loading state while either auth or user data is loading
+  if (isLoading || isAuthLoading) {
     return (
       <Route path={path}>
         <div className="flex items-center justify-center min-h-screen bg-bg-soft">
@@ -25,7 +28,8 @@ export function ProtectedRoute({
     );
   }
 
-  if (!user) {
+  // Only redirect to login if we're sure there's no authenticated user
+  if (!currentUser || !user) {
     return (
       <Route path={path}>
         <Redirect to="/login" />
@@ -34,19 +38,36 @@ export function ProtectedRoute({
   }
 
   // Check role-based access
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    // Redirect based on role
-    const redirectPath = user.role === "admin" 
-      ? "/admin" 
-      : user.role === "manager" 
-        ? "/manager" 
-        : "/";
-        
-    return (
-      <Route path={path}>
-        <Redirect to={redirectPath} />
-      </Route>
-    );
+  if (allowedRoles.length > 0) {
+    const hasAccess = allowedRoles.some(role => {
+      switch (role) {
+        case "LMS Admin":
+          return isLMSAdmin;
+        case "LMS Student":
+          return isLMSStudent;
+        case "LMS Content Editor":
+          return isLMSContentEditor;
+        default:
+          return false;
+      }
+    });
+
+    if (!hasAccess) {
+      // Redirect based on role
+      const redirectPath = isLMSAdmin 
+        ? "/" 
+        : isLMSContentEditor 
+          ? "/modules" 
+          : isLMSStudent 
+            ? "/learner-dashboard" 
+            : "/login";
+      
+      return (
+        <Route path={path}>
+          <Redirect to={redirectPath} />
+        </Route>
+      );
+    }
   }
 
   return <Route path={path} component={Component} />;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React from "react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent as ShadAccordionContent } from "@/components/ui/accordion";
 
 interface AccordionItemType {
@@ -26,9 +26,9 @@ export default function AccordionContent({ content }: AccordionContentProps) {
 
   return (
     <div className="my-4">
-      <div className="text-lg font-semibold mb-1">{content.title}</div>
+      <div className="text-lg font-semibold mb-1 text-foreground">{content.title}</div>
       {content.description && (
-        <div className="prose prose-sm mb-2 text-muted-foreground" dangerouslySetInnerHTML={{ __html: content.description }} />
+        <div className="prose prose-sm dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground prose-blockquote:text-foreground mb-2" dangerouslySetInnerHTML={{ __html: content.description }} />
       )}
       <Accordion type="single" collapsible className="w-full">
         {items.length > 0 ? (
@@ -44,7 +44,7 @@ export default function AccordionContent({ content }: AccordionContentProps) {
                       className="max-w-[120px] h-auto rounded shadow border"
                     />
                   ) : null}
-                  <div className="prose prose-sm" dangerouslySetInnerHTML={{ __html: item.body_content }} />
+                  <div className="prose prose-sm dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground prose-blockquote:text-foreground" dangerouslySetInnerHTML={{ __html: item.body_content }} />
                 </div>
               </ShadAccordionContent>
             </AccordionItem>

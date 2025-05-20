@@ -29,6 +29,8 @@ import {
 import { useFrappeAuth } from "frappe-react-sdk"
 import { logoutFromFrappe } from "@/lib/frappe-auth"
 import { navigate } from "wouter/use-browser-location"
+import { ROUTES, getFullPath } from "@/config/routes"
+
 export function NavUser({
   user,
 }: {
@@ -43,7 +45,11 @@ export function NavUser({
   const { logout } = useFrappeAuth()
   const handleLogout = () => {
     logout()
-    navigate("/login")
+    navigate(getFullPath(ROUTES.LOGIN))
+  }
+
+  const handleProfileClick = () => {
+    navigate(getFullPath(ROUTES.PROFILE))
   }
 
   return (
@@ -90,18 +96,18 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <IconUserCircle />
+              <DropdownMenuItem onClick={handleProfileClick}>
+                <IconUserCircle className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <IconNotification />
+                <IconNotification className="mr-2 h-4 w-4" />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
-              <IconLogout />
+              <IconLogout className="mr-2 h-4 w-4" />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

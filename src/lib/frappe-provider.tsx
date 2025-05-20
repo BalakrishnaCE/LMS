@@ -22,6 +22,13 @@ export function NovelLMSFrappeProvider({ children }: NovelLMSFrappeProviderProps
       url='http://10.80.4.72'
       tokenParams={tokenParams}
       socketPort='9000'
+      swrConfig={{
+        revalidateOnFocus: false,
+        // revalidateOnReconnect: false,
+        // revalidateOnMount: false,
+        // revalidateIfStale: false,
+        refreshInterval: 0,
+      }}
     >
       {children}
     </FrappeProvider>

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sidebar"
 import { navigate } from "wouter/use-browser-location"
 import { useUser } from "@/hooks/use-user"
+import { getRelativePath, getFullPath } from "@/config/routes"
 
 export function NavMain({
   items,
@@ -24,6 +25,9 @@ export function NavMain({
   const [location] = useLocation();
   const { isLMSAdmin } = useUser();
 
+  // Get the current path without the base path
+  const currentPath = getRelativePath(location);
+
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
@@ -35,13 +39,13 @@ export function NavMain({
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
             >
               <IconCirclePlusFilled />
-              <span>Quick Create</span>
+              <span >Quick Create</span>
             </SidebarMenuButton>
             <Button
               size="icon"
               className="size-8 group-data-[collapsible=icon]:opacity-0 hover:text-white"
               variant="outline"
-              onClick={() => console.log("create")}
+              onClick={() => navigate('/module/new')}
             >
               <IconPlus className="size-4" />
               <span className="sr-only">Inbox</span>
@@ -52,7 +56,7 @@ export function NavMain({
 
         <SidebarMenu>
           {items.map((item) => {
-            const isActive = location === item.url;
+            const isActive = currentPath === item.url;
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
@@ -63,8 +67,8 @@ export function NavMain({
                       : "active:bg-primary/90 active:text-primary-foreground hover:text-white"
                   }
                   onClick={() => {
-                    if (item.url !== location) {
-                      navigate(item.url);
+                    if (item.url !== currentPath) {
+                      navigate(getFullPath(item.url));
                     }
                   }}
                 >

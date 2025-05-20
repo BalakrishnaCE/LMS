@@ -1,84 +1,273 @@
 import * as React from "react";
+import { useFrappeGetCall } from "frappe-react-sdk";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { motion } from "framer-motion";
+import { LearnersTable } from "@/pages/Learners/LearnersTable";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, Filter, Download } from "lucide-react";
+import { toast } from "sonner";
+
+interface User {
+  name: string;
+  full_name: string;
+  email: string;
+  enabled: number;
+}
+
+interface ApiData {
+  stats: {
+    total: number;
+    active: number;
+    inactive: number;
+    percentage_change: number;
+  };
+  users: User[];
+}
+
+interface FrappeResponse {
+  data: ApiData;
+}
+
+// Helper function to convert data to CSV
+function convertToCSV(data: User[]) {
+  const headers = ["Name", "Email", "Status"];
+  const rows = data.map(user => [
+    user.full_name,
+    user.email,
+    user.enabled === 1 ? "Active" : "Inactive"
+  ]);
+  
+  return [
+    headers.join(","),
+    ...rows.map(row => row.join(","))
+  ].join("\n");
+}
+
+// Helper function to download CSV
+function downloadCSV(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Stats Cards Component
+function StatsCards({ stats }: { stats: ApiData["stats"] }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <Card className="w-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Learners</CardTitle>
+            <span className="text-2xl">👥</span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.percentage_change > 0 ? "+" : ""}{stats.percentage_change}% from last month
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+      >
+        <Card className="w-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Learners</CardTitle>
+            <span className="text-2xl">✅</span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.active}</div>
+            <p className="text-xs text-muted-foreground">
+              {((stats.active / stats.total) * 100).toFixed(1)}% of total
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+      >
+        <Card className="w-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inactive Learners</CardTitle>
+            <span className="text-2xl">⏸️</span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.inactive}</div>
+            <p className="text-xs text-muted-foreground">
+              {((stats.inactive / stats.total) * 100).toFixed(1)}% of total
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <Card className="w-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Growth Rate</CardTitle>
+            <span className="text-2xl">📈</span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {stats.percentage_change > 0 ? "+" : ""}{stats.percentage_change}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Monthly growth rate
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
+  );
+}
+
+// Filters Component
+function Filters({ 
+  searchName, 
+  searchEmail, 
+  searchStatus, 
+  onSearchNameChange, 
+  onSearchEmailChange, 
+  onSearchStatusChange,
+  onExport
+}: {
+  searchName: string;
+  searchEmail: string;
+  searchStatus: string;
+  onSearchNameChange: (value: string) => void;
+  onSearchEmailChange: (value: string) => void;
+  onSearchStatusChange: (value: string) => void;
+  onExport: () => void;
+}) {
+  return (
+    <div className="flex flex-col md:flex-row gap-4 mt-6 mb-4">
+      <div className="flex-1">
+        <div className="relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name..."
+            value={searchName}
+            onChange={(e) => onSearchNameChange(e.target.value)}
+            className="w-full pl-8"
+          />
+        </div>
+      </div>
+      <div className="flex-1">
+        <div className="relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by email..."
+            value={searchEmail}
+            onChange={(e) => onSearchEmailChange(e.target.value)}
+            className="w-full pl-8"
+          />
+        </div>
+      </div>
+      <div className="w-full md:w-48">
+        <Select value={searchStatus} onValueChange={onSearchStatusChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <Button 
+        variant="outline" 
+        className="w-full md:w-auto"
+        onClick={onExport}
+      >
+        <Download className="mr-2 h-4 w-4" />
+        Export
+      </Button>
+    </div>
+  );
+}
+
 export default function Learners() {
   const [searchName, setSearchName] = React.useState("");
   const [searchEmail, setSearchEmail] = React.useState("");
-  const [searchStatus, setSearchStatus] = React.useState("");
-  return(
-    <div className="flex flex-col items-center justify-center h-full">
-    {/* active learners card and inactive learners card */}
-    <div className="flex flex-row items-center justify-center h-full gap-4 mt-4">
-      <div className="flex flex-col items-center justify-center h-full">
-        <Card className="w-60 h-32">
-          <CardHeader>
-            <CardTitle>Active Learners</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>100</p>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="flex flex-col items-center justify-center h-full">
-        <Card className="w-60 h-32">
-          <CardHeader>
-            <CardTitle>Inactive Learners</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>100</p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-    {/* learners table */}
-    <div className="flex flex-col items-center justify-center h-full w-2/3 mt-4">
-      <Table>
-      <TableHeader className="">
-        <TableRow>
-          <TableHead>
-            <Input type="text" placeholder="Search by name" onChange={(e) => {
-              setSearchName(e.target.value);
-            }}  />
-          </TableHead>
-          <TableHead>
-            <Input type="text" placeholder="Search by email" onChange={(e) => {
-              setSearchEmail(e.target.value);
-            }}/>
-          </TableHead>
-          <TableHead>
-            <Input type="text" placeholder="Search by status" onChange={(e) => {
-              setSearchStatus(e.target.value);
-            }}/>
-          </TableHead>
-        </TableRow>
-        
-          <TableRow>
-            {/* add filters in the table header */}
-            
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody className=" text-secondary-foreground">
-          <TableRow>
-            <TableCell>John Doe</TableCell>
-            <TableCell>john.doe@example.com</TableCell>
-            <TableCell>Active</TableCell>
-            <TableCell>Actions</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell>Jane Doe</TableCell>
-            <TableCell>jane.doe@example.com</TableCell>
-            <TableCell>Inactive</TableCell>
-            <TableCell>Actions</TableCell>
-          </TableRow>
+  const [searchStatus, setSearchStatus] = React.useState("all");
 
-        </TableBody>
-      </Table>
-    </div>
+  const { data: studentsData, error, isValidating } = useFrappeGetCall<FrappeResponse>("getStudentRoleCount");
+  const users = studentsData?.data?.users || [];
+  const stats = studentsData?.data?.stats;
+
+  // Filter users based on search criteria
+  const filteredUsers = users.filter(user => {
+    const nameMatch = user.full_name?.toLowerCase().includes(searchName.toLowerCase());
+    const emailMatch = user.email?.toLowerCase().includes(searchEmail.toLowerCase());
+    const statusMatch = searchStatus === "all" || 
+      (searchStatus === "active" && user.enabled === 1) || 
+      (searchStatus === "inactive" && user.enabled === 0);
+    return nameMatch && emailMatch && statusMatch;
+  });
+
+  const handleExport = () => {
+    try {
+      const csv = convertToCSV(filteredUsers);
+      const filename = `learners_export_${new Date().toISOString().split('T')[0]}.csv`;
+      downloadCSV(csv, filename);
+      toast.success("Export completed successfully");
+    } catch (error) {
+      toast.error("Failed to export data");
+      console.error("Export error:", error);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-red-500">Error loading learners: {error.message}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-4">
+      {stats && <StatsCards stats={stats} />}
+      
+      <Filters
+        searchName={searchName}
+        searchEmail={searchEmail}
+        searchStatus={searchStatus}
+        onSearchNameChange={setSearchName}
+        onSearchEmailChange={setSearchEmail}
+        onSearchStatusChange={setSearchStatus}
+        onExport={handleExport}
+      />
+
+      <LearnersTable
+        learners={filteredUsers}
+        isLoading={isValidating}
+      />
     </div>
   );
 }

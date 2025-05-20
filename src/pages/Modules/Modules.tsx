@@ -25,7 +25,9 @@ import {
 import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
+import { motion } from "framer-motion"
+import { Download } from "lucide-react"
+import { toast } from "sonner"
 
 interface ModulesProps {
     itemsPerPage: number;
@@ -34,23 +36,55 @@ interface ModulesProps {
 type FilterOperator = "=" | "!=" | ">" | ">=" | "<" | "<=" | "like";
 type Filter = [string, FilterOperator, string | number];
 
+// Helper function to convert module data to CSV
+function convertToCSV(modules: any[]) {
+  const headers = ["Name", "Short Text", "Description", "Status", "Department"];
+  const rows = modules.map(module => [
+    module.name1,
+    module.short_text,
+    module.description,
+    module.status,
+    module.department
+  ]);
+  
+  return [
+    headers.join(","),
+    ...rows.map(row => row.map(cell => `"${cell?.replace(/"/g, '""') || ''}"`).join(","))
+  ].join("\n");
+}
+
+// Helper function to download CSV
+function downloadCSV(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 function Modules({ itemsPerPage }: ModulesProps) {
     const [page, setPage] = useState(1)
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedDepartment, setSelectedDepartment] = useState("all")
     const [selectedStatus, setSelectedStatus] = useState("all")
+    const [isExporting, setIsExporting] = useState(false)
 
     // Get departments for filter
     const { data: departments } = useFrappeGetDocList("Department", {
         fields: ["name"],
     })
-    console.log(departments)
     const filters: Filter[] = []
     if (selectedDepartment && selectedDepartment !== "all") {
         filters.push(["department", "=", selectedDepartment])
     }
     if (selectedStatus && selectedStatus !== "all") {
-        filters.push(["is_published", "=", selectedStatus === "published" ? 1 : 0])
+        filters.push(["status", "=", selectedStatus])
     }
     if (searchQuery) {
         filters.push(["name1", "like", `%${searchQuery}%`])
@@ -58,7 +92,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
 
     const { data: module_data, error: module_error, isValidating } = useFrappeGetDocList("LMS Module",
         {
-          fields: ["name", "name1", "short_text", "description", "is_published", "image", "department"],
+          fields: ["name", "name1", "short_text", "description", "status", "image", "department"],
           limit: itemsPerPage,
           limit_start: (page - 1) * itemsPerPage,
           filters: filters
@@ -75,11 +109,11 @@ function Modules({ itemsPerPage }: ModulesProps) {
 
     const totalPages = Math.ceil((total_count?.length || 0) / itemsPerPage)
 
-    const module_list = module_data?.map((module: { name: string; name1: string; description: string; is_published: number; image: string; short_text: string; department: string }) => ({
+    const module_list = module_data?.map((module: { name: string; name1: string; description: string; status: string; image: string; short_text: string; department: string }) => ({
         name: module.name,
         name1: module.name1,
         description: module.description,
-        is_published: module.is_published,
+        status: module.status,
         image: module.image,
         short_text: module.short_text,
         department: module.department,
@@ -93,6 +127,42 @@ function Modules({ itemsPerPage }: ModulesProps) {
     useEffect(() => {
         setPage(1)
     }, [searchQuery, selectedDepartment, selectedStatus])
+
+    const handleExport = async () => {
+        try {
+            setIsExporting(true);
+            toast.loading("Preparing export...");
+
+            // Fetch all modules for export, ignoring pagination
+            const { data: exportData } = await useFrappeGetDocList("LMS Module", {
+                fields: ["name", "name1", "short_text", "description", "status", "department"],
+                limit: 0, // No limit to get all records
+                filters: filters
+            });
+
+            const exportModules = exportData?.map((module: any) => ({
+                name: module.name,
+                name1: module.name1,
+                description: module.description,
+                status: module.status,
+                short_text: module.short_text,
+                department: module.department,
+            })) || [];
+
+            const csv = convertToCSV(exportModules);
+            const filename = `modules_export_${new Date().toISOString().split('T')[0]}.csv`;
+            downloadCSV(csv, filename);
+            
+            toast.dismiss();
+            toast.success(`Successfully exported ${exportModules.length} modules`);
+        } catch (error) {
+            toast.dismiss();
+            toast.error("Failed to export modules");
+            console.error("Export error:", error);
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     return (
         <div>
@@ -126,44 +196,88 @@ function Modules({ itemsPerPage }: ModulesProps) {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="published">Published</SelectItem>
-                            <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="Published">Published</SelectItem>
+                            <SelectItem value="Draft">Draft</SelectItem>
+                            <SelectItem value="Approval Pending">Approval Pending</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
+                <Button 
+                    variant="outline" 
+                    className="w-auto"
+                    onClick={handleExport}
+                    disabled={isExporting}
+                >
+                    <Download className="mr-2 h-4 w-4" />
+                    {isExporting ? "Exporting..." : "Export"}
+                </Button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 max-w-300 p-4">
                 {module_list?.map((module) => (
-                    <Card className="@container/card border-t-2 " key={module.name}>
-                        <CardHeader>
-                            <CardTitle className="text-sm ont-semibold ">
-                                {module.name1}
-                            </CardTitle>
-                            <CardAction>
-                                {module.is_published === 1 ? (
-                                    <Badge variant="outline" >
-                                        <IconPointFilled className="text-primary" />
-                                        <p className="">Published</p>
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="outline" >
-                                        <IconPointFilled className="text-accent-foreground" />
-                                        <p className="">Draft</p>
-                                    </Badge>
-                                )}
-                            </CardAction>
-                        </CardHeader>
-                        <CardContent>
-                            <CardDescription>{module.short_text}</CardDescription>
-                        </CardContent>
-                        <CardFooter className="flex justify-between flex-col gap-4">
-                            <Progress value={10} className="text-sm" />
-                            <Link href={`/module/${module.name}`} className="w-full">
-                                <Button variant="outline" className="hover:text-white w-full">View</Button>
-                            </Link>
-                        </CardFooter>
-                    </Card>
+                    <motion.div
+                        key={module.name}
+                        whileHover={{ 
+                            scale: 1.02,
+                            transition: { duration: 0.2 }
+                        }}
+                        className="h-full"
+                    >
+                        <Card 
+                            className={`@container/card border-t-2 relative overflow-hidden h-full ${module.image ? 'min-h-[200px]' : ''}`} 
+                        >
+                            {module.image && (
+                                <div 
+                                    className="absolute inset-0 bg-cover bg-center"
+                                    style={{ 
+                                        backgroundImage: `url(${module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`})`,
+                                    }}
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/70 to-black/70" />
+                                </div>
+                            )}
+                            <CardHeader className={`relative ${module.image ? 'text-white' : ''}`}>
+                                <div className="flex items-center justify-between gap-2">
+                                    <CardTitle className={`text-sm font-semibold ${module.image ? 'drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]' : ''}`}>
+                                        {module.name1}
+                                    </CardTitle>
+                                    {module.status === "Published" ? (
+                                        <Badge variant="outline" className="bg-green-50/95 text-green-700 border-green-200 shrink-0">
+                                            <IconPointFilled className="text-green-500 mr-1 h-2 w-2" />
+                                            Published
+                                        </Badge>
+                                    ) : module.status === "Approval Pending" ? (
+                                        <Badge variant="outline" className="bg-amber-50/95 text-amber-700 border-amber-200 shrink-0">
+                                            <IconPointFilled className="text-amber-500 mr-1 h-2 w-2" />
+                                            Pending
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="bg-gray-50/95 text-gray-700 border-gray-200 shrink-0">
+                                            <IconPointFilled className="text-gray-500 mr-1 h-2 w-2" />
+                                            Draft
+                                        </Badge>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            <CardContent className={`relative ${module.image ? 'text-white' : ''}`}>
+                                <CardDescription className={`${module.image ? 'text-white/95 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' : ''}`}>
+                                    {module.short_text}
+                                </CardDescription>
+                            </CardContent>
+                            <CardFooter className="flex justify-between flex-col gap-4 relative">
+                                <Link href={`/module/${module.name}`} className="w-full">
+                                    <Button 
+                                        variant={ "outline"} 
+                                        className={`w-full transition-colors duration-200 ${
+                                             'hover:text-white'
+                                        }`}
+                                    >
+                                        View
+                                    </Button>
+                                </Link>
+                            </CardFooter>
+                        </Card>
+                    </motion.div>
                 ))}
             </div>
 

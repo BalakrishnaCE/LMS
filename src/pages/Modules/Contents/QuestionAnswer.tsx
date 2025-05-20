@@ -57,7 +57,6 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
       .then(res => res.json())
       .then(res => {
         setData(res.data);
-        console.log(res.data);
         setLoading(false);
       })
       .catch(e => {

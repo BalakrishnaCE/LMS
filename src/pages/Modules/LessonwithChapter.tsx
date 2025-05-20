@@ -116,7 +116,7 @@ function ContentRenderer({ contentType, contentReference }: { contentType: strin
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={cn("text-sm prose")}
+            className={cn("text-sm prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground prose-blockquote:text-foreground")}
             dangerouslySetInnerHTML={{ __html: content.body || content.value || "" }}
           />
         );
@@ -138,7 +138,7 @@ function ContentRenderer({ contentType, contentReference }: { contentType: strin
             className="relative aspect-video"
           >
             <video
-              src={"http://10.80.4.72"+content.video || content.url}
+              src={"http://10.80.4.72"+content.video}
               controls
               className="w-full h-full rounded-lg shadow-lg"
             />
