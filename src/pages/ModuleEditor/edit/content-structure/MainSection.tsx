@@ -23,23 +23,87 @@ import {
   DialogClose,
   // DialogTrigger,
 } from "@/components/ui/dialog";
-import { contentsList as rawContentsList } from '@/pages/test/contents';
+import { contentsList as rawContentsList } from '@/pages/ModuleEditor/contents';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 // import ChecklistContent from './ChecklistContent';
-import StepsContent from './StepsContent';
-import AccordionContent, { AccordionPreview } from './AccordionContent';
+// import StepsContent from './StepsContent';
+import AccordionContent, { AccordionPreview } from '@/pages/ModuleEditor/edit/content-structure/AccordionContent';
 import { useFrappeCreateDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
-import TextContentEditor from '@/pages/ModuleEditor/content/TextContentEditor';
-import ImageContentEditor from '@/pages/ModuleEditor/content/ImageContentEditor';
-import VideoContentEditor from '@/pages/ModuleEditor/content/VideoContentEditor';
-import FileAttachContentEditor from '@/pages/ModuleEditor/content/FileAttachContentEditor';
-import CheckListContentEditor from '@/pages/test/edit/content-structure/ChecklistContent';
-import StepsTableContentEditor from '@/pages/test/edit/content-structure/StepsContent';
-import AccordionContentEditor from '@/pages/test/edit/content-structure/AccordionContent';
+import TextContentEditor from '@/pages/ModuleEditor/edit/content-structure/TextContentEditor';
+import ImageContentEditor from '@/pages/ModuleEditor/edit/content-structure/ImageContentEditor';
+import VideoContentEditor from '@/pages/ModuleEditor/edit/content-structure/VideoContentEditor';
+import FileAttachContentEditor from '@/pages/ModuleEditor/edit/content-structure/FileAttachContentEditor';
+import CheckListContentEditor from '@/pages/ModuleEditor/edit/content-structure/ChecklistContent';
+import StepsTableContentEditor from '@/pages/ModuleEditor/edit/content-structure/StepsContent';
+import AccordionContentEditor from '@/pages/ModuleEditor/edit/content-structure/AccordionContent';
 import { Checkbox } from "@/components/ui/checkbox";
 import { StepsPreview } from './StepsContent';
+
+const contentStyles = `
+    .prose ul {
+        list-style-type: disc;
+        padding-left: 1.5em;
+        margin: 1em 0;
+    }
+    .prose > div >ul li {
+        margin-bottom: 0.5em;
+    }
+    .prose ol {
+        list-style-type: decimal;
+        padding-left: 1.5em;
+        margin: 1em 0;
+    }
+    .prose > div > ol li {
+        margin-bottom: 0.5em;
+    }
+    .prose table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 1em 0;
+        overflow-x: auto;
+        display: block;
+    }
+    .prose table th,
+    .prose table td {
+        border: 1px solid #e2e8f0;
+        padding: 0.5em;
+        word-break: break-word;
+        white-space: normal;
+        max-width: 300px;
+    }
+    .prose table th {
+        background-color: #f8fafc;
+        font-weight: 600;
+    }
+    .prose {
+        max-width: 100%;
+    }
+    .prose img {
+        max-width: 100%;
+        height: auto;
+    }
+    .prose h1 {
+        font-size: 2em;
+        font-weight: 600;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+    .prose h2 {
+        font-size: 1.5em;
+        font-weight: 500;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+    .prose h3 {
+        font-size: 1.25em;
+        font-weight: 400;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+    
+`;
 
 // Define the always-visible content types outside the component
 const alwaysVisibleContentTypes = [
@@ -410,357 +474,360 @@ export default function MainSection({
   }
 
   return (
-    <div className="flex-1 h-full flex flex-col items-center justify-start bg-background pt-8 px-10 text-center">
-      {!activeLesson && !hasLessons && (
-        <div className="w-full max-w-2xl mx-auto">
-          <h2 className="text-2xl font-bold mb-4">Create Your First Lesson</h2>
-          <p className="text-muted-foreground mb-8">Start by creating your first lesson and chapter</p>
-          <Button
-            onClick={() => setAdding(true)}
-            className="rounded-full px-8 py-3 text-lg shadow-lg"
-          >
-            + Create First Lesson
-          </Button>
-        </div>
-      )}
-
-      {/* Lesson Creation Dialog */}
-      <Dialog open={adding} onOpenChange={setAdding}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Lesson</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="lessonTitle">Lesson Title</Label>
-              <Input
-                id="lessonTitle"
-                value={lessonTitle}
-                onChange={(e) => setLessonTitle(e.target.value)}
-                placeholder="Enter lesson title"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="lessonDesc">Lesson Description</Label>
-              <RichEditor
-                content={lessonDesc}
-                onChange={setLessonDesc}
-              />
-            </div>
-            <div>
-              <Label htmlFor="chapterTitle">First Chapter Title</Label>
-              <Input
-                id="chapterTitle"
-                value={chapterTitle}
-                onChange={(e) => setChapterTitle(e.target.value)}
-                placeholder="Enter chapter title"
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={() => setAdding(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={() => {
-                if (lessonTitle && chapterTitle) {
-                  handleCreateLessonAndChapter({
-                    lesson_name: lessonTitle,
-                    description: lessonDesc,
-                    chapter: { title: chapterTitle }
-                  });
-                } else {
-                  toast.error("Please fill in all required fields");
-                }
-              }}
-              disabled={!lessonTitle || !chapterTitle}
+    <div className="relative w-full h-full">
+      <style>{contentStyles}</style>
+      <div className="flex-1 h-full flex flex-col items-center justify-start bg-background pt-8 px-10 text-center">
+        {!activeLesson && !hasLessons && (
+          <div className="w-full max-w-2xl mx-auto">
+            <h2 className="text-2xl font-bold mb-4">Create Your First Lesson</h2>
+            <p className="text-muted-foreground mb-8">Start by creating your first lesson and chapter</p>
+            <Button
+              onClick={() => setAdding(true)}
+              className="rounded-full px-8 py-3 text-lg shadow-lg"
             >
-              Create
+              + Create First Lesson
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
 
-      {activeLesson && (
-        <div className="w-full px-2 md:px-0">
-          {/* Lesson Name with Edit */}
-          <div className="flex items-center justify-center gap-2 mb-2">
-            {editingLessonName ? (
-              <div className="flex items-center gap-2">
+        {/* Lesson Creation Dialog */}
+        <Dialog open={adding} onOpenChange={setAdding}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Lesson</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="lessonTitle">Lesson Title</Label>
                 <Input
-                  value={lessonNameValue}
-                  onChange={(e) => setLessonNameValue(e.target.value)}
-                  className="text-2xl font-bold text-center"
+                  id="lessonTitle"
+                  value={lessonTitle}
+                  onChange={(e) => setLessonTitle(e.target.value)}
+                  placeholder="Enter lesson title"
+                  className="mt-1"
                 />
-                <Button size="sm" onClick={handleLessonNameSave}>Save</Button>
-                <Button size="sm" variant="outline" onClick={() => setEditingLessonName(false)}>Cancel</Button>
               </div>
-            ) : (
+              <div>
+                <Label htmlFor="lessonDesc">Lesson Description</Label>
+                <RichEditor
+                  content={lessonDesc}
+                  onChange={setLessonDesc}
+                />
+              </div>
+              <div>
+                <Label htmlFor="chapterTitle">First Chapter Title</Label>
+                <Input
+                  id="chapterTitle"
+                  value={chapterTitle}
+                  onChange={(e) => setChapterTitle(e.target.value)}
+                  placeholder="Enter chapter title"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="outline" onClick={() => setAdding(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (lessonTitle && chapterTitle) {
+                    handleCreateLessonAndChapter({
+                      lesson_name: lessonTitle,
+                      description: lessonDesc,
+                      chapter: { title: chapterTitle }
+                    });
+                  } else {
+                    toast.error("Please fill in all required fields");
+                  }
+                }}
+                disabled={!lessonTitle || !chapterTitle}
+              >
+                Create
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {activeLesson && (
+          <div className="w-full px-2 md:px-0">
+            {/* Lesson Name with Edit */}
+            <div className="flex items-center justify-center gap-2 mb-2">
+              {editingLessonName ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={lessonNameValue}
+                    onChange={(e) => setLessonNameValue(e.target.value)}
+                    className="text-2xl font-bold text-center"
+                  />
+                  <Button size="sm" onClick={handleLessonNameSave}>Save</Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditingLessonName(false)}>Cancel</Button>
+                </div>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-bold">Lesson: {activeLesson.title}</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingLessonName(true)}
+                    className="p-1"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Lesson Description with Edit */}
+            <div className="mb-4">
+              {editingLessonDesc ? (
+                <div className="flex flex-col items-center gap-2">
+                  <RichEditor
+                    content={lessonDescValue}
+                    onChange={setLessonDescValue}
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleLessonDescSave}>Save</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingLessonDesc(false)}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="block" dangerouslySetInnerHTML={{ __html: activeLesson.description }} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingLessonDesc(true)}
+                    className="p-1"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <hr className="my-6 border-border" />
+            
+            {activeChapter && (
               <>
-                <h2 className="text-2xl font-bold">Lesson: {activeLesson.title}</h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditingLessonName(true)}
-                  className="p-1"
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
+                {/* Chapter Name with Edit */}
+                <div className="mb-4">
+                  {editingChapterName ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Input
+                        value={chapterNameValue}
+                        onChange={(e) => setChapterNameValue(e.target.value)}
+                        className="text-lg font-semibold text-center"
+                      />
+                      <Button size="sm" onClick={handleChapterNameSave}>Save</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingChapterName(false)}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="block text-lg font-semibold text-foreground">
+                        Chapter: {activeChapter.title}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingChapterName(true)}
+                        className="p-1"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <hr className="my-6 border-border" />
+                
+                {/* Render content blocks */}
+                {activeChapter.contents && activeChapter.contents.length > 0 && (
+                  <SortableContentBlocks
+                    contents={activeChapter.contents}
+                    chapter={activeChapter}
+                    reorderContentBlocks={reorderContentBlocks}
+                    setModule={setModule}
+                  />
+                )}
+                {/* Clickable Add Content Section (now at the end) */}
+                <div className="mt-8 text-center">
+                  <DroppableContentDropArea
+                    setDrawerOpen={setDrawerOpen}
+                    addContentToChapter={(type) => {
+                      if (activeLessonId && activeChapterId) {
+                        addContentToChapter(type, activeLessonId, activeChapterId);
+                      }
+                    }}
+                    activeLessonId={activeLessonId || ''}
+                    activeChapterId={activeChapterId || ''}
+                  />
+                </div>
+                {/* Create Next Chapter Button (at the end of lesson/chapter details) */}
+                <div className="flex justify-center mt-12">
+                  <Button
+                    onClick={() => setShowAddChapter(true)}
+                    className="rounded-full px-8 py-3 text-lg shadow-lg"
+                  >
+                    + Create Next Chapter
+                  </Button>
+                </div>
               </>
             )}
           </div>
-
-          {/* Lesson Description with Edit */}
-          <div className="mb-4">
-            {editingLessonDesc ? (
-              <div className="flex flex-col items-center gap-2">
-                <RichEditor
-                  content={lessonDescValue}
-                  onChange={setLessonDescValue}
-                />
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleLessonDescSave}>Save</Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditingLessonDesc(false)}>Cancel</Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2">
-                <div className="block" dangerouslySetInnerHTML={{ __html: activeLesson.description }} />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditingLessonDesc(true)}
-                  className="p-1"
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <hr className="my-6 border-border" />
-          
-          {activeChapter && (
-            <>
-              {/* Chapter Name with Edit */}
-              <div className="mb-4">
-                {editingChapterName ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <Input
-                      value={chapterNameValue}
-                      onChange={(e) => setChapterNameValue(e.target.value)}
-                      className="text-lg font-semibold text-center"
-                    />
-                    <Button size="sm" onClick={handleChapterNameSave}>Save</Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingChapterName(false)}>Cancel</Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="block text-lg font-semibold text-foreground">
-                      Chapter: {activeChapter.title}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditingChapterName(true)}
-                      className="p-1"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <hr className="my-6 border-border" />
-              
-              {/* Render content blocks */}
-              {activeChapter.contents && activeChapter.contents.length > 0 && (
-                <SortableContentBlocks
-                  contents={activeChapter.contents}
-                  chapter={activeChapter}
-                  reorderContentBlocks={reorderContentBlocks}
-                  setModule={setModule}
-                />
-              )}
-              {/* Clickable Add Content Section (now at the end) */}
-              <div className="mt-8 text-center">
-                <DroppableContentDropArea
-                  setDrawerOpen={setDrawerOpen}
-                  addContentToChapter={(type) => {
-                    if (activeLessonId && activeChapterId) {
-                      addContentToChapter(type, activeLessonId, activeChapterId);
-                    }
-                  }}
-                  activeLessonId={activeLessonId || ''}
-                  activeChapterId={activeChapterId || ''}
-                />
-              </div>
-              {/* Create Next Chapter Button (at the end of lesson/chapter details) */}
-              <div className="flex justify-center mt-12">
-                <Button
-                  onClick={() => setShowAddChapter(true)}
-                  className="rounded-full px-8 py-3 text-lg shadow-lg"
-                >
-                  + Create Next Chapter
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-      {/* Modal for creating next chapter */}
-      <Dialog open={showAddChapter} onOpenChange={setShowAddChapter}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Next Chapter</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={newChapterTitle}
-            onChange={e => setNewChapterTitle(e.target.value)}
-            placeholder="Chapter Title"
-            className="mb-2"
-          />
-          <div className="flex gap-2 mt-4 justify-end">
-            <DialogClose asChild>
-              <Button variant="outline" onClick={() => setShowAddChapter(false)}>Cancel</Button>
-            </DialogClose>
-            <Button
-              onClick={async () => {
-                // 1. Create the chapter in Frappe and get its docname
-                const chapterResponse = await createDoc("Chapter", {
-                  title: newChapterTitle,
-                  scoring: 0
-                });
-                if (!chapterResponse?.name) {
-                  toast.error("Failed to create chapter");
-                  return;
-                }
-                const newChapterId = chapterResponse.name;
-                // 2. Update local state: add the new chapter to the end of the active lesson's chapters
-                setModule((prev: any) => {
-                  if (!prev.lessons || prev.lessons.length === 0) return prev;
-                  const updatedLessons = prev.lessons.map((lesson: any) => {
-                    if (lesson.id === (activeLessonId || prev.lessons[0].id)) {
-                      return {
-                        ...lesson,
-                        chapters: [
-                          ...lesson.chapters,
-                          {
-                            id: newChapterId,
-                            title: newChapterTitle,
-                            contents: []
-                          }
-                        ]
-                      };
-                    }
-                    return lesson;
+        )}
+        {/* Modal for creating next chapter */}
+        <Dialog open={showAddChapter} onOpenChange={setShowAddChapter}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Next Chapter</DialogTitle>
+            </DialogHeader>
+            <Input
+              value={newChapterTitle}
+              onChange={e => setNewChapterTitle(e.target.value)}
+              placeholder="Chapter Title"
+              className="mb-2"
+            />
+            <div className="flex gap-2 mt-4 justify-end">
+              <DialogClose asChild>
+                <Button variant="outline" onClick={() => setShowAddChapter(false)}>Cancel</Button>
+              </DialogClose>
+              <Button
+                onClick={async () => {
+                  // 1. Create the chapter in Frappe and get its docname
+                  const chapterResponse = await createDoc("Chapter", {
+                    title: newChapterTitle,
+                    scoring: 0
                   });
-                  return { ...prev, lessons: updatedLessons };
-                });
-                // 3. Update the lesson in Frappe
-                const lesson = lessons.find((l: any) => l.id === (activeLessonId || lessons[0].id));
-                if (lesson) {
-                  const updatedChapters = [
-                    ...lesson.chapters,
-                    {
-                      id: newChapterId,
-                      title: newChapterTitle,
-                      contents: []
-                    }
-                  ];
-                  if (lesson.id) {
-                    await updateDoc("Lesson", lesson.id, {
-                      chapters: updatedChapters.map((ch, idx) => ({
-                        chapter: ch.id, // use Frappe docname
-                        order: idx + 1
-                      }))
-                    });
+                  if (!chapterResponse?.name) {
+                    toast.error("Failed to create chapter");
+                    return;
                   }
-                }
-                setShowAddChapter(false);
-                setNewChapterTitle('');
-              }}
-              disabled={!newChapterTitle}
-            >
-              Create
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {/*  Drawer for Content Types using shadcn/ui Drawer */}
-      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} direction="right">
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>Select Content Type</DrawerTitle>
-          </DrawerHeader>
-          <div className="relative flex w-full max-w-md mx-auto pb-6 px-4">
-            <div className="grid grid-cols-2 gap-4 flex-1">
-              {contentsList.map((content) => {
-                const LucideIcon = content.icon;
-                const showPreview = ["checklist", "steps", "accordion", "quiz", "question_answer"].includes(content.id);
+                  const newChapterId = chapterResponse.name;
+                  // 2. Update local state: add the new chapter to the end of the active lesson's chapters
+                  setModule((prev: any) => {
+                    if (!prev.lessons || prev.lessons.length === 0) return prev;
+                    const updatedLessons = prev.lessons.map((lesson: any) => {
+                      if (lesson.id === (activeLessonId || prev.lessons[0].id)) {
+                        return {
+                          ...lesson,
+                          chapters: [
+                            ...lesson.chapters,
+                            {
+                              id: newChapterId,
+                              title: newChapterTitle,
+                              contents: []
+                            }
+                          ]
+                        };
+                      }
+                      return lesson;
+                    });
+                    return { ...prev, lessons: updatedLessons };
+                  });
+                  // 3. Update the lesson in Frappe
+                  const lesson = lessons.find((l: any) => l.id === (activeLessonId || lessons[0].id));
+                  if (lesson) {
+                    const updatedChapters = [
+                      ...lesson.chapters,
+                      {
+                        id: newChapterId,
+                        title: newChapterTitle,
+                        contents: []
+                      }
+                    ];
+                    if (lesson.id) {
+                      await updateDoc("Lesson", lesson.id, {
+                        chapters: updatedChapters.map((ch, idx) => ({
+                          chapter: ch.id, // use Frappe docname
+                          order: idx + 1
+                        }))
+                      });
+                    }
+                  }
+                  setShowAddChapter(false);
+                  setNewChapterTitle('');
+                }}
+                disabled={!newChapterTitle}
+              >
+                Create
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        {/*  Drawer for Content Types using shadcn/ui Drawer */}
+        <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} direction="right">
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Select Content Type</DrawerTitle>
+            </DrawerHeader>
+            <div className="relative flex w-full max-w-md mx-auto pb-6 px-4">
+              <div className="grid grid-cols-2 gap-4 flex-1">
+                {contentsList.map((content) => {
+                  const LucideIcon = content.icon;
+                  const showPreview = ["checklist", "steps", "accordion", "quiz", "question_answer"].includes(content.id);
+                  return (
+                    <TooltipProvider key={content.id} delayDuration={200}>
+                      <Tooltip>
+                        {true && (
+                          <TooltipTrigger asChild>
+                            <Button
+                              className="flex flex-col items-center justify-center gap-2 py-6 min-h-[96px] min-w-[120px] rounded-lg border border-border bg-muted text-foreground hover:bg-accent hover:text-primary transition-colors text-base font-medium shadow-sm"
+                              variant="outline"
+                              style={{ background: 'var(--color-card, var(--color-background))' }}
+                              onClick={() => {
+                                if (activeLessonId && activeChapterId) {
+                                  addContentToChapter(content.id, activeLessonId, activeChapterId);
+                                  setDrawerOpen(false);
+                                }
+                              }}
+                              onMouseEnter={() => setHoveredType(showPreview ? content.id : null)}
+                              onMouseLeave={() => setHoveredType(null)}
+                            >
+                              <LucideIcon className="w-7 h-7 mb-1" />
+                              <span>{content.name}</span>
+                            </Button>
+                          </TooltipTrigger>
+                        )}
+                        {!showPreview && (
+                          <TooltipContent side="right" className="max-w-xs text-sm">
+                            {content.description}
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                })}
+              </div>
+              {/* Preview panel for supported types */}
+              {hoveredType && (() => {
+                const content = contentsList.find(c => c.id === hoveredType);
+                if (!content || !hasPreview(content)) return null;
+                const Preview = content.Preview;
+                let previewProps: any = {};
+                if (content.id === 'checklist') previewProps = { items: [{ item: 'Checklist item 1' }, { item: 'Checklist item 2' }] };
+                if (content.id === 'steps') previewProps = { steps: [{ item_name: 'Step 1', item_content: 'Do this' }, { item_name: 'Step 2', item_content: 'Do that' }] };
+                if (content.id === 'accordion') previewProps = { items: [{ header_title: 'Accordion 1', body_content: 'Accordion body 1' }, { header_title: 'Accordion 2', body_content: 'Accordion body 2' }] };
+                if (content.id === 'quiz') previewProps = { questions: [{ question: 'Sample question?', options: ['A', 'B', 'C'], answer: 'A' }] };
+                if (content.id === 'question_answer') previewProps = { question: 'Sample Q?', answer: 'Sample A' };
                 return (
-                  <TooltipProvider key={content.id} delayDuration={200}>
-                    <Tooltip>
-                      {true && (
-                        <TooltipTrigger asChild>
-                          <Button
-                            className="flex flex-col items-center justify-center gap-2 py-6 min-h-[96px] min-w-[120px] rounded-lg border border-border bg-muted text-foreground hover:bg-accent hover:text-primary transition-colors text-base font-medium shadow-sm"
-                            variant="outline"
-                            style={{ background: 'var(--color-card, var(--color-background))' }}
-                            onClick={() => {
-                              if (activeLessonId && activeChapterId) {
-                                addContentToChapter(content.id, activeLessonId, activeChapterId);
-                                setDrawerOpen(false);
-                              }
-                            }}
-                            onMouseEnter={() => setHoveredType(showPreview ? content.id : null)}
-                            onMouseLeave={() => setHoveredType(null)}
-                          >
-                            <LucideIcon className="w-7 h-7 mb-1" />
-                            <span>{content.name}</span>
-                          </Button>
-                        </TooltipTrigger>
-                      )}
-                      {!showPreview && (
-                        <TooltipContent side="right" className="max-w-xs text-sm">
-                          {content.description}
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
+                  <div className="absolute left-full top-0 ml-6 w-72 bg-card border border-border rounded-lg shadow-lg p-4 z-50 flex flex-col items-start min-h-[120px]">
+                    <div className="font-semibold mb-2 text-primary text-base">{content.name} Preview</div>
+                    <Preview {...previewProps} />
+                  </div>
                 );
-              })}
+              })()}
             </div>
-            {/* Preview panel for supported types */}
-            {hoveredType && (() => {
-              const content = contentsList.find(c => c.id === hoveredType);
-              if (!content || !hasPreview(content)) return null;
-              const Preview = content.Preview;
-              let previewProps: any = {};
-              if (content.id === 'checklist') previewProps = { items: [{ item: 'Checklist item 1' }, { item: 'Checklist item 2' }] };
-              if (content.id === 'steps') previewProps = { steps: [{ item_name: 'Step 1', item_content: 'Do this' }, { item_name: 'Step 2', item_content: 'Do that' }] };
-              if (content.id === 'accordion') previewProps = { items: [{ header_title: 'Accordion 1', body_content: 'Accordion body 1' }, { header_title: 'Accordion 2', body_content: 'Accordion body 2' }] };
-              if (content.id === 'quiz') previewProps = { questions: [{ question: 'Sample question?', options: ['A', 'B', 'C'], answer: 'A' }] };
-              if (content.id === 'question_answer') previewProps = { question: 'Sample Q?', answer: 'Sample A' };
-              return (
-                <div className="absolute left-full top-0 ml-6 w-72 bg-card border border-border rounded-lg shadow-lg p-4 z-50 flex flex-col items-start min-h-[120px]">
-                  <div className="font-semibold mb-2 text-primary text-base">{content.name} Preview</div>
-                  <Preview {...previewProps} />
-                </div>
-              );
-            })()}
-          </div>
-          <DrawerClose asChild>
-            <div className="flex justify-center">
-              <Button variant="destructive" className="w-1/2">Close</Button>
-            </div>
-          </DrawerClose>
-        </DrawerContent>
-      </Drawer>
-      {/* Floating draggable bar with framer-motion label animation */}
-      <FloatingDraggableBar />
+            <DrawerClose asChild>
+              <div className="flex justify-center">
+                <Button variant="destructive" className="w-1/2">Close</Button>
+              </div>
+            </DrawerClose>
+          </DrawerContent>
+        </Drawer>
+        {/* Floating draggable bar with framer-motion label animation */}
+        <FloatingDraggableBar />
+      </div>
     </div>
   );
 }

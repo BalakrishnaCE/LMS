@@ -32,7 +32,7 @@ export interface ModuleInfo {
   lessons?: Lesson[];
 }
 
-export default function TestModuleEdit() {
+export default function ModuleEdit() {
   const params = useParams();
   const moduleId = params?.moduleId;
   const [, setLocation] = useLocation();

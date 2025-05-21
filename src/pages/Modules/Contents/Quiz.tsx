@@ -177,7 +177,7 @@ export default function Quiz({ quizReference }: QuizProps) {
                         >
                           {question.options.map((option, optionIndex) => (
                             <div key={optionIndex} className="flex items-center space-x-2">
-                              <RadioGroupItem value={option.option_text} id={`${question.name}-option-${optionIndex}`} />
+                              <RadioGroupItem value={option.option_text} id={`${question.name}-option-${optionIndex}`} className="border-primary-background" />
                               <Label htmlFor={`${question.name}-option-${optionIndex}`}>{option.option_text}</Label>
                             </div>
                           ))}

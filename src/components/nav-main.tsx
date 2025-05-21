@@ -45,7 +45,7 @@ export function NavMain({
               size="icon"
               className="size-8 group-data-[collapsible=icon]:opacity-0 hover:text-white"
               variant="outline"
-              onClick={() => navigate('/module/new')}
+              onClick={() => navigate('/edit')}
             >
               <IconPlus className="size-4" />
               <span className="sr-only">Inbox</span>

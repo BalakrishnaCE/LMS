@@ -340,7 +340,7 @@ export default function ModuleDetail() {
                     </div>
 
                     {enableEditing && (
-                        <Link href={`/module/${module.name}/edit`} className="block">
+                        <Link href={`/edit/${module.name}`} className="block">
                             <Button variant="outline" className="w-full hover:bg-primary/10">
                                 Edit Module
                             </Button>
@@ -355,7 +355,7 @@ export default function ModuleDetail() {
                 animate={{ opacity: 1 }}
                 className="flex-1 overflow-y-auto"
             >
-                <div className="max-w-4xl mx-auto p-6">
+                <div className="w-full mx-auto p-6">
                     {currentLesson && (
                         <motion.div 
                             key={currentLesson.lesson}

@@ -8,7 +8,7 @@ import { NovelLMSFrappeProvider } from "@/lib/frappe-provider";
 import {Switch, Route, Router} from "wouter"
 import { Toaster } from "@/components/ui/sonner"
 import Learners from "@/pages/Learners/Learners";
-import ModuleEdit from "@/pages/ModuleEditor/ModuleEdit";
+// import ModuleEdit from "@/pages/ModuleEditor/ModuleEdit";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { BASE_PATH } from "@/config/routes";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -16,9 +16,10 @@ import { LearnerModulePage } from "@/pages/Modules/Learner/ModulePage";
 import Profile from "@/pages/Profile/Profile";
 import NotFound from "@/pages/NotFound";
 import LearnerModuleDetail from "@/pages/Modules/Learner/ModuleDetail";
-import TestModuleEdit from "@/pages/test/edit/testModuleEdit";
-import ModuleCreationForm from "@/pages/test/edit/ModuleCreationForm";
+import TestModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
+import ModuleCreationForm from "@/pages/ModuleEditor/edit/ModuleCreationForm";
 import { SiteHeader } from "@/components/site-header";
+import AnalyticsDashboard from "@/pages/Analytics/AnalyticsDashboard";
 
 function App() {
   return (
@@ -48,12 +49,6 @@ function App() {
               <ProtectedRoute path="/module/:moduleName" component={() => (
                 <ModuleDetail />
               )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} />
-              <ProtectedRoute path="/module/new" component={() => (
-                <ModuleEdit />
-              )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
-              <ProtectedRoute path="/module/:moduleName/edit" component={() => (
-                <ModuleEdit />
-              )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
               <ProtectedRoute path="/modules/learner" component={() => (
                 <Layout>
                   <LearnerModulePage />
@@ -72,17 +67,22 @@ function App() {
                 </Layout>
               )} allowedRoles={["LMS Admin", "LMS Student", "LMS Content Editor"]} />
               {/* Test module routes */}
-              <ProtectedRoute path="/test/edit" component={() => (
+              <ProtectedRoute path="/edit" component={() => (
                 <Layout>
                   <ModuleCreationForm />
                 </Layout>
               )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
-              <ProtectedRoute path="/test/edit/:moduleId" component={() => (
+              <ProtectedRoute path="/edit/:moduleId" component={() => (
                 <>
                   {/* <SiteHeader/> */}
                   <TestModuleEdit />
                   </>
               )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
+              <ProtectedRoute path="/analytics" component={() => (
+                <Layout>
+                  <AnalyticsDashboard />
+                </Layout>
+              )} allowedRoles={["LMS Admin"]} />
               {/* Show 404 for all unrecognized routes */}
               <Route path="/:path*" component={NotFound} />
             </Switch>

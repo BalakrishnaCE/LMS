@@ -2,7 +2,6 @@ import * as React from "react"
 import {
   IconChartBar,
   IconDashboard,
-  IconFolder,
   IconBook,
   IconListDetails,
   IconUsers,
@@ -59,22 +58,10 @@ const adminNavItems: NavItem[] = [
     tooltip: "Analytics",
   },
   {
-    title: "Projects",
-    url: ROUTES.PROJECTS,
-    icon: IconFolder,
-    tooltip: "Projects",
-  },
-  {
     title: "Learners",
     url: ROUTES.LEARNERS,
     icon: IconUsers,
     tooltip: "Learners",
-  },
-  {
-    title: "Test Nav",
-    url: "/test/edit",
-    icon: IconDashboard,  
-    tooltip: "Test Module Edit",
   },
 ];
 
