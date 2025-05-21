@@ -18,10 +18,11 @@ import NotFound from "@/pages/NotFound";
 import LearnerModuleDetail from "@/pages/Modules/Learner/ModuleDetail";
 import TestModuleEdit from "@/pages/test/edit/testModuleEdit";
 import ModuleCreationForm from "@/pages/test/edit/ModuleCreationForm";
+import { SiteHeader } from "@/components/site-header";
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="novel-lms-theme">
+    <ThemeProvider storageKey="novel-lms-theme">
       <div className="flex flex-col items-center justify-center min-h-svh">
         <NovelLMSFrappeProvider>
           <Router base={BASE_PATH}>
@@ -77,7 +78,10 @@ function App() {
                 </Layout>
               )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
               <ProtectedRoute path="/test/edit/:moduleId" component={() => (
-                <TestModuleEdit />
+                <>
+                  {/* <SiteHeader/> */}
+                  <TestModuleEdit />
+                  </>
               )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
               {/* Show 404 for all unrecognized routes */}
               <Route path="/:path*" component={NotFound} />

@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { ModuleInfo } from "./testModuleEdit";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, Settings, X, Pencil } from "lucide-react";
 import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
 import {
@@ -18,12 +18,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+} from "@/components/ui/sheet";
 import { BookIcon, FileTextIcon, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -39,6 +39,26 @@ import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Info, Settings as SettingsIcon } from "lucide-react";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Lesson {
   id: string;
@@ -59,6 +79,10 @@ interface ModuleSidebarProps {
   setActiveLessonId?: (id: string) => void;
   activeChapterId?: string | null;
   setActiveChapterId?: (id: string) => void;
+}
+
+interface LearnerRow {
+  user: string;
 }
 
 function SortableChapter({ chapter, index, activeChapterId, setActiveChapterId, setActiveLessonId, lessonId, onDelete }: any) {
@@ -102,12 +126,507 @@ function SortableChapter({ chapter, index, activeChapterId, setActiveChapterId, 
   );
 }
 
+function LearnerCombobox({ value, onChange, users }: { value: string; onChange: (val: string) => void; users: any[] }) {
+  const [open, setOpen] = useState(false);
+  const selectedUser = users.find((u) => u.name === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+        >
+          {selectedUser
+            ? `${selectedUser.full_name} (${selectedUser.email})`
+            : "Select learner"}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0">
+        <Command>
+          <CommandInput placeholder="Search learners..." />
+          <CommandList>
+            <CommandEmpty>No learner found.</CommandEmpty>
+            <CommandGroup>
+              {users.map((u) => (
+                <CommandItem
+                  key={u.name}
+                  value={u.name}
+                  onSelect={() => {
+                    onChange(u.name);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === u.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {u.full_name} <span className="text-muted-foreground">({u.email})</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Update SettingsDialog component
+function SettingsDialog({ 
+  open, 
+  onOpenChange, 
+  moduleInfo, 
+  editState, 
+  setEditState, 
+  onSave,
+  departments 
+}: { 
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  moduleInfo: ModuleInfo;
+  editState: ModuleInfo | null;
+  setEditState: (state: ModuleInfo | null) => void;
+  onSave: () => Promise<void>;
+  departments: any[];
+}) {
+  const handleFieldChange = (field: keyof ModuleInfo, value: any) => {
+    if (!editState) return;
+    setEditState({ ...editState, [field]: value });
+  };
+
+  // Fetch all users with LMS Student role
+  const { data: lmsStudents, isLoading: loadingStudents } = useFrappeGetDocList("User", {
+    fields: ["name", "full_name", "email", "enabled"],
+    filters: [["enabled", "=", 1]],
+    limit: 1000,
+  });
+  // Use all users from the data (no roles filter needed)
+  const studentUsers = lmsStudents || [];
+
+  // Local learners state for manual assignment
+  const [learners, setLearners] = useState<LearnerRow[]>(() => {
+    // Try to get from editState if present
+    // @ts-ignore
+    return (editState && (editState as any).learners) || [];
+  });
+  useEffect(() => {
+    // Sync local learners state if module changes
+    // @ts-ignore
+    setLearners((editState && (editState as any).learners) || []);
+  }, [editState]);
+
+  const handleAddLearnerRow = () => {
+    setLearners([...learners, { user: "" }]);
+  };
+  const handleRemoveLearnerRow = (idx: number) => {
+    setLearners(learners.filter((_, i) => i !== idx));
+  };
+  const handleLearnerChange = (idx: number, user: string) => {
+    setLearners(learners.map((l, i) => (i === idx ? { ...l, user } : l)));
+  };
+
+  // On save, sync learners to editState
+  const handleSaveWithLearners = async () => {
+    if (!editState) return;
+    // @ts-ignore
+    setEditState({ ...editState, learners });
+    await onSave();
+  };
+
+  const [search, setSearch] = useState("");
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-full p-0 overflow-y-auto">
+        <div className="h-full flex flex-col overflow-y-auto">
+          <SheetHeader className="p-6 border-b">
+            <SheetTitle>Module Settings</SheetTitle>
+          </SheetHeader>
+          <Tabs defaultValue="basic" className="flex-1 flex flex-col">
+            <TabsList className="mx-auto mt-4 mb-6">
+              <TabsTrigger value="basic">
+                <Info className="mr-2 w-4 h-4" /> Basic Details
+              </TabsTrigger>
+              <TabsTrigger value="settings">
+                <SettingsIcon className="mr-2 w-4 h-4" /> Settings
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex-1 overflow-y-auto px-6 pb-6 max-w-3xl mx-auto w-full">
+              <TabsContent value="basic">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label>Module Name</Label>
+                    <Input
+                      value={editState?.name || ""}
+                      onChange={(e) => handleFieldChange("name", e.target.value)}
+                      placeholder="Module Name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <RichEditor
+                      content={editState?.description || ""}
+                      onChange={(content) => handleFieldChange("description", content)}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="settings">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={editState?.status || "Draft"}
+                      onValueChange={(value) => handleFieldChange("status", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Draft">Draft</SelectItem>
+                        <SelectItem value="Published">Published</SelectItem>
+                        <SelectItem value="Archived">Archived</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Duration (days)</Label>
+                    <Input
+                      type="number"
+                      value={editState?.duration || ""}
+                      onChange={(e) => handleFieldChange("duration", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Assignment</Label>
+                    <Select
+                      value={editState?.assignment_based || "Everyone"}
+                      onValueChange={(value) => handleFieldChange("assignment_based", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Department">Department</SelectItem>
+                        <SelectItem value="Everyone">Everyone</SelectItem>
+                        <SelectItem value="Manual">Manual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {editState?.assignment_based === "Department" && (
+                    <div className="space-y-2">
+                      <Label>Department</Label>
+                      <Select
+                        value={editState?.department || ""}
+                        onValueChange={(value) => handleFieldChange("department", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departments?.map((dept, deptIndex) => (
+                            <SelectItem key={dept.name || `dept-${deptIndex}`} value={dept.name}>
+                              {dept.department}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {editState?.assignment_based === "Manual" && (
+                    <div className=" flex flex-col gap-2">
+                      <div>
+                        <Label>Learners</Label>
+                        {/* Searchable user table with Add button */}
+                        <Input
+                          placeholder="Search learners..."
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                          className="mb-2 w-full"
+                        />
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {studentUsers
+                              .filter(u =>
+                                u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+                                u.email?.toLowerCase().includes(search.toLowerCase())
+                              )
+                              .map(u => {
+                                const alreadyAdded = learners.some(l => l.user === u.name);
+                                return (
+                                  <TableRow key={u.name}>
+                                    <TableCell>{u.full_name}</TableCell>
+                                    <TableCell>{u.email}</TableCell>
+                                    <TableCell>
+                                      <Button
+                                        size="sm"
+                                        variant={alreadyAdded ? "secondary" : "outline"}
+                                        disabled={alreadyAdded}
+                                        onClick={() => {
+                                          if (!alreadyAdded) setLearners([...learners, { user: u.name }]);
+                                        }}
+                                      >
+                                        {alreadyAdded ? "Added" : "Add"}
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {/* Current module learners list */}
+                      <div className="mt-4">
+                        <Label>Current Learners</Label>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {learners.map((row, idx) => {
+                              const user = studentUsers.find(u => u.name === row.user);
+                              if (!user) return null;
+                              return (
+                                <TableRow key={row.user}>
+                                  <TableCell>{user.full_name}</TableCell>
+                                  <TableCell>{user.email}</TableCell>
+                                  <TableCell>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => setLearners(learners.filter((l, i) => i !== idx))}
+                                    >
+                                      Remove
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </div>
+          </Tabs>
+          <div className="p-6 border-t flex justify-end gap-2 max-w-3xl mx-auto w-full">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={handleSaveWithLearners}>Save Changes</Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// Update the Add Lesson Dialog to use Sheet
+function AddLessonDialog({ 
+  open, 
+  onOpenChange, 
+  onSubmit, 
+  loading 
+}: { 
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  loading: boolean;
+}) {
+  const [lessonTitle, setLessonTitle] = useState("");
+  const [lessonDesc, setLessonDesc] = useState("");
+  const [chapterTitle, setChapterTitle] = useState("");
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-full p-0 ">
+        <div className="h-full flex flex-col">
+          <SheetHeader className="p-6 border-b">
+            <div className="flex items-center justify-between">
+              <SheetTitle>Add Lesson & Chapter</SheetTitle>
+              <SheetClose asChild>
+                <Button variant="ghost" size="icon">
+                  <X className="h-4 w-4" />
+                </Button>
+              </SheetClose>
+            </div>
+          </SheetHeader>
+          
+          <div className="flex-1 overflow-y-auto p-6">
+            <form className="space-y-4 max-w-3xl mx-auto" onSubmit={onSubmit}>
+              <div>
+                <Label htmlFor="sidebar-lesson-title" className="text-sm font-semibold mb-1 block">Lesson Title</Label>
+                <Input
+                  id="sidebar-lesson-title"
+                  value={lessonTitle}
+                  onChange={e => setLessonTitle(e.target.value)}
+                  placeholder="Enter lesson title"
+                  className="w-full text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="sidebar-lesson-desc" className="text-sm font-semibold mb-1 block">Lesson Description</Label>
+                <RichEditor
+                  content={lessonDesc}
+                  onChange={setLessonDesc}
+                />
+              </div>
+              <div>
+                <Label htmlFor="sidebar-chapter-title" className="text-sm font-semibold mb-1 block">Chapter Title</Label>
+                <Input
+                  id="sidebar-chapter-title"
+                  value={chapterTitle}
+                  onChange={e => setChapterTitle(e.target.value)}
+                  placeholder="Enter chapter title"
+                  className="w-full text-sm"
+                  required
+                />
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Adding..." : "Create Lesson & Chapter"}
+                </Button>
+                <SheetClose asChild>
+                  <Button type="button" variant="outline" onClick={() => { setLessonTitle(""); setLessonDesc(""); setChapterTitle(""); }}>
+                    Cancel
+                  </Button>
+                </SheetClose>
+              </div>
+            </form>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// Update DeleteLessonDialog to use Sheet
+function DeleteLessonDialog({
+  open,
+  onOpenChange,
+  onConfirm
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-full p-0">
+        <div className="h-full flex flex-col">
+          <SheetHeader className="p-6 border-b">
+            <div className="flex items-center justify-between">
+              <SheetTitle>Delete Lesson</SheetTitle>
+              <SheetClose asChild>
+                <Button variant="ghost" size="icon">
+                  <X className="h-4 w-4" />
+                </Button>
+              </SheetClose>
+            </div>
+          </SheetHeader>
+          
+          <div className="flex-1 p-6">
+            <div className="max-w-3xl mx-auto space-y-4">
+              <p className="text-muted-foreground">
+                Are you sure you want to delete this lesson? This action cannot be undone and will also delete all chapters within this lesson.
+              </p>
+              <div className="flex justify-end gap-2">
+                <SheetClose asChild>
+                  <Button variant="outline">Cancel</Button>
+                </SheetClose>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    onConfirm();
+                    onOpenChange(false);
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// Update DeleteChapterDialog to use Sheet
+function DeleteChapterDialog({
+  open,
+  onOpenChange,
+  onConfirm
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-full p-0">
+        <div className="h-full flex flex-col">
+          <SheetHeader className="p-6 border-b">
+            <div className="flex items-center justify-between">
+              <SheetTitle>Delete Chapter</SheetTitle>
+              <SheetClose asChild>
+                <Button variant="ghost" size="icon">
+                  <X className="h-4 w-4" />
+                </Button>
+              </SheetClose>
+            </div>
+          </SheetHeader>
+          
+          <div className="flex-1 p-6">
+            <div className="max-w-3xl mx-auto space-y-4">
+              <p className="text-muted-foreground">
+                Are you sure you want to delete this chapter? This action cannot be undone and will also delete all content within this chapter.
+              </p>
+              <div className="flex justify-end gap-2">
+                <SheetClose asChild>
+                  <Button variant="outline">Cancel</Button>
+                </SheetClose>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    onConfirm();
+                    onOpenChange(false);
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFinishSetup, isMobile, onLessonAdded, activeLessonId, setActiveLessonId, activeChapterId, setActiveChapterId }: ModuleSidebarProps) {
   const [, setLocation] = useLocation();
   const { updateDoc, loading: saving } = useFrappeUpdateDoc();
   const [editState, setEditState] = useState<ModuleInfo | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [addingLesson, setAddingLesson] = useState(false);
   const [lessonTitle, setLessonTitle] = useState("");
   const [lessonDesc, setLessonDesc] = useState("");
@@ -154,7 +673,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     
     try {
       // Prepare the update data
-      const updateData = {
+      const updateData: any = {
         name1: editState.name1,
         description: editState.description,
         duration: editState.duration,
@@ -165,12 +684,18 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
 
       // Only include lessons if they exist in the current module state
       if (module?.lessons) {
-        // Map the lessons to the format expected by Frappe
         const formattedLessons = module.lessons.map((lesson, index) => ({
           lesson: lesson.id,
           order: index + 1
         }));
-        (updateData as any).lessons = formattedLessons;
+        updateData.lessons = formattedLessons;
+      }
+
+      // --- ADD: include learners if assignment_based is Manual ---
+      if (editState.assignment_based === "Manual") {
+        // learners should be an array of { user: userId }
+        // @ts-ignore
+        updateData.learners = (editState as any).learners || [];
       }
 
       // Update module info
@@ -178,19 +703,13 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
 
       toast.success("Module saved successfully");
       setHasChanges(false);
-      setIsEditing(false);
+      setShowSettings(false);
       onFinishSetup?.(editState);
     } catch (err) {
       console.error("Save error:", err);
       toast.error("Failed to save module");
     }
   };
-
-  const handleFieldChange = (field: keyof ModuleInfo, value: any) => {
-    if (!editState) return;
-    setEditState(prev => prev ? { ...prev, [field]: value } : null);
-  };
-
 
   // Add lesson handler
   const handleAddLesson = async (e: React.FormEvent) => {
@@ -341,323 +860,141 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                 <ArrowLeftIcon className="w-4 h-4" /> Back to Modules
               </Button>
 
-            <AnimatePresence mode="wait">
-              {moduleInfo && (
-                <motion.div
-                  key={`module-info-${moduleInfo.id}`}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.25 }}
-                  className="space-y-4"
-                >
-                  {/* Save Button */}
-                  <Button
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={handleSave}
-                    disabled={!hasChanges || saving}
+              <AnimatePresence mode="wait">
+                {moduleInfo && (
+                  <motion.div
+                    key={`module-info-${moduleInfo.id}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.25 }}
+                    className="space-y-4"
                   >
-                    {saving ? "Saving..." : "Save"}
-                  </Button>
-
-                  <div className="space-y-2">
-                    {isEditing ? (
-                      <Input
-                        value={editState?.name1 || ""}
-                        onChange={(e) => handleFieldChange("name1", e.target.value)}
-                        placeholder="Module Name"
-                        className="text-lg font-bold"
-                      />
-                    ) : (
-                      <div className="font-bold text-lg truncate" title={moduleInfo.name}>
-                        {moduleInfo.name}
-                      </div>
-                    )}
-                    <div className="text-xs text-muted-foreground">ID: {moduleInfo.id}</div>
-                  </div>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Status:</span>
-                      {isEditing ? (
-                        <Select
-                          value={editState?.status || "Draft"}
-                          onValueChange={(value) => handleFieldChange("status", value)}
-                        >
-                          <SelectTrigger className="w-[120px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Draft">Draft</SelectItem>
-                            <SelectItem value="Published">Published</SelectItem>
-                            <SelectItem value="Archived">Archived</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="font-medium">{moduleInfo.status}</span>
-                      )}
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Duration:</span>
-                      {isEditing ? (
-                        <Input
-                          type="number"
-                          value={editState?.duration || ""}
-                          onChange={(e) => handleFieldChange("duration", e.target.value)}
-                          className="w-[100px]"
-                        />
-                      ) : (
-                        <span className="font-medium">{moduleInfo.duration} days</span>
-                      )}
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Assignment:</span>
-                      {isEditing ? (
-                        <Select
-                          value={editState?.assignment_based || "Everyone"}
-                          onValueChange={(value) => handleFieldChange("assignment_based", value)}
-                        >
-                          <SelectTrigger className="w-[120px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Department">Department</SelectItem>
-                            <SelectItem value="Everyone">Everyone</SelectItem>
-                            <SelectItem value="Manual">Manual</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="font-medium">{moduleInfo.assignment_based}</span>
-                      )}
-                    </div>
-
-                    {moduleInfo.assignment_based === "Department" && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Department:</span>
-                        {isEditing ? (
-                          <Select
-                            value={editState?.department || ""}
-                            onValueChange={(value) => handleFieldChange("department", value)}
-                          >
-                            <SelectTrigger className="w-[120px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {departments?.map((dept, deptIndex) => (
-                                <SelectItem key={dept.name || `dept-${deptIndex}`} value={dept.name}>
-                                  {dept.department}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className="font-medium">{moduleInfo.department}</span>
-                        )}
-                      </div>
-                    )}
-
-                    {moduleInfo.created_by && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Created by:</span>
-                        <span className="font-medium">{moduleInfo.created_by}</span>
-                      </div>
-                    )}
-
-                    {moduleInfo.creation && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Created on:</span>
-                        <span className="font-medium">
-                          {format(new Date(moduleInfo.creation), 'MMM d, yyyy')}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-medium">Description</h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsEditing(!isEditing)}
-                      >
-                        {isEditing ? "Done" : "Edit"}
-                      </Button>
-                    </div>
-                    {isEditing ? (
-                      <RichEditor
-                        content={editState?.description || ""}
-                        onChange={(content) => handleFieldChange("description", content)}
-                      />
-                    ) : (
-                      <div 
-                        className="prose prose-sm text-muted-foreground"
-                        dangerouslySetInnerHTML={{ __html: moduleInfo.description || "" }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Lessons/Chapters Hierarchy */}
-                  {module?.lessons && module.lessons.length > 0 && (
-                    <div className="mt-6">
-                      <h4 className="text-sm font-semibold mb-2">Lessons</h4>
-                      <ul className="space-y-2">
-                        {module.lessons.map((lesson, lessonIndex) => {
-                          const isActiveLesson = lesson.id === activeLessonId;
-                          return (
-                            <motion.li
-                              key={lesson.id || `lesson-${lessonIndex}`}
-                              layout
-                              className={`relative rounded-lg px-3 py-2 transition-all cursor-pointer group
-                                ${isActiveLesson ? "bg-primary/10 border-l-4 border-primary shadow-md" : "hover:bg-muted"}
-                              `}
-                              onClick={() => {
-                                setActiveLessonId && setActiveLessonId(lesson.id);
-                                if (lesson.chapters?.length && setActiveChapterId) {
-                                  setActiveChapterId(lesson.chapters[0].id);
-                                }
-                              }}
-                            >
-                              <div className={`flex items-center justify-between gap-2 min-w-0 ${isActiveLesson ? "text-primary font-bold" : "text-foreground"}`}>
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <BookIcon className="w-4 h-4" />
-                                  <span className="truncate flex-1 min-w-0">{lesson.title}</span>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
-                                  onClick={e => { e.stopPropagation(); setLessonToDelete(lesson.id); setShowDeleteLessonDialog(true); }}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                              {lesson.chapters && lesson.chapters.length > 0 && (
-                                <DndContext
-                                  collisionDetection={closestCenter}
-                                  onDragStart={() => handleChapterDragStart(lesson.id, lesson.chapters)}
-                                  onDragEnd={event => handleChapterDragEnd(event, lesson)}
-                                >
-                                  <SortableContext
-                                    items={lesson.chapters.map((c: any) => c.id)}
-                                    strategy={verticalListSortingStrategy}
-                                  >
-                                    <ul className="ml-6 mt-1 space-y-1">
-                                      {lesson.chapters.map((chapter, chapterIndex) => (
-                                        <SortableChapter
-                                          key={chapter.id || `chapter-${lesson.id}-${chapterIndex}`}
-                                          chapter={chapter}
-                                          index={chapterIndex}
-                                          activeChapterId={activeChapterId}
-                                          setActiveChapterId={setActiveChapterId}
-                                          setActiveLessonId={setActiveLessonId}
-                                          lessonId={lesson.id}
-                                          onDelete={() => { setChapterToDelete({ lessonId: lesson.id, chapterId: chapter.id }); setShowDeleteChapterDialog(true); }}
-                                        />
-                                      ))}
-                                    </ul>
-                                  </SortableContext>
-                                </DndContext>
-                              )}
-                            </motion.li>
-                          );
-                        })}
-                      </ul>
-                      {/* Add Lesson Button and Dialog */}
-                      <Dialog open={addingLesson} onOpenChange={setAddingLesson}>
-                        <div className="flex justify-center mt-6">
-                          <Button
-                            size={isMobile ? "default" : "lg"}
-                            className={`rounded-full ${isMobile ? 'w-full max-w-xs mx-auto px-4 py-3 text-base' : 'px-8 py-4 text-lg'} shadow-lg`}
-                            onClick={() => setAddingLesson(true)}
-                          >
-                            + Add Lesson
-                          </Button>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-lg break-words whitespace-pre-wrap" title={moduleInfo.name}>
+                          {moduleInfo.name}
                         </div>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Add Lesson & Chapter</DialogTitle>
-                          </DialogHeader>
-                          <form className="space-y-4" onSubmit={handleAddLesson}>
-                            <div>
-                              <Label htmlFor="sidebar-lesson-title" className="text-sm font-semibold mb-1 block">Lesson Title</Label>
-                              <Input
-                                id="sidebar-lesson-title"
-                                value={lessonTitle}
-                                onChange={e => setLessonTitle(e.target.value)}
-                                placeholder="Enter lesson title"
-                                className="w-full text-sm"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="sidebar-lesson-desc" className="text-sm font-semibold mb-1 block">Lesson Description</Label>
-                              <RichEditor
-                                content={lessonDesc}
-                                onChange={setLessonDesc}
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="sidebar-chapter-title" className="text-sm font-semibold mb-1 block">Chapter Title</Label>
-                              <Input
-                                id="sidebar-chapter-title"
-                                value={chapterTitle}
-                                onChange={e => setChapterTitle(e.target.value)}
-                                placeholder="Enter chapter title"
-                                className="w-full text-sm"
-                                required
-                              />
-                            </div>
-                            <div className="flex gap-2 mt-2">
-                              <Button type="submit" className="w-full" disabled={addingLessonLoading}>{addingLessonLoading ? "Adding..." : "Create Lesson & Chapter"}</Button>
-                              <DialogClose asChild>
-                                <Button type="button" variant="outline" onClick={() => { setAddingLesson(false); setLessonTitle(""); setLessonDesc(""); setChapterTitle(""); }}>Cancel</Button>
-                              </DialogClose>
-                            </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowSettings(true)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                    <div className="space-y-2">
+                      <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: moduleInfo.description || "" }} />
+                    </div>
+
+                    {/* Lessons/Chapters Hierarchy */}
+                    {module?.lessons && module.lessons.length > 0 && (
+                      <div className="mt-6">
+                        <h4 className="text-sm font-semibold mb-2">Lessons</h4>
+                        <ul className="space-y-2">
+                          {module.lessons.map((lesson, lessonIndex) => {
+                            const isActiveLesson = lesson.id === activeLessonId;
+                            return (
+                              <motion.li
+                                key={lesson.id || `lesson-${lessonIndex}`}
+                                layout
+                                className={`relative rounded-lg px-3 py-2 transition-all cursor-pointer group
+                                  ${isActiveLesson ? "bg-primary/10 border-l-4 border-primary shadow-md" : "hover:bg-muted"}
+                                `}
+                                onClick={() => {
+                                  setActiveLessonId && setActiveLessonId(lesson.id);
+                                  if (lesson.chapters?.length && setActiveChapterId) {
+                                    setActiveChapterId(lesson.chapters[0].id);
+                                  }
+                                }}
+                              >
+                                <div className={`flex items-center justify-between gap-2 min-w-0 ${isActiveLesson ? "text-primary font-bold" : "text-foreground"}`}>
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <BookIcon className="w-4 h-4" />
+                                    <span className="truncate flex-1 min-w-0">{lesson.title}</span>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+                                    onClick={e => { e.stopPropagation(); setLessonToDelete(lesson.id); setShowDeleteLessonDialog(true); }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                                {lesson.chapters && lesson.chapters.length > 0 && (
+                                  <DndContext
+                                    collisionDetection={closestCenter}
+                                    onDragStart={() => handleChapterDragStart(lesson.id, lesson.chapters)}
+                                    onDragEnd={event => handleChapterDragEnd(event, lesson)}
+                                  >
+                                    <SortableContext
+                                      items={lesson.chapters.map((c: any) => c.id)}
+                                      strategy={verticalListSortingStrategy}
+                                    >
+                                      <ul className="ml-6 mt-1 space-y-1">
+                                        {lesson.chapters.map((chapter, chapterIndex) => (
+                                          <SortableChapter
+                                            key={chapter.id || `chapter-${lesson.id}-${chapterIndex}`}
+                                            chapter={chapter}
+                                            index={chapterIndex}
+                                            activeChapterId={activeChapterId}
+                                            setActiveChapterId={setActiveChapterId}
+                                            setActiveLessonId={setActiveLessonId}
+                                            lessonId={lesson.id}
+                                            onDelete={() => { setChapterToDelete({ lessonId: lesson.id, chapterId: chapter.id }); setShowDeleteChapterDialog(true); }}
+                                          />
+                                        ))}
+                                      </ul>
+                                    </SortableContext>
+                                  </DndContext>
+                                )}
+                              </motion.li>
+                            );
+                          })}
+                        </ul>
+                        {/* Add Lesson Button and Dialog */}
+                        <AddLessonDialog
+                          open={addingLesson}
+                          onOpenChange={setAddingLesson}
+                          onSubmit={handleAddLesson}
+                          loading={addingLessonLoading}
+                        />
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </motion.aside>
       )}
+
+      {/* Settings Dialog */}
+      <SettingsDialog
+        open={showSettings}
+        onOpenChange={setShowSettings}
+        moduleInfo={moduleInfo!}
+        editState={editState}
+        setEditState={setEditState}
+        onSave={handleSave}
+        departments={departments || []}
+      />
+
       {/* Delete Lesson Dialog */}
-      <AlertDialog open={showDeleteLessonDialog} onOpenChange={setShowDeleteLessonDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Lesson</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this lesson? This action cannot be undone and will also delete all chapters within this lesson.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteLesson} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteLessonDialog
+        open={showDeleteLessonDialog}
+        onOpenChange={setShowDeleteLessonDialog}
+        onConfirm={handleDeleteLesson}
+      />
+
       {/* Delete Chapter Dialog */}
-      <AlertDialog open={showDeleteChapterDialog} onOpenChange={setShowDeleteChapterDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Chapter</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this chapter? This action cannot be undone and will also delete all content within this chapter.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteChapter} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteChapterDialog
+        open={showDeleteChapterDialog}
+        onOpenChange={setShowDeleteChapterDialog}
+        onConfirm={handleDeleteChapter}
+      />
     </AnimatePresence>
   );
 } 

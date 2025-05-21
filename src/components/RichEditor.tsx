@@ -19,6 +19,7 @@ import { History } from 'reactjs-tiptap-editor/history';
 import { Iframe } from 'reactjs-tiptap-editor/iframe'; 
 import { Indent } from 'reactjs-tiptap-editor/indent'; 
 import { LineHeight } from 'reactjs-tiptap-editor/lineheight'; 
+import { Color } from 'reactjs-tiptap-editor/color'; 
 import { ListItem } from 'reactjs-tiptap-editor/listitem'; 
 import { MoreMark } from 'reactjs-tiptap-editor/moremark'; 
 import { ColumnActionButton } from 'reactjs-tiptap-editor/multicolumn'; 
@@ -28,8 +29,11 @@ import { TextUnderline } from 'reactjs-tiptap-editor/textunderline';
 import { TextAlign } from 'reactjs-tiptap-editor/textalign'; 
 import { Mermaid } from 'reactjs-tiptap-editor/mermaid'; 
 import { BubbleMenuMermaid } from 'reactjs-tiptap-editor/bubble-extra'; 
-import { Excalidraw } from 'reactjs-tiptap-editor/excalidraw'; 
-import { BubbleMenuExcalidraw } from 'reactjs-tiptap-editor/bubble-extra'; 
+import { Video } from 'reactjs-tiptap-editor/video'; 
+import { FontFamily } from 'reactjs-tiptap-editor/fontfamily'; 
+import { SlashCommand } from 'reactjs-tiptap-editor/slashcommand'; 
+import { Strike } from 'reactjs-tiptap-editor/strike'; 
+import { Emoji } from 'reactjs-tiptap-editor/emoji'; 
 
 import 'reactjs-tiptap-editor/style.css';
 
@@ -37,6 +41,7 @@ interface RichEditorProps {
     content: string;
     onChange: (content: string) => void;
     disabled?: boolean;
+    theme?: string;
 }
 
 const extensions = [
@@ -52,20 +57,24 @@ const extensions = [
         depth: 100,
         newGroupDelay: 500,
     }),
-    Bold.configure(
-      toolbar: false,
-    ),
+    Bold.configure(),
     Italic.configure(),
     TextUnderline.configure(),
     Code.configure(),
     Heading.configure({
         levels: [1, 2, 3],
     }),
+    Strike.configure(),
     BulletList.configure(),
     OrderedList.configure(),
     // ListItem.configure(),
     FontSize.configure(),
-    TextAlign.configure(toolbar: false,),
+    FontFamily.configure(),
+    TextAlign.configure({
+      types: ['heading', 'paragraph'],
+      alignments: ['left', 'center', 'right', 'justify'],
+    }),
+    Emoji.configure(),
     Image.configure({
       upload: async (files: File) => {
         const formData = new FormData();
@@ -92,6 +101,32 @@ const extensions = [
         }
       },
     }),
+    Video.configure({
+      
+        upload: async (files: File) => {
+            const formData = new FormData();
+            formData.append('file', files);
+            try {
+                const response = await fetch('http://10.80.4.72/api/method/upload_file', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                    credentials: 'include',
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to upload file');
+                }
+                const data = await response.json();
+                return "http://10.80.4.72" + data.message.file_url
+            } catch (e) {
+                console.error(e);
+                throw new Error('Failed to upload file');
+            }
+        },
+    }),
     Link.configure({
         openOnClick: false,
         HTMLAttributes: {
@@ -102,6 +137,7 @@ const extensions = [
         resizable: true,
     }),
     FormatPainter.configure(),
+    Color.configure(),
     Highlight.configure(),
     HorizontalRule.configure(),
     Iframe.configure(),
@@ -110,34 +146,8 @@ const extensions = [
     MoreMark.configure(),
     ColumnActionButton.configure(),
     Mermaid.configure(),
-    Excalidraw.configure({
-        upload: async (files: File) => {
-        const formData = new FormData();
-        formData.append('file', files);
-
-        try {
-          const response = await fetch('http://10.80.4.72/api/method/upload_file', {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': 'token xxxx:yyyy',
-            },
-            body: formData,
-            credentials: 'include',
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to upload file');
-          }
-
-          const data = await response.json();
-          return data.file_url;
-        } catch (e) {
-          console.error(e);
-          throw new Error('Failed to upload file');
-        }
-      },
-    }),
+    SlashCommand.configure(),
+    TextBubble.configure(),
 ];
 
 const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, disabled = false }) => {
@@ -177,10 +187,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, disabled = f
                           editor={editor}
                           key="mermaid"
                         /> : null}
-                        {extensionsNames.includes('excalidraw')  ? <BubbleMenuExcalidraw disabled={disabled}
-                            editor={editor}
-                            key="excalidraw"
-                        /> : null} 
                       </>
                     },
                   }}
