@@ -16,10 +16,10 @@ import { LearnerModulePage } from "@/pages/Modules/Learner/ModulePage";
 import Profile from "@/pages/Profile/Profile";
 import NotFound from "@/pages/NotFound";
 import LearnerModuleDetail from "@/pages/Modules/Learner/ModuleDetail";
-import TestModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
+import ModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
 import ModuleCreationForm from "@/pages/ModuleEditor/edit/ModuleCreationForm";
-import { SiteHeader } from "@/components/site-header";
 import AnalyticsDashboard from "@/pages/Analytics/AnalyticsDashboard";
+import TESTH5P from '@/pages/Test/TESTH5P';
 
 function App() {
   return (
@@ -55,7 +55,7 @@ function App() {
                 </Layout>
               )} allowedRoles={["LMS Student"]} />
               {/* Detailed module view with progress tracking */}
-              <ProtectedRoute path="/modules/learner/:moduleName" component={LearnerModuleDetail} allowedRoles={["LMS Student"]} />
+              <ProtectedRoute path="/modules/learner/:moduleName" component={LearnerModuleDetail} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
               <ProtectedRoute path="/learners" component={() => (
                 <Layout>
                   <Learners />
@@ -75,7 +75,7 @@ function App() {
               <ProtectedRoute path="/edit/:moduleId" component={() => (
                 <>
                   {/* <SiteHeader/> */}
-                  <TestModuleEdit />
+                  <ModuleEdit />
                   </>
               )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
               <ProtectedRoute path="/analytics" component={() => (
@@ -83,6 +83,11 @@ function App() {
                   <AnalyticsDashboard />
                 </Layout>
               )} allowedRoles={["LMS Admin"]} />
+              <ProtectedRoute path="/test/h5p" component={() => (
+                <Layout>
+                  <TESTH5P />
+                </Layout>
+              )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} />
               {/* Show 404 for all unrecognized routes */}
               <Route path="/:path*" component={NotFound} />
             </Switch>

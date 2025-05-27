@@ -48,7 +48,7 @@ export default function ModuleCreationForm() {
 
       if (response?.name) {
         toast.success("Module created successfully");
-        setLocation(`/test/edit/${response.name}`);
+        setLocation(`/edit/${response.name}`);
       } else {
         throw new Error("Invalid response from server");
       }

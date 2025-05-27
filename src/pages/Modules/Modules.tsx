@@ -214,71 +214,72 @@ function Modules({ itemsPerPage }: ModulesProps) {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 max-w-300 p-4">
-                {module_list?.map((module) => (
-                    <motion.div
-                        key={module.name}
-                        whileHover={{ 
-                            scale: 1.02,
-                            transition: { duration: 0.2 }
-                        }}
-                        className="h-full"
-                    >
-                        <Card 
-                            className={`@container/card border-t-2 relative overflow-hidden h-full ${module.image ? 'min-h-[200px]' : ''}`} 
+                {module_list?.map((module) => {
+                    // Status bar color logic
+                    let statusColor = "bg-gray-200 text-gray-700";
+                    if (module.status === "Published") statusColor = "bg-green-100 text-green-700";
+                    else if (module.status === "Approval Pending") statusColor = "bg-amber-100 text-amber-700";
+                    else if (module.status === "Draft") statusColor = "bg-gray-200 text-gray-700";
+
+                    let statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
+                    if (module.status === "Published") statusDarkColor = "dark:bg-green-900 dark:text-green-300";
+                    else if (module.status === "Approval Pending") statusDarkColor = "dark:bg-amber-900 dark:text-amber-200";
+                    else if (module.status === "Draft") statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
+
+                    return (
+                        <motion.div
+                            key={module.name}
+                            whileHover={{ 
+                                scale: 1.02,
+                                transition: { duration: 0.2 }
+                            }}
+                            className="h-full"
                         >
-                            {module.image && (
-                                <div 
-                                    className="absolute inset-0 bg-cover bg-center"
-                                    style={{ 
-                                        backgroundImage: `url(${module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`})`,
-                                    }}
-                                >
-                                    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/70 to-black/70" />
-                                </div>
-                            )}
-                            <CardHeader className={`relative ${module.image ? 'text-white' : ''}`}>
-                                <div className="flex items-center justify-between gap-2">
-                                    <CardTitle className={`text-sm font-semibold ${module.image ? 'drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]' : ''}`}>
-                                        {module.name1}
-                                    </CardTitle>
-                                    {module.status === "Published" ? (
-                                        <Badge variant="outline" className="bg-green-50/95 text-green-700 border-green-200 shrink-0">
-                                            <IconPointFilled className="text-green-500 mr-1 h-2 w-2" />
-                                            Published
-                                        </Badge>
-                                    ) : module.status === "Approval Pending" ? (
-                                        <Badge variant="outline" className="bg-amber-50/95 text-amber-700 border-amber-200 shrink-0">
-                                            <IconPointFilled className="text-amber-500 mr-1 h-2 w-2" />
-                                            Pending
-                                        </Badge>
+                            <Card className="@container/card overflow-hidden h-full hover:shadow-lg transition-all duration-300 dark:hover:border-primary/50 dark:hover:bg-accent/50 !pt-0 !py-0">
+                                <div className="relative">
+                                    {/* Status Bar */}
+                                    <div className={`w-full h-8 flex items-center justify-center text-sm font-medium ${statusColor} ${statusDarkColor} z-10`}
+                                         style={{ position: 'absolute', top: 0, left: 0 }}>
+                                        {module.status === "Approval Pending" ? "Pending" : module.status}
+                                    </div>
+                                    {/* Image or Letter Avatar */}
+                                    {module.image ? (
+                                        <div 
+                                            className="w-full h-48 bg-cover bg-center pb-4"
+                                            style={{ 
+                                                backgroundImage: `url(${module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`})`,
+                                                marginTop: '2rem', // To push image below the status bar
+                                            }}
+                                        />
                                     ) : (
-                                        <Badge variant="outline" className="bg-gray-50/95 text-gray-700 border-gray-200 shrink-0">
-                                            <IconPointFilled className="text-gray-500 mr-1 h-2 w-2" />
-                                            Draft
-                                        </Badge>
+                                        <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 pb-4" style={{ marginTop: '2rem' }}>
+                                            <span className="text-6xl font-semibold text-primary/60 dark:text-primary/70">
+                                                {module.name1.charAt(0).toUpperCase()}
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
-                            </CardHeader>
-                            <CardContent className={`relative ${module.image ? 'text-white' : ''}`}>
-                                <CardDescription className={`${module.image ? 'text-white/95 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' : ''}`}>
-                                    {module.short_text}
-                                </CardDescription>
-                            </CardContent>
-                            <CardFooter className="flex justify-between flex-col gap-4 relative">
-                                <Link href={`/module/${module.name}`} className="w-full">
-                                    <Button 
-                                        variant={ "outline"} 
-                                        className={`w-full transition-colors duration-200 ${
-                                             'hover:text-white'
-                                        }`}
-                                    >
-                                        View
-                                    </Button>
-                                </Link>
-                            </CardFooter>
-                        </Card>
-                    </motion.div>
-                ))}
+
+                                <CardHeader className="space-y-1 pb-4">
+                                    <CardTitle className="text-lg dark:text-foreground  ">
+                                        {module.name1}
+                                    </CardTitle>
+                                </CardHeader>
+
+                                <CardFooter className="pt-0 pb-4">
+                                    <Link href={`/modules/learner/${module.name}`} className="w-full">
+                                        <Button 
+                                            variant="outline"
+                                            className="w-full transition-all duration-200 dark:text-foreground dark:hover:bg-primary dark:hover:text-primary-foreground dark:border-primary/50 hover:scale-[1.02] active:scale-[0.98]"
+                                        >
+                                            View
+                                        </Button>
+                                    </Link>
+                                </CardFooter>
+                            </Card>
+                        </motion.div>
+                    )
+                })}
             </div>
 
             <div className="flex justify-center mt-6">
@@ -291,16 +292,68 @@ function Modules({ itemsPerPage }: ModulesProps) {
                             />
                         </PaginationItem>
                         
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                            <PaginationItem key={pageNum}>
-                                <PaginationLink
-                                    onClick={() => handlePageChange(pageNum)}
-                                    isActive={page === pageNum}
-                                >
-                                    {pageNum}
-                                </PaginationLink>
-                            </PaginationItem>
-                        ))}
+                        {/* Updated Pagination Logic with Ellipsis */}
+                        {(() => {
+                            const pageButtons = [];
+                            const maxPageButtons = 5; // Show at most 5 page numbers (can adjust)
+                            let startPage = Math.max(1, page - 1);
+                            let endPage = Math.min(totalPages, page + 1);
+
+                            // Always show first and last page
+                            if (page <= 3) {
+                                startPage = 1;
+                                endPage = Math.min(totalPages, maxPageButtons);
+                            } else if (page >= totalPages - 2) {
+                                startPage = Math.max(1, totalPages - maxPageButtons + 1);
+                                endPage = totalPages;
+                            } else {
+                                startPage = page - 1;
+                                endPage = page + 1;
+                            }
+
+                            // First page
+                            if (startPage > 1) {
+                                pageButtons.push(
+                                    <PaginationItem key={1}>
+                                        <PaginationLink onClick={() => handlePageChange(1)} isActive={page === 1}>{1}</PaginationLink>
+                                    </PaginationItem>
+                                );
+                                if (startPage > 2) {
+                                    pageButtons.push(
+                                        <PaginationItem key="start-ellipsis">
+                                            <PaginationEllipsis />
+                                        </PaginationItem>
+                                    );
+                                }
+                            }
+
+                            // Middle pages
+                            for (let i = startPage; i <= endPage; i++) {
+                                pageButtons.push(
+                                    <PaginationItem key={i}>
+                                        <PaginationLink onClick={() => handlePageChange(i)} isActive={page === i}>{i}</PaginationLink>
+                                    </PaginationItem>
+                                );
+                            }
+
+                            // Last page
+                            if (endPage < totalPages) {
+                                if (endPage < totalPages - 1) {
+                                    pageButtons.push(
+                                        <PaginationItem key="end-ellipsis">
+                                            <PaginationEllipsis />
+                                        </PaginationItem>
+                                    );
+                                }
+                                pageButtons.push(
+                                    <PaginationItem key={totalPages}>
+                                        <PaginationLink onClick={() => handlePageChange(totalPages)} isActive={page === totalPages}>{totalPages}</PaginationLink>
+                                    </PaginationItem>
+                                );
+                            }
+
+                            return pageButtons;
+                        })()}
 
                         <PaginationItem>
                             <PaginationNext 

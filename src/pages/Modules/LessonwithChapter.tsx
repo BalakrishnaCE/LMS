@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { useEffect, useState } from "react";
-import Quiz from './Contents/Quiz';
-import QuestionAnswer from './Contents/QuestionAnswer';
-import SlideContent from './Contents/SlideContent';
-import FileAttachContent from './Contents/FileAttachContent';
+import Quiz from "@/pages/Modules/Contents/Quiz";
+import QuestionAnswer from "@/pages/Modules/Contents/QuestionAnswer";
+import SlideContent from "@/pages/Modules/Contents/SlideContent";
+import FileAttachContent from "@/pages/Modules/Contents/FileAttachContent";
 import { useFrappeGetDoc } from "frappe-react-sdk";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

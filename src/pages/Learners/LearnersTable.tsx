@@ -21,9 +21,10 @@ interface User {
 interface LearnersTableProps {
   learners: User[];
   isLoading: boolean;
+  onRowClick?: (learner: User) => void;
 }
 
-export function LearnersTable({ learners, isLoading }: LearnersTableProps) {
+export function LearnersTable({ learners, isLoading, onRowClick }: LearnersTableProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full w-full mt-4">
       <Table>
@@ -51,7 +52,10 @@ export function LearnersTable({ learners, isLoading }: LearnersTableProps) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.2, delay: index * 0.1 }}
-                  className="group hover:bg-muted/50 transition-colors duration-200 cursor-pointer"
+                  className="group hover:bg-muted/50 transition-colors duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
+                  tabIndex={0}
+                  onClick={() => onRowClick && onRowClick(learner)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onRowClick && onRowClick(learner); }}
                 >
                   <TableCell className="group-hover:text-primary transition-colors duration-200">{learner.full_name}</TableCell>
                   <TableCell className="group-hover:text-primary transition-colors duration-200">{learner.email}</TableCell>
@@ -67,7 +71,7 @@ export function LearnersTable({ learners, isLoading }: LearnersTableProps) {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <Button variant="ghost" className="h-8 w-8 p-0">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

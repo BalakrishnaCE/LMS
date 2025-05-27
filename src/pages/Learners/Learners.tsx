@@ -6,8 +6,9 @@ import { LearnersTable } from "@/pages/Learners/LearnersTable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Download } from "lucide-react";
+import { Search, Filter, Download, Users, CheckCircle, PauseCircle, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
+import { UserDetailsDrawer } from "./components/LearnerDetailsDrawer";
 
 interface User {
   name: string;
@@ -71,8 +72,7 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
       >
         <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Learners</CardTitle>
-            <span className="text-2xl">👥</span>
+            <CardTitle className="text-sm font-medium flex items-center gap-2"><Users className="w-5 h-5" />Total Learners</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -90,8 +90,7 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
       >
         <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Learners</CardTitle>
-            <span className="text-2xl">✅</span>
+            <CardTitle className="text-sm font-medium flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500" />Active Learners</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.active}</div>
@@ -109,8 +108,7 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
       >
         <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactive Learners</CardTitle>
-            <span className="text-2xl">⏸️</span>
+            <CardTitle className="text-sm font-medium flex items-center gap-2"><PauseCircle className="w-5 h-5 text-blue-400" />Inactive Learners</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.inactive}</div>
@@ -128,12 +126,11 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
       >
         <Card className="w-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Growth Rate</CardTitle>
-            <span className="text-2xl">📈</span>
+            <CardTitle className="text-sm font-medium flex items-center gap-2"><TrendingUp className="w-5 h-5 text-red-500" />Growth Rate</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats.percentage_change > 0 ? "+" : ""}{stats.percentage_change}%
+              {stats.percentage_change}%
             </div>
             <p className="text-xs text-muted-foreground">
               Monthly growth rate
@@ -215,6 +212,7 @@ export default function Learners() {
   const [searchName, setSearchName] = React.useState("");
   const [searchEmail, setSearchEmail] = React.useState("");
   const [searchStatus, setSearchStatus] = React.useState("all");
+  const [selectedLearner, setSelectedLearner] = React.useState<User | null>(null);
 
   const { data: studentsData, error, isValidating } = useFrappeGetCall<FrappeResponse>("getStudentRoleCount");
   const users = studentsData?.data?.users || [];
@@ -267,6 +265,13 @@ export default function Learners() {
       <LearnersTable
         learners={filteredUsers}
         isLoading={isValidating}
+        onRowClick={setSelectedLearner}
+      />
+
+      <UserDetailsDrawer
+        learner={selectedLearner}
+        open={!!selectedLearner}
+        onClose={() => setSelectedLearner(null)}
       />
     </div>
   );
