@@ -74,6 +74,8 @@ function Modules({ itemsPerPage }: ModulesProps) {
     const [selectedDepartment, setSelectedDepartment] = useState("all")
     const [selectedStatus, setSelectedStatus] = useState("all")
     const [isExporting, setIsExporting] = useState(false)
+    // Add image error state for all cards
+    const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
 
     // Get departments for filter
     const { data: departments } = useFrappeGetDocList("Department", {
@@ -226,6 +228,12 @@ function Modules({ itemsPerPage }: ModulesProps) {
                     else if (module.status === "Approval Pending") statusDarkColor = "dark:bg-amber-900 dark:text-amber-200";
                     else if (module.status === "Draft") statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
 
+                    // Use imageErrors state for this module
+                    const imageUrl = module.image
+                        ? (module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`)
+                        : null;
+                    const hasError = imageErrors[module.name];
+
                     return (
                         <motion.div
                             key={module.name}
@@ -235,38 +243,38 @@ function Modules({ itemsPerPage }: ModulesProps) {
                             }}
                             className="h-full"
                         >
-                            <Card className="@container/card overflow-hidden h-full hover:shadow-lg transition-all duration-300 dark:hover:border-primary/50 dark:hover:bg-accent/50 !pt-0 !py-0">
-                                <div className="relative">
-                                    {/* Status Bar */}
-                                    <div className={`w-full h-8 flex items-center justify-center text-sm font-medium ${statusColor} ${statusDarkColor} z-10`}
-                                         style={{ position: 'absolute', top: 0, left: 0 }}>
-                                        {module.status === "Approval Pending" ? "Pending" : module.status}
-                                    </div>
-                                    {/* Image or Letter Avatar */}
-                                    {module.image ? (
-                                        <div 
-                                            className="w-full h-48 bg-cover bg-center pb-4"
-                                            style={{ 
-                                                backgroundImage: `url(${module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`})`,
-                                                marginTop: '2rem', // To push image below the status bar
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 pb-4" style={{ marginTop: '2rem' }}>
-                                            <span className="text-6xl font-semibold text-primary/60 dark:text-primary/70">
-                                                {module.name1.charAt(0).toUpperCase()}
-                                            </span>
+                            <Card className="@container/card overflow-hidden h-full flex flex-col hover:shadow-lg transition-all duration-300 dark:hover:border-primary/50 dark:hover:bg-accent/50 !pt-0 !py-0">
+                                <div className="flex-1 flex flex-col">
+                                    <div className="relative">
+                                        {/* Status Bar */}
+                                        <div className={`w-full h-8 flex items-center justify-center text-sm font-medium ${statusColor} ${statusDarkColor} z-10`}
+                                             style={{ position: 'absolute', top: 0, left: 0 }}>
+                                            {module.status === "Approval Pending" ? "Pending" : module.status}
                                         </div>
-                                    )}
+                                        {/* Image or Letter Avatar with fallback */}
+                                        {imageUrl && !hasError ? (
+                                            <img
+                                                src={imageUrl}
+                                                alt={module.name1}
+                                                className="w-full h-48 object-cover pb-4"
+                                                style={{ marginTop: '2rem' }}
+                                                onError={() => setImageErrors(prev => ({ ...prev, [module.name]: true }))}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 pb-4" style={{ marginTop: '2rem' }}>
+                                                <span className="text-6xl font-semibold text-primary/60 dark:text-primary/70">
+                                                    {module.name1?.charAt(0).toUpperCase() || "M"}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <CardHeader className="space-y-1 pb-4">
+                                        <CardTitle className="text-lg dark:text-foreground  ">
+                                            {module.name1}
+                                        </CardTitle>
+                                    </CardHeader>
                                 </div>
-
-                                <CardHeader className="space-y-1 pb-4">
-                                    <CardTitle className="text-lg dark:text-foreground  ">
-                                        {module.name1}
-                                    </CardTitle>
-                                </CardHeader>
-
-                                <CardFooter className="pt-0 pb-4">
+                                <CardFooter className="pt-0 pb-4 mt-auto">
                                     <Link href={`/modules/learner/${module.name}`} className="w-full">
                                         <Button 
                                             variant="outline"

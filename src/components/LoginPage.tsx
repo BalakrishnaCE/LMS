@@ -10,12 +10,11 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useFrappeAuth, useFrappeGetDoc } from "frappe-react-sdk"
+import { useFrappeAuth } from "frappe-react-sdk"
 import { toast } from "sonner"
 import { navigate } from "wouter/use-browser-location"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { motion, HTMLMotionProps } from "framer-motion"
-import { useUser } from "@/hooks/use-user"
 import { ROUTES, getFullPath } from "@/config/routes"
 
 interface UserRole {
@@ -30,55 +29,91 @@ export function LoginForm({
   const [password, setPassword] = React.useState("")
   const [showPassword, setShowPassword] = React.useState(false)
   const [isLoggingIn, setIsLoggingIn] = React.useState(false)
-  const { login, error: loginError, isLoading: isLoginLoading } = useFrappeAuth()
-  const { user, isLoading: isUserLoading, isLMSAdmin, isLMSStudent, isLMSContentEditor } = useUser()
+  const { login, error: loginError, isLoading: isLoginLoading, currentUser } = useFrappeAuth()
+  const [user, setUser] = React.useState<any>(null)
+  const [userLoading, setUserLoading] = React.useState(false)
+  const [userError, setUserError] = React.useState<string | null>(null)
+  const [isLMSAdmin, setIsLMSAdmin] = React.useState(false)
+  const [isLMSStudent, setIsLMSStudent] = React.useState(false)
+  const [isLMSContentEditor, setIsLMSContentEditor] = React.useState(false)
+  const [loginTriggered, setLoginTriggered] = React.useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoggingIn(true)
-
+    setLoginTriggered(true)
     try {
       // First, attempt to login
       const loginResponse = await login({ username: username, password: password })
-      
       if (loginResponse) {
         toast.success("Login successful")
-        
-        // Wait for user data to be loaded
-        const checkUserData = setInterval(() => {
-          if (user) {
-            clearInterval(checkUserData)
-            setIsLoggingIn(false)
-            
-            // Redirect based on role
-            if (isLMSAdmin) {
-              navigate(getFullPath(ROUTES.HOME))
-            } else if (isLMSContentEditor) {
-              navigate(getFullPath(ROUTES.MODULES))
-            } else if (isLMSStudent) {
-              navigate(getFullPath(ROUTES.LEARNER_DASHBOARD))
-            } else {
-              navigate(getFullPath(ROUTES.LOGIN))
-              toast.error("You don't have the required permissions to access this system")
-            }
-          }
-        }, 100) // Check every 100ms
-
-        // Clear interval after 5 seconds if user data is not loaded
-        setTimeout(() => {
-          clearInterval(checkUserData)
-          if (!user) {
-            setIsLoggingIn(false)
-            toast.error("Failed to load user data. Please try again.")
-          }
-        }, 5000)
+        // Now wait for user data to load (handled by useEffect below)
       }
     } catch (err) {
       console.error("Login failed", err)
       toast.error("Login failed. Please check your credentials.")
       setIsLoggingIn(false)
+      setLoginTriggered(false)
     }
   }
+
+  // Fetch user doc after login
+  React.useEffect(() => {
+    if (!loginTriggered || !currentUser) return;
+    setUserLoading(true);
+    setUserError(null);
+    // Fetch user doc using useFrappeGetDoc
+    const fetchUser = async () => {
+      try {
+        // Use direct fetch for user doc
+        // add with credentials true 
+        const res = await fetch(`http://10.80.4.72/api/resource/User/${currentUser}`, {
+          credentials: "include"
+        });
+        const userDoc = await res.json();
+        const userData = userDoc.data || userDoc;
+        setUser(userData);
+        // Set role flags
+        const roles = (userData.roles || []) as Array<{ role: string }>;
+        setIsLMSAdmin(roles.some((role: { role: string }) => role.role === "LMS Admin"));
+        setIsLMSStudent(roles.some((role: { role: string }) => role.role === "LMS Student"));
+        setIsLMSContentEditor(roles.some((role: { role: string }) => role.role === "LMS Content Editor"));
+        setUserLoading(false);
+      } catch (err: any) {
+        setUserError(err?.message || "Failed to fetch user data");
+        setUserLoading(false);
+      }
+    };
+    fetchUser();
+  }, [loginTriggered, currentUser]);
+
+  // Redirect as soon as user data is available after login
+  React.useEffect(() => {
+    if (!loginTriggered) return;
+    if (user) {
+      setIsLoggingIn(false);
+      setLoginTriggered(false);
+      if (isLMSAdmin) {
+        navigate(getFullPath(ROUTES.HOME));
+      } else if (isLMSContentEditor) {
+        navigate(getFullPath(ROUTES.MODULES));
+      } else if (isLMSStudent) {
+        navigate(getFullPath(ROUTES.LEARNER_DASHBOARD));
+      } else {
+        navigate(getFullPath(ROUTES.LOGIN));
+        toast.error("You don't have the required permissions to access this system");
+      }
+    }
+    // If user data doesn't load in 5 seconds, show error
+    const timeout = setTimeout(() => {
+      if (!user) {
+        setIsLoggingIn(false);
+        setLoginTriggered(false);
+        toast.error("Failed to load user data. Please try again.");
+      }
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [user, isLMSAdmin, isLMSStudent, isLMSContentEditor, loginTriggered]);
 
   const motionProps: HTMLMotionProps<"div"> = {
     initial: { opacity: 0, y: 20 },

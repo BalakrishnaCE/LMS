@@ -98,7 +98,7 @@ function SortableChapter({ chapter, index, activeChapterId, setActiveChapterId, 
     <li
       ref={setNodeRef}
       style={style}
-      className={`rounded px-2 py-1 transition-all cursor-pointer group/chapter flex items-center ${chapter.id === activeChapterId ? "bg-primary/20 text-primary font-semibold" : "text-muted-foreground hover:bg-accent"}`}
+      className={`rounded px-2 py-1 transition-all cursor-pointer group/chapter flex items-center ${chapter.id === activeChapterId ? "bg-primary/20 text-primary font-semibold" : "text-muted-foreground hover:bg-accent hover:text-secondary"}`}
       onClick={e => {
         e.stopPropagation();
         setActiveChapterId && setActiveChapterId(chapter.id);
@@ -621,6 +621,78 @@ function DeleteChapterDialog({
   );
 }
 
+// Add this new component for sortable lessons
+function SortableLesson({ lesson, activeLessonId, setActiveLessonId, setActiveChapterId, onDelete, activeChapterId, setChapterToDelete, setShowDeleteChapterDialog, onChapterReorder }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+    background: lesson.id === activeLessonId ? "var(--color-primary-20)" : undefined,
+  };
+  const isActiveLesson = lesson.id === activeLessonId;
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`relative rounded-lg px-3 py-2 transition-all cursor-pointer group flex flex-col ${isActiveLesson ? "bg-primary/10 border-l-4 border-primary shadow-md text-primary font-bold" : "hover:bg-muted text-foreground"}`}
+      onClick={() => {
+        setActiveLessonId && setActiveLessonId(lesson.id);
+        if (lesson.chapters?.length && setActiveChapterId) {
+          setActiveChapterId(lesson.chapters[0].id);
+        }
+      }}
+    >
+      <div className="flex items-center justify-between gap-2 min-w-0 flex-1 w-full">
+        <span {...attributes} {...listeners} className="cursor-grab p-2 mr-2 text-muted-foreground group-hover:text-foreground flex items-center">
+          <GripVertical className="w-5 h-5" />
+        </span>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <BookIcon className="w-4 h-4" />
+          <span className="truncate flex-1 min-w-0">{lesson.title}</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+          onClick={e => { e.stopPropagation(); onDelete(); }}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+      {/* Render chapters if any */}
+      {lesson.chapters && lesson.chapters.length > 0 && (
+        <DndContext
+          collisionDetection={closestCenter}
+          onDragStart={() => {}}
+          onDragEnd={event => onChapterReorder(event, lesson)}
+        >
+          <SortableContext
+            items={lesson.chapters.map((c: any) => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul className="ml-6 mt-1 space-y-1">
+              {lesson.chapters.map((chapter: any, chapterIndex: number) => (
+                <SortableChapter
+                  key={chapter.id || `chapter-${lesson.id}-${chapterIndex}`}
+                  chapter={chapter}
+                  index={chapterIndex}
+                  activeChapterId={activeChapterId}
+                  setActiveChapterId={setActiveChapterId}
+                  setActiveLessonId={setActiveLessonId}
+                  lessonId={lesson.id}
+                  onDelete={() => { setChapterToDelete({ lessonId: lesson.id, chapterId: chapter.id }); setShowDeleteChapterDialog(true); }}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
+      )}
+    </li>
+  );
+}
+
 export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFinishSetup, isMobile, onLessonAdded, activeLessonId, setActiveLessonId, activeChapterId, setActiveChapterId }: ModuleSidebarProps) {
   const [, setLocation] = useLocation();
   const { updateDoc, loading: saving } = useFrappeUpdateDoc();
@@ -638,8 +710,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   const [showDeleteChapterDialog, setShowDeleteChapterDialog] = useState(false);
   const [lessonToDelete, setLessonToDelete] = useState<string | null>(null);
   const [chapterToDelete, setChapterToDelete] = useState<{ lessonId: string; chapterId: string } | null>(null);
-  const [dragLessonId, setDragLessonId] = useState<string | null>(null);
-  const [dragChapters, setDragChapters] = useState<any[]>([]);
+  const [dragLessonActiveId, setDragLessonActiveId] = useState<string | null>(null);
 
   // Fetch departments for the department selector
   const { data: departments } = useFrappeGetDocList("Department", {
@@ -809,16 +880,29 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     }
   };
 
-  // Handler for drag start
-  const handleChapterDragStart = (lessonId: string, chapters: any[]) => {
-    setDragLessonId(lessonId);
-    setDragChapters(chapters);
+  // Handler for drag end (lessons)
+  const handleLessonDragEnd = async (event: any) => {
+    setDragLessonActiveId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id || !module?.lessons || !moduleInfo) return;
+    const oldIndex = module.lessons.findIndex((l: any) => l.id === active.id);
+    const newIndex = module.lessons.findIndex((l: any) => l.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newLessons = arrayMove(module.lessons, oldIndex, newIndex);
+    // Update backend order
+    try {
+      await updateDoc("LMS Module", moduleInfo.id, {
+        lessons: newLessons.map((l: any, idx: number) => ({ lesson: l.id, order: idx + 1 }))
+      });
+      toast.success("Lessons reordered");
+      onLessonAdded?.(); // Refresh
+    } catch (err) {
+      toast.error("Failed to reorder lessons");
+    }
   };
 
-  // Handler for drag end
+  // In Sidebar component, add the chapter drag end handler:
   const handleChapterDragEnd = async (event: any, lesson: any) => {
-    setDragLessonId(null);
-    setDragChapters([]);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const oldIndex = lesson.chapters.findIndex((c: any) => c.id === active.id);
@@ -854,7 +938,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
               <Button
                 variant="outline"
                 size="sm"
-                className="mb-4 w-full hover:bg-accent hover:text-secondary"
+                className="mb-4 w-full hover:bg-accent hover:text-primary"
                 onClick={() => setLocation('/modules')}
               >
                 <ArrowLeftIcon className="w-4 h-4" /> Back to Modules
@@ -892,68 +976,33 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                     {module?.lessons && module.lessons.length > 0 && (
                       <div className="mt-6">
                         <h4 className="text-sm font-semibold mb-2">Lessons</h4>
-                        <ul className="space-y-2">
-                          {module.lessons.map((lesson, lessonIndex) => {
-                            const isActiveLesson = lesson.id === activeLessonId;
-                            return (
-                              <motion.li
-                                key={lesson.id || `lesson-${lessonIndex}`}
-                                layout
-                                className={`relative rounded-lg px-3 py-2 transition-all cursor-pointer group
-                                  ${isActiveLesson ? "bg-primary/10 border-l-4 border-primary shadow-md" : "hover:bg-muted"}
-                                `}
-                                onClick={() => {
-                                  setActiveLessonId && setActiveLessonId(lesson.id);
-                                  if (lesson.chapters?.length && setActiveChapterId) {
-                                    setActiveChapterId(lesson.chapters[0].id);
-                                  }
-                                }}
-                              >
-                                <div className={`flex items-center justify-between gap-2 min-w-0 ${isActiveLesson ? "text-primary font-bold" : "text-foreground"}`}>
-                                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                                    <BookIcon className="w-4 h-4" />
-                                    <span className="truncate flex-1 min-w-0">{lesson.title}</span>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
-                                    onClick={e => { e.stopPropagation(); setLessonToDelete(lesson.id); setShowDeleteLessonDialog(true); }}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                                {lesson.chapters && lesson.chapters.length > 0 && (
-                                  <DndContext
-                                    collisionDetection={closestCenter}
-                                    onDragStart={() => handleChapterDragStart(lesson.id, lesson.chapters)}
-                                    onDragEnd={event => handleChapterDragEnd(event, lesson)}
-                                  >
-                                    <SortableContext
-                                      items={lesson.chapters.map((c: any) => c.id)}
-                                      strategy={verticalListSortingStrategy}
-                                    >
-                                      <ul className="ml-6 mt-1 space-y-1">
-                                        {lesson.chapters.map((chapter, chapterIndex) => (
-                                          <SortableChapter
-                                            key={chapter.id || `chapter-${lesson.id}-${chapterIndex}`}
-                                            chapter={chapter}
-                                            index={chapterIndex}
-                                            activeChapterId={activeChapterId}
-                                            setActiveChapterId={setActiveChapterId}
-                                            setActiveLessonId={setActiveLessonId}
-                                            lessonId={lesson.id}
-                                            onDelete={() => { setChapterToDelete({ lessonId: lesson.id, chapterId: chapter.id }); setShowDeleteChapterDialog(true); }}
-                                          />
-                                        ))}
-                                      </ul>
-                                    </SortableContext>
-                                  </DndContext>
-                                )}
-                              </motion.li>
-                            );
-                          })}
-                        </ul>
+                        <DndContext
+                          collisionDetection={closestCenter}
+                          onDragStart={event => setDragLessonActiveId(String(event.active.id))}
+                          onDragEnd={handleLessonDragEnd}
+                        >
+                          <SortableContext
+                            items={(module.lessons ?? []).map((l: any) => l.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <ul className="space-y-2">
+                              {module.lessons && module.lessons.map((lesson, lessonIndex) => (
+                                <SortableLesson
+                                  key={lesson.id || `lesson-${lessonIndex}`}
+                                  lesson={lesson}
+                                  activeLessonId={activeLessonId}
+                                  setActiveLessonId={setActiveLessonId}
+                                  setActiveChapterId={setActiveChapterId}
+                                  onDelete={() => { setLessonToDelete(lesson.id); setShowDeleteLessonDialog(true); }}
+                                  activeChapterId={activeChapterId}
+                                  setChapterToDelete={setChapterToDelete}
+                                  setShowDeleteChapterDialog={setShowDeleteChapterDialog}
+                                  onChapterReorder={handleChapterDragEnd}
+                                />
+                              ))}
+                            </ul>
+                          </SortableContext>
+                        </DndContext>
                         {/* Add Lesson Button and Dialog */}
                         <AddLessonDialog
                           open={addingLesson}

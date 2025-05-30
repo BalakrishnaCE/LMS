@@ -4,14 +4,13 @@ import { useUser } from "@/hooks/use-user";
 import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
 import { motion, AnimatePresence } from "framer-motion";
 import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar";
-import { WelcomeScreen } from "@/pages/Modules/Learner/components/WelcomeScreen";
 import { CompletionScreen } from "@/pages/Modules/Learner/components/CompletionScreen";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { ROUTES } from "@/config/routes";
 import { ContentRenderer } from "@/pages/Modules/Learner/components/ContentRenderer";
-import { BookOpen, ArrowLeft, ArrowRight } from "lucide-react";
+import { BookOpen, ArrowLeft, ArrowRight, Edit } from "lucide-react";
+import { Link } from "wouter";
 
 // TypeScript interfaces
 interface Content {
@@ -96,7 +95,6 @@ export default function LearnerModuleDetail() {
         filters: [["name", "=", moduleName]]
     });
     const moduleData = moduleListData?.data?.modules?.[0];
-
     // Post call for starting module
     const { call: startModule } = useFrappePostCall('addLearnerProgress');
     // Fetch progress and module structure
@@ -430,9 +428,17 @@ export default function LearnerModuleDetail() {
                                         <h2 className="text-2xl font-bold mb-2">{currentLesson.lesson_name}</h2>
                                         <h3 className="text-xl font-semibold">{currentChapter.title}</h3>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-md">
-                                        <BookOpen className="h-4 w-4" />
-                                        <span>Admin Preview</span>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-md">
+                                            <BookOpen className="h-4 w-4" />
+                                            <span>Admin Preview</span>
+                                        </div>
+                                        <Link href={`/edit/${module.name}`}>
+                                            <Button variant="outline" size="sm" className="gap-2">
+                                                <Edit className="h-4 w-4" />
+                                                Edit Module
+                                            </Button>
+                                        </Link>
                                     </div>
                                 </div>
                                 

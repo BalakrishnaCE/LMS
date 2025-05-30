@@ -125,7 +125,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                 >
                     <Card className="mx-auto w-full max-w-4xl bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-2xl rounded-3xl p-6 md:p-10 flex flex-col gap-6 items-center border border-border">
                         {/* Card Title */}
-                        <div className="w-full text-center text-2xl font-extrabold tracking-tight mb-2 text-primary-foreground/90 text-foreground">Your Learning Stats</div>
+                        <div className="w-full text-center text-2xl font-extrabold tracking-tight mb-2 text-foreground">Your Learning Stats</div>
                         {/* Stats Row */}
                         <div className="flex flex-col md:flex-row w-full justify-center items-center gap-6 md:gap-10">
                             {barData.map((stat, idx) => (
@@ -203,12 +203,16 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                     />
                 </div>
                 </motion.div>
+            </AnimatePresence>
 
-                {isLoading && filteredModules.length === 0 && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center">Loading modules...</motion.div>
-                )}
-                {error && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center text-red-500">Error loading modules.</motion.div>}
+            {/* Loading and Error States */}
+            {isLoading && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center">Loading modules...</motion.div>
+            )}
+            {error && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center text-red-500">Error loading modules.</motion.div>}
 
+            {/* Modules Grid */}
+            {!isLoading && !error && (
                 <motion.div
                     key="grid"
                     variants={containerVariants}
@@ -306,7 +310,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                 })}
                     </AnimatePresence>
                 </motion.div>
-            </AnimatePresence>
+            )}
 
             <div className="flex justify-center mt-8">
                 <Pagination>

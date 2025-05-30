@@ -10,6 +10,72 @@ import StepsContent from "@/pages/Modules/Contents/StepsContent";
 import CheckListContent from "@/pages/Modules/Contents/CheckListContent";
 import AccordionContent from "@/pages/Modules/Contents/AccordionContent";
 
+const contentStyles = `
+    .prose ul {
+        list-style-type: disc;
+        padding-left: 1.5em;
+        margin: 1em 0;
+    }
+    .prose > div >ul li {
+        margin-bottom: 0.5em;
+    }
+    .prose ol {
+        list-style-type: decimal;
+        padding-left: 1.5em;
+        margin: 1em 0;
+    }
+    .prose > div > ol li {
+        margin-bottom: 0.5em;
+    }
+    .prose table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 1em 0;
+        overflow-x: auto;
+        display: block;
+    }
+    .prose table th,
+    .prose table td {
+        border: 1px solid #e2e8f0;
+        padding: 0.5em;
+        word-break: break-word;
+        white-space: normal;
+        max-width: 300px;
+    }
+    .prose table th {
+        background-color: #f8fafc;
+        font-weight: 600;
+    }
+    .prose {
+        max-width: 100%;
+    }
+    .prose img {
+        max-width: 100%;
+        height: auto;
+    }
+    .prose h1 {
+        font-size: 2em;
+        font-weight: 600;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+    .prose h2 {
+        font-size: 1.5em;
+        font-weight: 500;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+    .prose h3 {
+        font-size: 1.25em;
+        font-weight: 400;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+    .prose p {
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+    }
+`;
 interface ContentRendererProps {
   contentType: string;
   contentReference: string;
@@ -91,6 +157,9 @@ export function ContentRenderer({ contentType, contentReference }: ContentRender
   };
 
   return (
+    <div>
+
+    <style>{contentStyles}</style>
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -99,5 +168,6 @@ export function ContentRenderer({ contentType, contentReference }: ContentRender
     >
       {renderContent()}
     </motion.div>
+    </div>
   );
 } 

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {  FileText, Image as ImageIcon, Video, File, GripVertical, Pencil } from "lucide-react";
+import {  FileText, Image as ImageIcon, Video, File, GripVertical, Pencil, ExternalLink, Trash2 } from "lucide-react";
 import RichEditor from "@/components/RichEditor";
 import {
   Drawer,
@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 // import ChecklistContent from './ChecklistContent';
 // import StepsContent from './StepsContent';
 import AccordionContent, { AccordionPreview } from '@/pages/ModuleEditor/edit/content-structure/AccordionContent';
-import { useFrappeCreateDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
+import { useFrappeCreateDoc, useFrappeUpdateDoc, useFrappeDeleteDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
 import TextContentEditor from '@/pages/ModuleEditor/edit/content-structure/TextContentEditor';
@@ -40,6 +40,11 @@ import StepsTableContentEditor from '@/pages/ModuleEditor/edit/content-structure
 import AccordionContentEditor from '@/pages/ModuleEditor/edit/content-structure/AccordionContent';
 import { Checkbox } from "@/components/ui/checkbox";
 import { StepsPreview } from './StepsContent';
+import QuizContentEditor from '@/pages/ModuleEditor/edit/content-structure/QuizContentEditor';
+import QuestionAnswerContentEditor from '@/pages/ModuleEditor/edit/content-structure/QuestionAnswerContentEditor';
+import SlideContentEditor from '@/pages/ModuleEditor/edit/content-structure/SlideContentEditor';
+import IframeContentEditor from '@/pages/ModuleEditor/edit/content-structure/IframeContentEditor';
+import { SlidePreview } from '@/pages/ModuleEditor/contents/slide';
 
 const contentStyles = `
     .prose ul {
@@ -291,6 +296,7 @@ export default function MainSection({
   const [newChapterTitle, setNewChapterTitle] = useState('');
   const { createDoc } = useFrappeCreateDoc();
   const { updateDoc } = useFrappeUpdateDoc();
+  const { deleteDoc } = useFrappeDeleteDoc();
   const [minLoading, setMinLoading] = useState(true);
   const [editingLessonName, setEditingLessonName] = useState(false);
   const [editingLessonDesc, setEditingLessonDesc] = useState(false);
@@ -302,6 +308,12 @@ export default function MainSection({
   // Get active lesson and chapter
   const activeLesson = lessons?.find(l => l.id === activeLessonId) || null;
   const activeChapter = activeLesson?.chapters?.find((c: Chapter) => c.id === activeChapterId) || null;
+
+  // Preview function
+  const handlePreviewModule = () => {
+    const previewUrl = `/modules/learner/${moduleName}`;
+    window.open(previewUrl, '_blank', 'noopener,noreferrer');
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setMinLoading(false), 1000);
@@ -551,7 +563,7 @@ export default function MainSection({
 
         {activeLesson && (
           <div className="w-full px-2 md:px-0">
-            {/* Lesson Name with Edit */}
+            {/* Lesson Name with Edit and Preview Button */}
             <div className="flex items-center justify-center gap-2 mb-2">
               {editingLessonName ? (
                 <div className="flex items-center gap-2">
@@ -564,7 +576,7 @@ export default function MainSection({
                   <Button size="sm" variant="outline" onClick={() => setEditingLessonName(false)}>Cancel</Button>
                 </div>
               ) : (
-                <>
+                <div className="flex items-center gap-3">
                   <h2 className="text-2xl font-bold">Lesson: {activeLesson.title}</h2>
                   <Button
                     variant="ghost"
@@ -574,7 +586,16 @@ export default function MainSection({
                   >
                     <Pencil className="w-4 h-4" />
                   </Button>
-                </>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviewModule}
+                    className="flex items-center gap-2"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Preview Module
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -765,7 +786,7 @@ export default function MainSection({
               <div className="grid grid-cols-2 gap-4 flex-1">
                 {contentsList.map((content) => {
                   const LucideIcon = content.icon;
-                  const showPreview = ["checklist", "steps", "accordion", "quiz", "question_answer"].includes(content.id);
+                  const showPreview = ["checklist", "steps", "accordion", "quiz", "question_answer", "slide", "iframe"].includes(content.id);
                   return (
                     <TooltipProvider key={content.id} delayDuration={200}>
                       <Tooltip>
@@ -810,6 +831,16 @@ export default function MainSection({
                 if (content.id === 'accordion') previewProps = { items: [{ header_title: 'Accordion 1', body_content: 'Accordion body 1' }, { header_title: 'Accordion 2', body_content: 'Accordion body 2' }] };
                 if (content.id === 'quiz') previewProps = { questions: [{ question: 'Sample question?', options: ['A', 'B', 'C'], answer: 'A' }] };
                 if (content.id === 'question_answer') previewProps = { question: 'Sample Q?', answer: 'Sample A' };
+                if (content.id === 'slide') previewProps = { 
+                  title: 'Sample Presentation',
+                  description: 'Interactive slideshow with multiple slides',
+                  slide_show_items: [
+                    { option_text: 'Introduction', slide_content: '<p>Welcome to our presentation</p>' },
+                    { option_text: 'Main Content', slide_content: '<p>Key points and information</p>' },
+                    { option_text: 'Conclusion', slide_content: '<p>Summary and next steps</p>' }
+                  ]
+                };
+                if (content.id === 'iframe') previewProps = { url: 'https://example.com' };
                 return (
                   <div className="absolute left-full top-0 ml-6 w-72 bg-card border border-border rounded-lg shadow-lg p-4 z-50 flex flex-col items-start min-h-[120px]">
                     <div className="font-semibold mb-2 text-primary text-base">{content.name} Preview</div>
@@ -902,7 +933,13 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
       case 'Accordion Content':
         return <AccordionContentEditor content={localContent} onSave={handleSave} onCancel={handleCancel} />;
       case 'Slide Content':
-        return <div className="border rounded p-2">Slide content editor coming soon...</div>;
+        return <SlideContentEditor content={localContent} onSave={handleSave} onCancel={handleCancel} />;
+      case 'Quiz':
+        return <QuizContentEditor content={localContent} onSave={handleSave} onCancel={handleCancel} />;
+      case 'Question Answer':
+        return <QuestionAnswerContentEditor content={localContent} onSave={handleSave} onCancel={handleCancel} />;
+      case 'Iframe Content':
+        return <IframeContentEditor content={localContent} onSave={handleSave} onCancel={handleCancel} />;
       default:
         return <div className="border rounded p-2">Unsupported content type: {content.type}</div>;
     }
@@ -983,9 +1020,35 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
     case 'Slide Content':
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto">
+          <SlidePreview 
+            title={content.title} 
+            description={content.description}
+            progress_enabled={content.progress_enabled}
+            is_active={content.is_active}
+            slide_show_items={content.slide_show_items || []} 
+          />
+          <Button size="sm" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Edit</Button>
+        </div>
+      );
+    case 'Quiz':
+      return (
+        <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto">
           <div className="font-bold mb-2">{content.title}</div>
-          {content.slide && <img src={content.slide} alt={content.title} className="max-h-48 mx-auto rounded" />}
-          <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
+          <Button size="sm" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Edit</Button>
+        </div>
+      );
+    case 'Question Answer':
+      return (
+        <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto">
+          <div className="font-bold mb-2">{content.title}</div>
+          <Button size="sm" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Edit</Button>
+        </div>
+      );
+    case 'Iframe Content':
+      return (
+        <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto">
+          <div className="font-bold mb-2">{content.title}</div>
+          <Button size="sm" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
     default:
@@ -1004,6 +1067,7 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
 
   const { createDoc } = useFrappeCreateDoc();
   const { updateDoc } = useFrappeUpdateDoc();
+  const { deleteDoc } = useFrappeDeleteDoc();
 
   const handleSaveContent = async (data: any) => {
     try {
@@ -1070,6 +1134,62 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
               parenttype: 'Accordion Content',
               docstatus: 0
             }))
+          };
+          break;
+        case 'Quiz':
+          doctype = 'Quiz';
+          fields = { 
+            title: data.title,
+            description: data.description,
+            total_score: data.total_score,
+            randomize_questions: data.randomize_questions,
+            time_limit_mins: data.time_limit_mins,
+            is_active: data.is_active,
+            questions: (Array.isArray(data.questions) ? data.questions : []).map((question: any) => ({
+              question_text: question.question_text,
+              question_type: question.question_type,
+              score: question.score,
+              quiz_child: question.quiz_child,
+              options: (Array.isArray(question.options) ? question.options : []).map((option: any) => ({
+                option_text: option.option_text,
+                correct: option.correct,
+                quiz_question: option.quiz_question
+              }))
+            }))
+          };
+          break;
+        case 'Question Answer':
+          doctype = 'Question Answer';
+          fields = { 
+            title: data.title,
+            description: data.description,
+            max_score: data.max_score,
+            time_limit_mins: data.time_limit_mins,
+            questions: (Array.isArray(data.questions) ? data.questions : []).map((question: any) => ({
+              question: question.question,
+              score: question.score,
+              suggested_answer: question.suggested_answer
+            }))
+          };
+          break;
+        case 'Slide Content':
+          doctype = 'Slide Content';
+          fields = { 
+            title: data.title,
+            description: data.description,
+            progress_enabled: data.progress_enabled,
+            is_active: data.is_active,
+            slide_show_items: (Array.isArray(data.slide_show_items) ? data.slide_show_items : []).map((slide: any) => ({
+              option_text: slide.option_text,
+              slide_content: slide.slide_content
+            }))
+          };
+          break;
+        case 'Iframe Content':
+          doctype = 'Iframe Content';
+          fields = { 
+            title: data.title,
+            url: data.url
           };
           break;
         default:
@@ -1151,6 +1271,50 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
     // Optionally reset state or remove new content block if not saved
   };
 
+  // Delete content block handler
+  const handleDeleteContent = async () => {
+    if (!content || (!content.docname && !content.content_reference)) {
+      toast.error("Content reference missing");
+      return;
+    }
+    const docname = content.docname || content.content_reference;
+    const doctype = content.type || content.content_type;
+    try {
+      // 1. Remove from chapter's contents in backend (child table update)
+      const updatedContents = (chapter.contents || [])
+        .filter((c: any) => (c.docname || c.content_reference) !== docname)
+        .map((c: any, idx: number) => ({
+          content_type: c.type || c.content_type,
+          content_reference: c.docname || c.content_reference,
+          order: idx + 1
+        }));
+      await updateDoc("Chapter", chapter.id, { contents: updatedContents });
+      // 2. Remove from local state
+      setModule((prev: any) => {
+        const lessons = prev.lessons.map((lesson: any) => {
+          if (!lesson.chapters) return lesson;
+          return {
+            ...lesson,
+            chapters: lesson.chapters.map((ch: any) => {
+              if (ch.id !== chapter.id) return ch;
+              return {
+                ...ch,
+                contents: (ch.contents || []).filter((c: any) => (c.docname || c.content_reference) !== docname)
+              };
+            })
+          };
+        });
+        return { ...prev, lessons };
+      });
+      // 3. Delete the content doc
+      await deleteDoc(doctype, docname);
+      toast.success("Content deleted");
+    } catch (err) {
+      console.error("Error deleting content", err);
+      toast.error("Failed to delete content");
+    }
+  };
+
   return (
     <div ref={setNodeRef} style={style} className="relative flex items-center group">
       <span
@@ -1169,6 +1333,28 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
           isNew={content.isNew}
         />
       </div>
+      {/* Delete button, visible on hover */}
+      {content && (content.docname || content.content_reference) ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="absolute right-2 top-1 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+          onClick={handleDeleteContent}
+          title="Delete Content"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="absolute right-2 top-1 opacity-0 group-hover:opacity-100"
+          disabled
+          title="Save this content before deleting."
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
     </div>
   );
 }

@@ -5,6 +5,10 @@ import { imageContentInfo, ImagePreview } from './image';
 import { videoContentInfo, VideoPreview } from './video';
 import { checklistContentInfo, CheckListPreview } from './checklist';
 import { stepsContentInfo, StepsPreview } from './steps';
+import { quizContentInfo, QuizPreview } from './quiz';
+import { questionAnswerContentInfo, QuestionAnswerPreview } from './question_answer';
+import { slideContentInfo, SlidePreview } from './slide';
+import { iframeContentInfo, IframePreview } from './iframe';
 import { FileText, Image as ImageIcon, Video as VideoIcon, CheckSquare, ListOrdered, File, HelpCircle, FolderKanban, Globe, MessageSquare, Presentation } from 'lucide-react';
 
 export const contentsList = [
@@ -13,14 +17,13 @@ export const contentsList = [
   { ...videoContentInfo, icon: VideoIcon, Preview: VideoPreview },
   { ...checklistContentInfo, icon: CheckSquare, Preview: CheckListPreview },
   { ...stepsContentInfo, icon: ListOrdered, Preview: StepsPreview },
+  { ...quizContentInfo, icon: HelpCircle, Preview: QuizPreview },
+  { ...questionAnswerContentInfo, icon: MessageSquare, Preview: QuestionAnswerPreview },
+  { ...slideContentInfo, icon: Presentation, Preview: SlidePreview },
+  { ...iframeContentInfo, icon: Globe, Preview: IframePreview },
   // Additional content types (placeholders for now)
   { id: 'file', name: 'File', icon: File, description: 'A file upload or attachment block.' },
-  { id: 'pdf', name: 'PDF', icon: FileText, description: 'A PDF document block.' },
-  { id: 'quiz', name: 'Quiz', icon: HelpCircle, description: 'A quiz or assessment block.' },
-  { id: 'slide', name: 'Slide', icon: Presentation, description: 'A slide or presentation block.' },
   { id: 'Accordion Content', name: 'Accordion Content', icon: FolderKanban, description: 'An accordion content block.' },
-  { id: 'iframe', name: 'Iframe', icon: Globe, description: 'An embedded web page or iframe block.' },
-  { id: 'question_answer', name: 'Question Answer', icon: MessageSquare, description: 'A Q&A or FAQ block.' },
   // Example:
   // { id: 'text', name: 'Text', icon: '📝', description: 'Text content block' },
 ]; 
