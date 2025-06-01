@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { motion, AnimatePresence } from "framer-motion";
-import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Eye, MoreHorizontal, Pencil } from "lucide-react";
 import {
@@ -10,6 +9,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Lottie from 'lottie-react';
+import errorAnimation from '@/assets/Error.json';
+import loadingAnimation from '@/assets/Loading.json';
 
 interface User {
   name: string;
@@ -40,7 +42,8 @@ export function LearnersTable({ learners, isLoading, onRowClick }: LearnersTable
           {isLoading ? (
             <TableRow>
               <TableCell colSpan={4} className="text-center">
-                <Spinner size="small" />
+                <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
+                <div className="mt-2 text-muted-foreground">Loading learners...</div>
               </TableCell>
             </TableRow>
           ) : (

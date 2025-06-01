@@ -1,7 +1,8 @@
 import { useUser } from "@/hooks/use-user";
-import { Loader2 } from "lucide-react";
 import { Redirect, Route } from "wouter";
 import { useFrappeAuth } from "frappe-react-sdk";
+import Lottie from 'lottie-react';
+import loadingAnimation from '@/assets/Loading.json';
 
 interface ProtectedRouteProps {
   path: string;
@@ -22,7 +23,7 @@ export function ProtectedRoute({
     return (
       <Route path={path}>
         <div className="flex items-center justify-center min-h-screen bg-bg-soft">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
         </div>
       </Route>
     );

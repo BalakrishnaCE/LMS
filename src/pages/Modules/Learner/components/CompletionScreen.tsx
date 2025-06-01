@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { ROUTES } from "@/config/routes";
+import CelebrationLottie from '@/assets/Celebration.json';
+import Lottie from 'lottie-react';
 
 interface CompletionScreenProps {
   onReview: () => void;
@@ -27,6 +29,15 @@ export function CompletionScreen({ onReview }: CompletionScreenProps) {
         role="dialog"
         ref={modalRef}
       >
+        {/* Celebration Lottie Animation Overlay */}
+        <div className="fixed inset-0 w-full h-full z-50 pointer-events-none flex items-center justify-center">
+          <Lottie
+            animationData={CelebrationLottie}
+            loop
+            autoplay
+            style={{ width: '100vw', height: '100vh', pointerEvents: 'none' }}
+          />
+        </div>
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}

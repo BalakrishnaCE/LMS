@@ -10,6 +10,10 @@ import { useFrappeGetCall } from 'frappe-react-sdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, Clock, XCircle } from 'lucide-react';
+import Lottie from 'lottie-react';
+import emptyAnimation from '@/assets/Empty.json';
+import errorAnimation from '@/assets/Error.json';
+import loadingAnimation from '@/assets/Loading.json';
 
 interface QuizProps {
   quizReference: string;
@@ -178,15 +182,50 @@ export default function Quiz({ quizReference }: QuizProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (userLoading) return <div>Loading user...</div>;
-  if (quizLoading) return <div>Loading quiz...</div>;
-  if (quizError) return <div>Error loading quiz</div>;
-  if (adding || updating) return <div>Saving progress...</div>;
-  if (addError) return <div>Error: {addError.message}</div>;
-  if (updateError) return <div>Error: {updateError.message}</div>;
+  if (userLoading) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-muted-foreground">Loading user...</div>
+    </div>
+  );
+  if (quizLoading) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-muted-foreground">Loading quiz...</div>
+    </div>
+  );
+  if (quizError) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-red-500">Error loading quiz</div>
+    </div>
+  );
+  if (adding || updating) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-muted-foreground">Saving progress...</div>
+    </div>
+  );
+  if (addError) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-red-500">Error: {addError.message}</div>
+    </div>
+  );
+  if (updateError) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-red-500">Error: {updateError.message}</div>
+    </div>
+  );
   if (!quiz) return null;
+  if (progressLoading || progressDocLoading) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-muted-foreground">Loading progress...</div>
+    </div>
+  );
 
-  if (progressLoading || progressDocLoading) return <div>Loading progress...</div>;
   if (showProgressOnly && progressDoc) {
     // Animated progress display
     const score = progressDoc.score || 0;

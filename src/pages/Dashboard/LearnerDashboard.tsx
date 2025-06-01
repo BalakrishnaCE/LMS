@@ -5,11 +5,12 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Spinner } from '@/components/ui/spinner'
 import { Link } from "wouter"
 import { Button } from "@/components/ui/button"
 import { BookOpen, Clock, Award, ChevronRight, Flame, Calendar, Star, Target } from "lucide-react"
 import { ROUTES } from "@/config/routes"
+import Lottie from 'lottie-react';
+import loadingAnimation from '@/assets/Loading.json';
 
 interface Module {
   name: string;
@@ -168,7 +169,8 @@ export default function LearnerDashboard() {
             exit={{ opacity: 0 }}
             className="text-center flex justify-center items-center h-full"
           >
-            <Spinner size="small" />
+            <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+            <div className="mt-4 text-muted-foreground">Loading dashboard...</div>
           </motion.div>
         ) : (
           <motion.div 

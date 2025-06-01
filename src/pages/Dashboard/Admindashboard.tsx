@@ -4,10 +4,11 @@ import { AdminDashboardCards } from "@/components/AdminDashboardCards"
 import Module from "@/pages/Modules/Modules"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LearnersTable } from "@/pages/Learners/LearnersTable"
-import { Spinner } from '@/components/ui/spinner';
 import { useUser } from "@/hooks/use-user"
 import { useFrappeGetCall } from "frappe-react-sdk"
 import { motion, AnimatePresence } from "framer-motion"
+import Lottie from 'lottie-react';
+import loadingAnimation from '@/assets/Loading.json';
 
 interface User {
   name: string;
@@ -79,7 +80,8 @@ function Admindashboard() {
                         exit={{ opacity: 0 }}
                         className="text-center flex justify-center items-center h-full"
                     >
-                        <Spinner size="small" />
+                        <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                        <div className="mt-4 text-muted-foreground">Loading dashboard...</div>
                     </motion.div>
                 ) : (
                     <motion.div 

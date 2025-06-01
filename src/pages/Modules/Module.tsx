@@ -14,6 +14,9 @@ import {
 } from 'recharts';
 import Modules from "@/pages/Modules/Modules";
 import { useEffect, useState } from "react";
+import Lottie from 'lottie-react';
+import errorAnimation from '@/assets/Error.json';
+import loadingAnimation from '@/assets/Loading.json';
 
 function Module() {
     const { data: modules, error, isValidating } = useFrappeGetDocList("LMS Module", {
@@ -79,8 +82,18 @@ function Module() {
         }
     ];
 
-    if (error) return <div>Error loading modules</div>;
-    if (isValidating) return <div>Loading...</div>;
+    if (error) return (
+      <div className="flex flex-col items-center justify-center p-8">
+        <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+        <div className="mt-4 text-red-500">Error loading modules</div>
+      </div>
+    );
+    if (isValidating) return (
+      <div className="flex flex-col items-center justify-center p-8">
+        <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+        <div className="mt-4 text-muted-foreground">Loading...</div>
+      </div>
+    );
 
     return (
         <div className="p-4">

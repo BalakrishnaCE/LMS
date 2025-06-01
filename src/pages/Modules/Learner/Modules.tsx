@@ -5,7 +5,6 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Link } from "wouter"
 import {
@@ -26,6 +25,10 @@ import { Progress } from "@/components/ui/progress"
 import { useFrappeGetCall } from "frappe-react-sdk"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { CheckCircle, Clock, MinusCircle } from 'lucide-react';
+import Lottie from 'lottie-react';
+import emptyAnimation from '@/assets/Empty.json';
+import errorAnimation from '@/assets/Error.json';
+import loadingAnimation from '@/assets/Loading.json';
 
 interface ModulesProps {
     itemsPerPage?: number;
@@ -76,11 +79,29 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
         )
     }, [modules, searchQuery])
 
-    // Bar chart data for status breakdown
+    // Sort modules: ordered modules (order > 0) first by order asc, then unordered (order 0 or undefined) in original order
+    const sortedModules = useMemo(() => {
+        const ordered = filteredModules.filter((m: any) => m.order && m.order > 0).sort((a: any, b: any) => a.order - b.order);
+        const unordered = filteredModules.filter((m: any) => !m.order || m.order === 0);
+        return [...ordered, ...unordered];
+    }, [filteredModules]);
+
+    // Calculate stats and average progress on the frontend for reliability
+    const completedCount = filteredModules.filter((m: any) => m.progress?.status === "Completed").length;
+    const inProgressCount = filteredModules.filter((m: any) => m.progress?.status === "In Progress").length;
+    const notStartedCount = filteredModules.filter((m: any) => !m.progress || m.progress.status === "Not Started").length;
+    const progressValues = filteredModules.map((m: any) => {
+        if (m.progress?.status === "Completed") return 100;
+        if (m.progress?.status === "In Progress") return m.progress?.progress || 0;
+        return 0;
+    });
+    const averageProgress = progressValues.length > 0 ? (progressValues.reduce((a: number, b: number) => a + b, 0) / progressValues.length) : 0;
+
+    // Bar chart data for status breakdown (frontend counts)
     const barData = [
-        { name: "Completed", value: meta.completed_modules || 0, color: '#22c55e', icon: <CheckCircle className="w-5 h-5 text-green-500" /> },
-        { name: "In Progress", value: meta.in_progress_modules || 0, color: '#0ea5e9', icon: <Clock className="w-5 h-5 text-blue-500" /> },
-        { name: "Yet to Start", value: meta.not_started_modules || 0, color: '#9ca3af', icon: <MinusCircle className="w-5 h-5 text-gray-400" /> },
+        { name: "Completed", value: completedCount, color: '#22c55e', icon: <CheckCircle className="w-5 h-5 text-green-500" /> },
+        { name: "In Progress", value: inProgressCount, color: '#0ea5e9', icon: <Clock className="w-5 h-5 text-blue-500" /> },
+        { name: "Yet to Start", value: notStartedCount, color: '#9ca3af', icon: <MinusCircle className="w-5 h-5 text-gray-400" /> },
     ];
     const filteredBarData = barData.filter(d => d.value > 0);
 
@@ -112,6 +133,13 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
         return null;
     };
 
+    // Donut chart data for status breakdown (from meta)
+    const donutChartData = [
+        { name: "Completed", value: meta.completed_modules || 0, color: "#22c55e" },
+        { name: "In Progress", value: meta.in_progress_modules || 0, color: "#0ea5e9" },
+        { name: "Yet to Start", value: meta.not_started_modules || 0, color: "#9ca3af" },
+    ];
+
     return (
         <div className="space-y-6">
             <AnimatePresence mode="wait">
@@ -126,7 +154,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                     <Card className="mx-auto w-full max-w-4xl bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-2xl rounded-3xl p-6 md:p-10 flex flex-col gap-6 items-center border border-border">
                         {/* Card Title */}
                         <div className="w-full text-center text-2xl font-extrabold tracking-tight mb-2 text-foreground">Your Learning Stats</div>
-                        {/* Stats Row */}
+                        {/* Stats Row - stack vertically on mobile */}
                         <div className="flex flex-col md:flex-row w-full justify-center items-center gap-6 md:gap-10">
                             {barData.map((stat, idx) => (
                                 <div key={stat.name} className="flex flex-col items-center gap-2">
@@ -140,50 +168,50 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                 </div>
                             ))}
                         </div>
-                        {/* Average Progress */}
-                        <div className="w-full text-center mt-2">
-                            <span className="text-xs text-muted-foreground font-medium">Average Progress</span>
-                            <div className="text-2xl font-bold" style={{ color: '#0ea5e9' }}>{meta.average_progress ?? 0}%</div>
+                        {/* Multi-segment Donut Chart for Module Status */}
+                        <div className="w-full flex flex-col items-center mt-2">
+                            <span className="text-xs text-muted-foreground font-medium">Module Status Breakdown</span>
+                            <div className="relative flex items-center justify-center w-full" style={{ minHeight: 180 }}>
+                                <ResponsiveContainer width={180} height={180}>
+                                    <PieChart>
+                                        <Pie
+                                            data={donutChartData}
+                                            dataKey="value"
+                                            nameKey="name"
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={60}
+                                            outerRadius={80}
+                                            paddingAngle={2}
+                                            labelLine={false}
+                                        >
+                                            {donutChartData.map((entry, idx) => (
+                                                <Cell key={entry.name} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={(value, name) => [`${value} module${value === 1 ? '' : 's'}`, name]} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                {/* Center label for average progress */}
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span className="text-3xl font-bold" style={{ color: '#0ea5e9' }}>{meta.average_progress?.toFixed(2) || '0.00'}%</span>
+                                    <span className="text-xs text-muted-foreground">Avg. Progress</span>
+                                </div>
                             </div>
-                        {/* Bar Chart Below Stats */}
-                        <div className="w-full mt-4 rounded-2xl bg-white/80 dark:bg-white/10 border border-border shadow-lg p-4">
-                            <ResponsiveContainer width="100%" height={140} initialDimension={{ width: 520, height: 140 }}>
-                                <BarChart
-                                    data={filteredBarData}
-                                    layout="vertical"
-                                    margin={{ top: 8, right: 24, left: 24, bottom: 8 }}
-                                    barCategoryGap={24}
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                    <XAxis type="number" allowDecimals={false} hide={filteredBarData.length === 1} axisLine={false} tickLine={false} />
-                                    <YAxis type="category" dataKey="name" width={0} tick={false} axisLine={false} tickLine={false} />
-                                    <Tooltip content={CustomTooltip} />
-                                    <Bar
-                                        dataKey="value"
-                                        radius={[12, 12, 12, 12]}
-                                        barSize={28}
-                                        label={{ position: 'right', fontSize: 15, fill: 'var(--foreground)' }}
-                                        isAnimationActive={true}
-                                    >
-                                        {filteredBarData.map((entry, idx) => (
-                                            <Cell key={entry.name} fill={entry.color} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
+                            {/* Legend below chart */}
+                            <div className="flex justify-center gap-6 mt-4 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-block w-4 h-4 rounded" style={{ background: '#22c55e' }} /> Completed
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-block w-4 h-4 rounded" style={{ background: '#0ea5e9' }} /> In Progress
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-block w-4 h-4 rounded" style={{ background: '#9ca3af' }} /> Yet to Start
+                                </div>
                             </div>
-                        <div className="w-full mt-2 flex justify-center gap-6 text-sm">
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block w-4 h-4 rounded bg-green-500" /> Completed
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block w-4 h-4 rounded bg-blue-500" /> In Progress
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="inline-block w-4 h-4 rounded bg-gray-400" /> Yet to Start
-                            </div>
-                    </div>
-                </Card>
+                        </div>
+                    </Card>
                 </motion.div>
 
                 <motion.div
@@ -200,6 +228,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="bg-background border-input"
+                        aria-label="Search modules"
                     />
                 </div>
                 </motion.div>
@@ -207,12 +236,26 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
 
             {/* Loading and Error States */}
             {isLoading && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center">Loading modules...</motion.div>
+                <div className="flex flex-col items-center justify-center p-8">
+                    <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                    <div className="mt-4 text-muted-foreground">Loading modules...</div>
+                </div>
             )}
-            {error && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-8 text-center text-red-500">Error loading modules.</motion.div>}
+            {error && (
+                <div className="flex flex-col items-center justify-center p-8">
+                    <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+                    <div className="mt-4 text-red-500">Error loading modules.</div>
+                </div>
+            )}
 
             {/* Modules Grid */}
-            {!isLoading && !error && (
+            {!isLoading && !error && sortedModules.length === 0 && (
+                <div className="flex flex-col items-center justify-center p-8">
+                    <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
+                    <div className="mt-4 text-muted-foreground text-lg">No modules found. Try a different search or check back later!</div>
+                </div>
+            )}
+            {!isLoading && !error && sortedModules.length > 0 && (
                 <motion.div
                     key="grid"
                     variants={containerVariants}
@@ -222,91 +265,119 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                     className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 max-w-7xl mx-auto p-4"
                 >
                     <AnimatePresence>
-                {filteredModules.map((module: any) => {
+                {sortedModules.map((module: any, idx: number) => {
                     const status = module.progress?.status || "Not Started";
-                    const progress = module.progress?.progress || 0;
+                    let progress = module.progress?.progress || 0;
                     const isCompleted = status === "Completed";
                     const isInProgress = status === "In Progress";
                     const isNotStarted = status === "Not Started";
+                    if (isCompleted) progress = 100;
                     let buttonText = "Start";
                     if (isInProgress) buttonText = "Continue";
-                    if (isCompleted && module.has_scoring) buttonText = "Results";
+                    if (isCompleted && module.has_scoring) buttonText = "Review";
                     if (isCompleted && !module.has_scoring) buttonText = "Completed";
                     const hasImage = !!module.image;
 
-                            // Status bar color logic
-                            let statusColor = "bg-gray-200 text-gray-700";
-                            if (isCompleted) statusColor = "bg-green-100 text-green-700";
-                            else if (isInProgress) statusColor = "bg-blue-100 text-blue-700";
-                            else if (isNotStarted) statusColor = "bg-gray-200 text-gray-700";
+                    // Locking logic
+                    let isLocked = false;
+                    let lockReason = "";
+                    if (module.assignment_based === "Department" && module.order && module.order > 0) {
+                        // Find all department-ordered modules
+                        const deptOrdered = sortedModules.filter((m: any) => m.assignment_based === "Department" && m.order && m.order > 0);
+                        // Find all previous modules (lower order)
+                        const previous = deptOrdered.filter((m: any) => m.order < module.order);
+                        // If any previous is not completed, lock this module
+                        if (previous.some((m: any) => m.progress?.status !== "Completed")) {
+                            isLocked = true;
+                            lockReason = "Complete previous modules to unlock this module.";
+                        }
+                    }
+                    // Unordered or Everyone/Manual modules are never locked
 
-                            let statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
-                            if (isCompleted) statusDarkColor = "dark:bg-green-900 dark:text-green-300";
-                            else if (isInProgress) statusDarkColor = "dark:bg-blue-900 dark:text-blue-200";
-                            else if (isNotStarted) statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
+                    // Status bar color logic
+                    let statusColor = "bg-gray-200 text-gray-700";
+                    if (isCompleted) statusColor = "bg-green-100 text-green-700";
+                    else if (isInProgress) statusColor = "bg-blue-100 text-blue-700";
+                    else if (isNotStarted) statusColor = "bg-gray-200 text-gray-700";
+
+                    let statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
+                    if (isCompleted) statusDarkColor = "dark:bg-green-900 dark:text-green-300";
+                    else if (isInProgress) statusDarkColor = "dark:bg-blue-900 dark:text-blue-200";
+                    else if (isNotStarted) statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
 
                     return (
                         <motion.div
                             key={module.name}
-                                    variants={itemVariants}
-                                    initial="hidden"
-                                    animate="visible"
-                                    exit="hidden"
-                                    whileHover={{ scale: 1.04, boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.15)" }}
+                            variants={itemVariants}
+                            initial="hidden"
+                            animate="visible"
+                            exit="hidden"
+                            whileHover={{ scale: 1.04, boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.15)" }}
                             className="h-full"
                         >
-                                    <Card className={`relative h-full shadow-2xl rounded-2xl overflow-hidden border-0 !pt-0 !py-0 flex flex-col`}>
-                                        {/* Status Bar */}
-                                        <div className={`w-full h-8 flex items-center justify-center text-sm font-medium ${statusColor} ${statusDarkColor} z-10`} style={{ position: 'absolute', top: 0, left: 0 }}>
-                                            {status}
-                                        </div>
-                                        {/* Image or Letter Avatar */}
-                                        {hasImage ? (
-                                            <div className="w-full h-44 relative" style={{ marginTop: '2rem' }}>
-                                                <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`})` }} />
-                                                <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/60" />
-                                            </div>
-                                        ) : (
-                                            <div className="w-full h-44 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/20 dark:from-primary/20 dark:to-primary/30" style={{ marginTop: '2rem' }}>
-                                                <span className="text-6xl font-semibold text-primary/60 dark:text-primary/70">
-                                                    {module.name1?.charAt(0).toUpperCase()}
-                                                </span>
+                            <Card className={`relative h-full shadow-2xl rounded-2xl overflow-hidden border-0 !pt-0 !py-0 flex flex-col`}>
+                                {/* Status Bar */}
+                                <div className={`w-full h-8 flex items-center justify-center text-sm font-medium ${statusColor} ${statusDarkColor} z-10`} style={{ position: 'absolute', top: 0, left: 0 }}>
+                                    {status}
+                                </div>
+                                {/* Image or Letter Avatar */}
+                                {hasImage ? (
+                                    <div className="w-full h-44 relative" style={{ marginTop: '2rem' }}>
+                                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`})` }} />
+                                        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/60" />
+                                    </div>
+                                ) : (
+                                    <div className="w-full h-44 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/20 dark:from-primary/20 dark:to-primary/30" style={{ marginTop: '2rem' }}>
+                                        <span className="text-6xl font-semibold text-primary/60 dark:text-primary/70">
+                                            {module.name1?.charAt(0).toUpperCase()}
+                                        </span>
                                     </div>
                                 )}
-                                        {/* Module Name and Progress */}
-                                        <div className="flex-1 flex flex-col justify-between">
-                                            <CardHeader className="pb-2 pt-6 text-center">
-                                                <CardTitle className="text-lg font-bold line-clamp-2">
+                                {/* Module Name and Progress */}
+                                <div className="flex-1 flex flex-col justify-between">
+                                    <CardHeader className="pb-2 pt-6 text-center">
+                                        <CardTitle className="text-lg font-bold">
                                             {module.name1}
                                         </CardTitle>
                                     </CardHeader>
-                                            {/* Progress Bar and Percentage */}
-                                            <div className="px-6 pb-2">
-                                                <div className="flex justify-between items-center text-xs mb-1">
-                                                    <span className="text-muted-foreground">Progress</span>
-                                                    <span className="font-semibold">{progress}%</span>
-                                                </div>
-                                                <Progress value={progress} className="h-2" aria-label={`Progress: ${progress}%`} />
+                                    {/* Progress Bar and Percentage */}
+                                    <div className="px-6 pb-2">
+                                        <div className="flex justify-between items-center text-xs mb-1">
+                                            <span className="text-muted-foreground">Progress</span>
+                                            <span className="font-semibold text-base">{progress}%</span>
                                         </div>
-                                            <CardFooter className="flex flex-col gap-2 pb-4 px-4">
-                                        <Link href={ROUTES.LEARNER_MODULE_DETAIL(module.name)} className="w-full">
-                                            <Button 
-                                                variant={isCompleted ? "secondary" : "default"}
-                                                        className={
-                                                            `w-full text-base font-semibold py-2 rounded-xl shadow-md transition-all duration-200
-                                                            hover:bg-primary/90 hover:shadow-lg
-                                                            dark:hover:bg-primary/80 dark:hover:shadow-lg
-                                                            focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`
-                                                        }
+                                        <Progress value={progress} className="h-3" aria-label={`Progress: ${progress}%`} />
+                                    </div>
+                                    <CardFooter className="flex flex-col gap-2 pb-4 px-4">
+                                    {isLocked && (
+                                            <div className="text-xs text-gray-400 mt-1 text-center">{lockReason}</div>
+                                        )}
+                                        <Link
+                                            href={isLocked ? '#' : ROUTES.LEARNER_MODULE_DETAIL(module.name)}
+                                            className="w-full"
+                                            tabIndex={isLocked ? -1 : 0}
+                                            aria-disabled={isLocked}
+                                            onClick={e => { if (isLocked) e.preventDefault(); }}
+                                        >
+                                            <Button
+                                                variant={isCompleted ? "secondary" : isInProgress ? "default" : "outline"}
+                                                className={`w-full text-base font-semibold py-2 rounded-xl shadow-md transition-all duration-200
+                                                    hover:bg-primary/90 hover:shadow-lg
+                                                    dark:hover:bg-primary/80 dark:hover:shadow-lg
+                                                    focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
+                                                    ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                                aria-label={buttonText + ' ' + module.name1}
+                                                disabled={isLocked}
                                             >
                                                 {buttonText}
                                             </Button>
                                         </Link>
+                                        
                                     </CardFooter>
                                 </div>
                             </Card>
                         </motion.div>
-                    )
+                    );
                 })}
                     </AnimatePresence>
                 </motion.div>
@@ -319,6 +390,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                             <PaginationPrevious 
                                 onClick={() => setPage(page - 1)}
                                 className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
+                                aria-label="Previous page"
                             />
                         </PaginationItem>
                         <PaginationItem>
@@ -328,6 +400,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                             <PaginationNext 
                                 onClick={() => setPage(page + 1)}
                                 className={page >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                                aria-label="Next page"
                             />
                         </PaginationItem>
                     </PaginationContent>

@@ -16,6 +16,7 @@ interface ModuleSidebarProps {
   onChapterClick?: (lessonName: string, chapterName: string) => void;
   currentLessonName?: string;
   currentChapterName?: string;
+  mode: 'admin' | 'learner' | 'review';
 }
 
 export function ModuleSidebar({
@@ -26,33 +27,34 @@ export function ModuleSidebar({
   onLessonClick,
   onChapterClick,
   currentLessonName,
-  currentChapterName
+  currentChapterName,
+  mode
 }: ModuleSidebarProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false);
   const [expandedLessons, setExpandedLessons] = React.useState<Set<string>>(new Set());
   const chapterRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   
-  // For admin view (progress is null), expand all lessons by default
-  // For learner view, only expand the current lesson
+  // Expand logic based on mode
   useEffect(() => {
-    if (progress === null && module?.lessons) {
-      // Admin view: expand all lessons
+    if (mode === 'admin' && module?.lessons) {
       setExpandedLessons(new Set(module.lessons.map((lesson: any) => lesson.name)));
-    } else if (progress?.current_lesson) {
-      // Learner view: expand only current lesson
+    } else if (mode === 'learner' && progress?.current_lesson) {
       setExpandedLessons(new Set([progress.current_lesson]));
+    } else if (mode === 'review' && currentLessonName) {
+      setExpandedLessons(new Set([currentLessonName]));
     }
-  }, [progress, module]);
+  }, [progress, module, mode, currentLessonName]);
 
   useEffect(() => {
-    if (progress?.current_chapter && chapterRefs.current[progress.current_chapter]) {
-      chapterRefs.current[progress.current_chapter]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if ((mode === 'learner' && progress?.current_chapter && chapterRefs.current[progress.current_chapter]) ||
+        (mode === 'review' && currentChapterName && chapterRefs.current[currentChapterName])) {
+      const chapterKey = mode === 'learner' ? progress?.current_chapter : currentChapterName;
+      chapterRefs.current[chapterKey]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [progress?.current_chapter]);
+  }, [progress?.current_chapter, currentChapterName, mode]);
 
   const toggleLesson = (lessonName: string) => {
-    // For admin view, allow toggling expanded state
-    if (progress === null) {
+    if (mode === 'admin') {
       setExpandedLessons(prev => {
         const newSet = new Set(prev);
         if (newSet.has(lessonName)) {
@@ -64,8 +66,6 @@ export function ModuleSidebar({
       });
     }
   };
-
-  const isAdmin = progress === null;
 
   return (
     <motion.div 
@@ -92,7 +92,7 @@ export function ModuleSidebar({
           </motion.h1>
           
           {/* Admin Indicator */}
-          {isAdmin && (
+          {mode === 'admin' && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-md">
               <BookOpen className="h-4 w-4" />
               <span>Admin Preview Mode</span>
@@ -142,7 +142,7 @@ export function ModuleSidebar({
           </div>
 
           {/* Progress bar - only for learners */}
-          {started && !isAdmin && (
+          {started && mode !== 'admin' && (
             <motion.div 
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -163,9 +163,7 @@ export function ModuleSidebar({
           <div className="space-y-2">
             {module?.lessons?.map((lesson: any, index: number) => {
               const isExpanded = expandedLessons.has(lesson.name);
-              const isCurrentLesson = isAdmin 
-                ? lesson.name === currentLessonName 
-                : lesson.name === progress?.current_lesson;
+              const isCurrentLesson = lesson.name === currentLessonName || (lesson.chapters && lesson.chapters.some((chapter: any) => chapter.name === currentChapterName));
               
               return (
                 <motion.div
@@ -194,11 +192,11 @@ export function ModuleSidebar({
                   >
                     <div className="flex items-center gap-2">
                       {/* Progress indicators only for learners */}
-                      {!isAdmin && (
+                      {mode !== 'admin' && (
                         <>
                           {lesson.progress === "Completed" ? (
                             <CheckCircle className="h-4 w-4 text-primary" />
-                          ) : lesson.name === progress?.current_lesson ? (
+                          ) : lesson.name === currentLessonName ? (
                             <PlayCircle className="h-4 w-4 text-primary" />
                           ) : (
                             <Circle className="h-4 w-4 text-muted-foreground" />
@@ -208,7 +206,7 @@ export function ModuleSidebar({
                       {lesson.lesson_name}
                     </div>
                     {/* Expand/collapse indicator for admin */}
-                    {isAdmin && lesson.chapters && lesson.chapters.length > 0 && (
+                    {mode === 'admin' && lesson.chapters && lesson.chapters.length > 0 && (
                       <motion.div
                         animate={{ rotate: isExpanded ? 180 : 0 }}
                         transition={{ duration: 0.2 }}
@@ -218,8 +216,8 @@ export function ModuleSidebar({
                     )}
                   </div>
                   
-                  {/* Show chapters if expanded (admin) or if it's the current lesson (learner) */}
-                  {(isExpanded || (!isAdmin && isCurrentLesson)) && lesson.chapters && (
+                  {/* Show chapters if expanded (admin) or if it's the current lesson (learner/review) */}
+                  {(isExpanded || (mode !== 'admin' && isCurrentLesson)) && lesson.chapters && (
                     <motion.div 
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
@@ -227,16 +225,20 @@ export function ModuleSidebar({
                       className="pl-4 pb-2 space-y-1 overflow-hidden"
                     >
                       {lesson.chapters.map((chapter: any, cidx: number) => {
-                        const isCurrentChapter = isAdmin
-                          ? chapter.name === currentChapterName
-                          : chapter.name === progress?.current_chapter;
-                        
+                        let isCurrentChapter = false;
+                        if (mode === 'admin') {
+                          isCurrentChapter = chapter.name === currentChapterName;
+                        } else if (mode === 'review') {
+                          isCurrentChapter = chapter.name === currentChapterName;
+                        } else {
+                          isCurrentChapter = chapter.name === progress?.current_chapter;
+                        }
                         return (
                           <div
                             key={chapter.name}
                             ref={el => { 
-                              if (!isAdmin) {
-                                chapterRefs.current[chapter.name] = el; 
+                              if (mode === 'learner' || mode === 'review') {
+                                chapterRefs.current[chapter.name] = el;
                               }
                             }}
                             className={cn(
@@ -252,11 +254,11 @@ export function ModuleSidebar({
                           >
                             <div className="flex items-center gap-2">
                               {/* Progress indicators only for learners */}
-                              {!isAdmin && (
+                              {mode !== 'admin' && (
                                 <>
                                   {chapter.progress === "Completed" ? (
                                     <CheckCircle className="h-3 w-3" />
-                                  ) : chapter.name === progress?.current_chapter ? (
+                                  ) : chapter.name === currentChapterName ? (
                                     <PlayCircle className="h-3 w-3" />
                                   ) : (
                                     <Circle className="h-3 w-3" />

@@ -30,7 +30,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import AccordionContent, { AccordionPreview } from '@/pages/ModuleEditor/edit/content-structure/AccordionContent';
 import { useFrappeCreateDoc, useFrappeUpdateDoc, useFrappeDeleteDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
-import { Spinner } from "@/components/ui/spinner";
+import Lottie from 'lottie-react';
+import loadingAnimation from '@/assets/Loading.json';
 import TextContentEditor from '@/pages/ModuleEditor/edit/content-structure/TextContentEditor';
 import ImageContentEditor from '@/pages/ModuleEditor/edit/content-structure/ImageContentEditor';
 import VideoContentEditor from '@/pages/ModuleEditor/edit/content-structure/VideoContentEditor';
@@ -480,7 +481,7 @@ export default function MainSection({
   if (loading || minLoading) {
     return (
       <div className="flex flex-1 items-center justify-center h-full">
-        <Spinner size="large" />
+        <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
       </div>
     );
   }

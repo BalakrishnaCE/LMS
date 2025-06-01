@@ -19,7 +19,7 @@ import LearnerModuleDetail from "@/pages/Modules/Learner/ModuleDetail";
 import ModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
 import ModuleCreationForm from "@/pages/ModuleEditor/edit/ModuleCreationForm";
 import AnalyticsDashboard from "@/pages/Analytics/AnalyticsDashboard";
-import TESTH5P from '@/pages/Test/TESTH5P';
+// import TESTH5P from '@/pages/Test/TESTH5P';
 
 function App() {
   return (
@@ -83,11 +83,11 @@ function App() {
                   <AnalyticsDashboard />
                 </Layout>
               )} allowedRoles={["LMS Admin"]} />
-              <ProtectedRoute path="/test/h5p" component={() => (
+              {/* <ProtectedRoute path="/test/h5p" component={() => (
                 <Layout>
                   <TESTH5P />
                 </Layout>
-              )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} />
+              )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} /> */}
               {/* Show 404 for all unrecognized routes */}
               <Route path="/:path*" component={NotFound} />
             </Switch>

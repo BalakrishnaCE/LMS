@@ -7,6 +7,10 @@ import { useFrappeGetDoc, useFrappePostCall, useFrappePutCall, useFrappeGetDocLi
 import { motion, AnimatePresence } from 'framer-motion';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, Clock, XCircle, BookOpen, Eye, FileText } from 'lucide-react';
+import Lottie from 'lottie-react';
+import emptyAnimation from '@/assets/Empty.json';
+import errorAnimation from '@/assets/Error.json';
+import loadingAnimation from '@/assets/Loading.json';
 
 interface QuestionAnswerProps {
   questionAnswerId: string;
@@ -180,44 +184,36 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
     answers[q.id] && answers[q.id].trim() && !submitted[q.id]
   );
 
-  if (userLoading) return <div>Loading user...</div>;
-  if (adding || updating) return <div>Saving progress...</div>;
-  if (addError) return <div>Error: {addError.message}</div>;
-  if (updateError) return <div>Error: {updateError.message}</div>;
-
-  // --- ADMIN PREVIEW MODE ---
-  if (isLMSAdmin) {
-    return (
-      <div className="space-y-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold mb-1">{data?.title || "Q&A"}</h2>
-            <div className="text-muted-foreground text-sm mb-2" dangerouslySetInnerHTML={{ __html: data?.description || "" }} />
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-md">
-            <BookOpen className="h-4 w-4" />
-            <span>Admin Preview</span>
-          </div>
-        </div>
-        {data?.questions?.map((q: any, idx: number) => (
-          <div key={q.id} className="mb-6 p-4 bg-muted/50 rounded-lg border">
-            <div className="font-semibold mb-2">Q{idx + 1}. {q.question}</div>
-            <div className="mb-2 text-xs text-muted-foreground">Score: {q.score}</div>
-            <div className="mb-2">
-              <div className="text-sm font-medium text-muted-foreground mb-1">Suggested Answer:</div>
-              <div className="prose prose-sm bg-background p-3 rounded border" dangerouslySetInnerHTML={{ __html: q.suggested_answer }} />
-            </div>
-            <div className="text-sm font-medium text-muted-foreground mb-1">Answer Area (Read-only):</div>
-            <div className="bg-muted/30 p-3 rounded border text-muted-foreground text-sm">
-              [Student answer input area - disabled in admin preview]
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (progressLoading || progressDocLoading || checkingProgress) return <div>Loading progress...</div>;
+  if (userLoading) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-muted-foreground">Loading user...</div>
+    </div>
+  );
+  if (adding || updating) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-muted-foreground">Saving progress...</div>
+    </div>
+  );
+  if (addError) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-red-500">Error: {addError.message}</div>
+    </div>
+  );
+  if (updateError) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-red-500">Error: {updateError.message}</div>
+    </div>
+  );
+  if (progressLoading || progressDocLoading || checkingProgress) return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+      <div className="mt-4 text-muted-foreground">Loading progress...</div>
+    </div>
+  );
   
   // Show completed Q&A progress (score_added = 1)
   if (showProgressOnly && (progressDoc || (existingProgress && existingProgress.length > 0))) {

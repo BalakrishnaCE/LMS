@@ -16,6 +16,8 @@ import { navigate } from "wouter/use-browser-location"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { motion, HTMLMotionProps } from "framer-motion"
 import { ROUTES, getFullPath } from "@/config/routes"
+import Lottie from 'lottie-react';
+import errorAnimation from '@/assets/Error.json';
 
 interface UserRole {
   role: string;
@@ -32,6 +34,7 @@ export function LoginForm({
   const { login, error: loginError, isLoading: isLoginLoading, currentUser } = useFrappeAuth()
   const [user, setUser] = React.useState<any>(null)
   const [userLoading, setUserLoading] = React.useState(false)
+  const [userLoadingError, setUserLoadingError] = React.useState<string | null>(null)
   const [userError, setUserError] = React.useState<string | null>(null)
   const [isLMSAdmin, setIsLMSAdmin] = React.useState(false)
   const [isLMSStudent, setIsLMSStudent] = React.useState(false)
@@ -212,13 +215,14 @@ export function LoginForm({
               </Button>
             </motion.div>
             {loginError && (
-              <motion.p 
+              <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-red-500 text-sm text-center mt-2"
+                className="flex flex-col items-center justify-center mt-2"
               >
-                {loginError.message || "Login error"}
-              </motion.p>
+                <Lottie animationData={errorAnimation} loop style={{ width: 80, height: 80 }} />
+                <div className="text-red-500 text-sm text-center mt-2">{loginError.message || "Login error"}</div>
+              </motion.div>
             )}
           </form>
         </CardContent>

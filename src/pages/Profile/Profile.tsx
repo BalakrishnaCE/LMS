@@ -3,7 +3,6 @@ import { useUser } from "@/hooks/use-user"
 import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Spinner } from '@/components/ui/spinner'
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +12,8 @@ import { Badge } from "@/components/ui/badge"
 import { useFrappeGetDocList, useFrappeUpdateDoc } from "frappe-react-sdk"
 import { BookOpen, Clock, Award, Calendar, Star, Target, Mail, Phone, MapPin, Flame, Camera } from "lucide-react"
 import { toast } from "sonner"
+import Lottie from 'lottie-react';
+import loadingAnimation from '@/assets/Loading.json';
 
 export default function Profile() {
   const { user, isLoading: userLoading } = useUser();
@@ -93,10 +94,11 @@ export default function Profile() {
     }
   }
 
-  if (isLoading || userLoading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner size="small" />
+      <div className="flex flex-col items-center justify-center p-8">
+        <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+        <div className="mt-4 text-muted-foreground">Loading profile...</div>
       </div>
     );
   }
@@ -144,7 +146,7 @@ export default function Profile() {
                   />
                   {isUploading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
-                      <Spinner size="small" className="text-white" />
+                      <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
                     </div>
                   )}
                 </div>

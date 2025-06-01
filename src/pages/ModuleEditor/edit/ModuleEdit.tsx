@@ -10,6 +10,9 @@ import { useModuleState } from "./content-structure/useModuleState";
 import { reorderContentBlocks } from "./content-structure/MainSection";
 import { useFrappeGetCall, useFrappeGetDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
+import Lottie from 'lottie-react';
+import errorAnimation from '@/assets/Error.json';
+import loadingAnimation from '@/assets/Loading.json';
 
 interface Lesson {
   id: string;
@@ -119,12 +122,22 @@ export default function ModuleEdit() {
   }, [module, activeLessonId, activeChapterId]);
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-8">
+        <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+        <div className="mt-4 text-muted-foreground">Loading...</div>
+      </div>
+    );
   }
 
   if (error) {
     toast.error("Failed to load module");
-    return <div>Error loading module</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-8">
+        <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+        <div className="mt-4 text-red-500">Error loading module</div>
+      </div>
+    );
   }
 
   if (!moduleId) {

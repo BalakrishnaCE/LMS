@@ -5,12 +5,16 @@ import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
 import { motion, AnimatePresence } from "framer-motion";
 import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar";
 import { CompletionScreen } from "@/pages/Modules/Learner/components/CompletionScreen";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { ContentRenderer } from "@/pages/Modules/Learner/components/ContentRenderer";
 import { BookOpen, ArrowLeft, ArrowRight, Edit } from "lucide-react";
 import { Link } from "wouter";
+import { ROUTES } from "@/config/routes";
+import Lottie from "lottie-react";
+import learningAnimation from "@/assets/learning-bg.json"; // Place your Lottie JSON here
+import emptyAnimation from '@/assets/Empty.json';
+import errorAnimation from '@/assets/Error.json';
+import loadingAnimation from '@/assets/Loading.json';
 
 // TypeScript interfaces
 interface Content {
@@ -45,6 +49,7 @@ interface Module {
     description: string;
     lessons: Lesson[];
     progress?: ModuleProgress;
+    image?: string;
 }
 
 interface ApiResponse<T> {
@@ -86,6 +91,7 @@ export default function LearnerModuleDetail() {
     const [started, setStarted] = useState(false);
     const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
     const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
+    const [reviewing, setReviewing] = useState(false);
 
     // Fetch module data
     const { data: moduleListData, error: moduleListError } = useFrappeGetCall<ApiResponse<{ modules: Module[] }>>("LearnerModuleData", {
@@ -173,7 +179,7 @@ export default function LearnerModuleDetail() {
 
     // Navigation handlers
     const handlePrevious = async () => {
-        if (!module?.lessons?.length || !user) return;
+        if (!module?.lessons?.length) return;
         let lessonIdx = currentLessonIdx;
         let chapterIdx = currentChapterIdx;
         if (chapterIdx > 0) {
@@ -184,23 +190,48 @@ export default function LearnerModuleDetail() {
         }
         setCurrentLessonIdx(lessonIdx);
         setCurrentChapterIdx(chapterIdx);
-        await updateProgress({
-            user: user.email,
-            module: moduleName,
-            lesson: module.lessons[lessonIdx].name,
-            chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
-            status: "In Progress"
-        });
-        setProgress({
-            ...progress!,
-            current_lesson: module.lessons[lessonIdx].name,
-            current_chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
-            status: "In Progress"
-        });
+        if (!reviewing && !completed && user) {
+            await updateProgress({
+                user: user.email,
+                module: moduleName,
+                lesson: module.lessons[lessonIdx].name,
+                chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
+                status: "In Progress"
+            });
+            setProgress({
+                ...progress!,
+                current_lesson: module.lessons[lessonIdx].name,
+                current_chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
+                status: "In Progress"
+            });
+        }
     };
 
     const handleNext = async () => {
-        if (!module?.lessons?.length || !user) return;
+        if (!module?.lessons?.length) return;
+        if (completed) {
+            return;
+        }
+        if (reviewing) {
+            let lessonIdx = currentLessonIdx;
+            let chapterIdx = currentChapterIdx;
+            const currentLesson = module.lessons[lessonIdx];
+            if (chapterIdx < currentLesson.chapters.length - 1) {
+                chapterIdx += 1;
+                setCurrentLessonIdx(lessonIdx);
+                setCurrentChapterIdx(chapterIdx);
+            } else if (lessonIdx < module.lessons.length - 1) {
+                lessonIdx += 1;
+                chapterIdx = 0;
+                setCurrentLessonIdx(lessonIdx);
+                setCurrentChapterIdx(chapterIdx);
+            } else {
+                // End of review: show completion screen again
+                setReviewing(false);
+            }
+            return;
+        }
+        if (!user) return;
         if (progress?.status === "Completed") {
             setCompleted(true);
             return;
@@ -220,8 +251,8 @@ export default function LearnerModuleDetail() {
         if (chapterIdx < currentLesson.chapters.length - 1) {
             // Move to next chapter in the same lesson
             chapterIdx += 1;
-        setCurrentLessonIdx(lessonIdx);
-        setCurrentChapterIdx(chapterIdx);
+            setCurrentLessonIdx(lessonIdx);
+            setCurrentChapterIdx(chapterIdx);
             await updateProgress({
                 user: user.email,
                 module: moduleName,
@@ -238,13 +269,13 @@ export default function LearnerModuleDetail() {
             return;
         }
         // At the end of the last chapter in the lesson, mark lesson as completed
-            await updateProgress({
-                user: user.email,
-                module: moduleName,
-                lesson: currentLesson.name,
-                chapter: currentChapter.name,
-                status: "Completed"
-            });
+        await updateProgress({
+            user: user.email,
+            module: moduleName,
+            lesson: currentLesson.name,
+            chapter: currentChapter.name,
+            status: "Completed"
+        });
         if (lessonIdx < module.lessons.length - 1) {
             // Move to next lesson and its first chapter
             lessonIdx += 1;
@@ -297,12 +328,32 @@ export default function LearnerModuleDetail() {
         }
     };
 
+    // Sidebar click handlers (for learners)
     const handleLessonClick = (lessonName: string) => {
         if (!module?.lessons?.length) return;
         const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
         if (lessonIdx !== -1) {
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(0);
+            // Update progress state so sidebar highlight matches
+            if (progress && progress.status !== "Completed") {
+                setProgress({
+                    ...progress,
+                    current_lesson: module.lessons[lessonIdx].name,
+                    current_chapter: module.lessons[lessonIdx].chapters[0]?.name || "",
+                    status: "In Progress"
+                });
+                // Optionally, call updateProgress API here to persist
+                if (user) {
+                    updateProgress({
+                        user: user.email,
+                        module: moduleName,
+                        lesson: module.lessons[lessonIdx].name,
+                        chapter: module.lessons[lessonIdx].chapters[0]?.name || "",
+                        status: "In Progress"
+                    });
+                }
+            }
         }
     };
 
@@ -315,6 +366,25 @@ export default function LearnerModuleDetail() {
             if (chapterIdx !== -1) {
                 setCurrentLessonIdx(lessonIdx);
                 setCurrentChapterIdx(chapterIdx);
+                // Update progress state so sidebar highlight matches
+                if (progress && progress.status !== "Completed") {
+                    setProgress({
+                        ...progress,
+                        current_lesson: module.lessons[lessonIdx].name,
+                        current_chapter: module.lessons[lessonIdx].chapters[chapterIdx]?.name || "",
+                        status: "In Progress"
+                    });
+                    // Optionally, call updateProgress API here to persist
+                    if (user) {
+                        updateProgress({
+                            user: user.email,
+                            module: moduleName,
+                            lesson: module.lessons[lessonIdx].name,
+                            chapter: module.lessons[lessonIdx].chapters[chapterIdx]?.name || "",
+                            status: "In Progress"
+                        });
+                    }
+                }
             }
         }
     };
@@ -329,22 +399,25 @@ export default function LearnerModuleDetail() {
     if (isLMSAdmin) {
         if (isLoading || userLoading) {
             return (
-                <div className="flex items-center justify-center h-full">
-                    <Spinner size="large" />
+                <div className="flex flex-col items-center justify-center h-full">
+                    <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                    <div className="mt-4 text-muted-foreground">Loading module details...</div>
                 </div>
             );
         }
         if (moduleListError) {
             return (
-                <div className="flex items-center justify-center h-full">
-                    <p className="text-red-500">Error loading module details.</p>
+                <div className="flex flex-col items-center justify-center h-full">
+                    <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+                    <div className="mt-4 text-red-500">Error loading module details.</div>
                 </div>
             );
         }
         if (!module) {
             return (
-                <div className="flex items-center justify-center h-full">
-                    <p className="text-muted-foreground">Module not found</p>
+                <div className="flex flex-col items-center justify-center h-full">
+                    <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
+                    <div className="mt-4 text-muted-foreground">Module not found</div>
                 </div>
             );
         }
@@ -415,6 +488,7 @@ export default function LearnerModuleDetail() {
                         onChapterClick={handleChapterClick}
                         currentLessonName={currentLesson?.name}
                         currentChapterName={currentChapter?.name}
+                        mode='admin'
                     />
                 </div>
                 {/* Main Content */}
@@ -491,22 +565,25 @@ export default function LearnerModuleDetail() {
     // --- LEARNER LOGIC (default, as before) ---
     if (isLoading || userLoading) {
         return (
-            <div className="flex items-center justify-center h-full">
-                <Spinner size="large" />
+            <div className="flex flex-col items-center justify-center h-full">
+                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                <div className="mt-4 text-muted-foreground">Loading module details...</div>
             </div>
         );
     }
     if (moduleListError) {
         return (
-            <div className="flex items-center justify-center h-full">
-                <p className="text-red-500">Error loading module details.</p>
+            <div className="flex flex-col items-center justify-center h-full">
+                <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
+                <div className="mt-4 text-red-500">Error loading module details.</div>
             </div>
         );
     }
     if (!module) {
         return (
-            <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Module not found</p>
+            <div className="flex flex-col items-center justify-center h-full">
+                <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
+                <div className="mt-4 text-muted-foreground">Module not found</div>
             </div>
         );
     }
@@ -515,6 +592,22 @@ export default function LearnerModuleDetail() {
     const isFirst = currentLessonIdx === 0 && currentChapterIdx === 0;
     const isLast = currentLessonIdx === (module.lessons?.length ?? 0) - 1 && 
                   currentChapterIdx === (currentLesson?.chapters?.length ?? 0) - 1;
+
+    // If module is completed, show completion screen immediately
+    if (progress?.status === "Completed" && !reviewing) {
+        return (
+            <div className="flex min-h-screen bg-muted gap-6 w-full items-center justify-center">
+                <CompletionScreen
+                    onReview={() => {
+                        setReviewing(true);
+                        setCurrentLessonIdx(0);
+                        setCurrentChapterIdx(0);
+                    }}
+                />
+            </div>
+        );
+    }
+
     return (
         <AnimatePresence mode="wait">
             {progress?.status === "Not Started" && showWelcome ? (
@@ -524,31 +617,58 @@ export default function LearnerModuleDetail() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -100 }}
                     transition={{ duration: 0.5 }}
-                    className="flex min-h-screen bg-muted items-center justify-center"
                 >
-                    <Card className="w-full max-w-2xl">
-                        <CardContent className="p-8">
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.2 }}
-                                className="text-center space-y-6"
-                            >
-                                <h1 className="text-4xl font-bold">{module.name1}</h1>
-                                <p className="text-xl text-muted-foreground" dangerouslySetInnerHTML={{ __html: module.description }} />
-                                <div className="pt-6">
-                                    <Button
-                                        size="lg"
-                                        className="text-lg px-8 py-6"
-                                        onClick={handleStartModule}
-                                        disabled={isTransitioning}
-                                    >
-                                        Start Learning
-                                    </Button>
+                    {/* Back Button */}
+                    <div className="absolute left-8 top-8 z-10">
+                        <Link href={ROUTES.LEARNER_MODULES}>
+                            <Button variant="outline" size="icon" className="rounded-full shadow hover:bg-primary/10">
+                                <ArrowLeft className="h-6 w-6" />
+                            </Button>
+                        </Link>
+                    </div>
+                    <div className="flex flex-col items-center w-full mx-auto px-4 space-y-6 pt-8">
+                        {/* Module Image or Avatar */}
+                        <h1 className="text-4xl font-bold leading-tight">{module.name1}</h1>
+                        
+                        {/* Lottie/Animated SVG Placeholder */}
+                        <div className=" inset-0 w-full h-full flex items-center justify-center pointer-events-none z-0">
+                            <Lottie
+                                animationData={learningAnimation}
+                                loop
+                                style={{ width: "40vw", height: "40vh"}}
+                            />
+                        </div>
+                        <div className="flex gap-4">
+                            <div className="flex justify-center mb-2">
+                                {module.image ? (
+                                    <img
+                                        src={module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`}
+                                        alt={module.name1}
+                                        className="w-32 h-32 object-cover rounded-2xl shadow-lg border border-border bg-white"
+                                    />
+                                ) : (
+                                    <div className="w-32 h-32 flex items-center justify-center rounded-2xl shadow-lg border border-border bg-primary/10 text-primary text-6xl font-bold">
+                                        {module.name1?.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                            </div>
+                            {module.description && (
+                                <div>
+                                    <h2 className="text-2xl font-bold mb-2">About this module</h2>
+                                    <p className="text-lg text-muted-foreground max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: module.description }} />
                                 </div>
-                            </motion.div>
-                        </CardContent>
-                    </Card>
+                            )}
+                        </div>
+                    
+                        <Button
+                            size="lg"
+                            className="text-lg px-10 py-6 rounded-xl shadow-lg bg-primary text-white hover:bg-primary/90 transition-all duration-200 mt-2"
+                            onClick={handleStartModule}
+                            disabled={isTransitioning}
+                        >
+                            Start Learning
+                        </Button>
+                    </div>
                 </motion.div>
             ) : (
                 <div className="flex min-h-screen bg-muted gap-6 w-full">
@@ -556,11 +676,14 @@ export default function LearnerModuleDetail() {
                     <div className=" w-80 border-r flex-shrink-0">
                         <ModuleSidebar
                             module={module}
-                            progress={progress}
-                            started={started}
+                            progress={isLMSAdmin ? null : (reviewing ? null : progress)}
+                            started={started || reviewing}
                             overallProgress={overallProgress}
                             onLessonClick={handleLessonClick}
                             onChapterClick={handleChapterClick}
+                            currentLessonName={module.lessons?.[currentLessonIdx]?.name}
+                            currentChapterName={module.lessons?.[currentLessonIdx]?.chapters?.[currentChapterIdx]?.name}
+                            mode={isLMSAdmin ? 'admin' : (reviewing ? 'review' : 'learner')}
                         />
                     </div>
                     {/* Main Content */}
@@ -611,21 +734,10 @@ export default function LearnerModuleDetail() {
                                     </div>
                                 </div>
                             )}
-                            {completed && (
-                                <CompletionScreen
-                                    onReview={() => {
-                                        if (!module?.lessons?.length) return;
-                                        setProgress(getInitialProgress(module));
-                                        setCompleted(false);
-                                        setCurrentLessonIdx(0);
-                                        setCurrentChapterIdx(0);
-                                    }}
-                                />
-                            )}
                         </div>
                     </div>
                 </div>
             )}
         </AnimatePresence>
     );
-} 
+}
