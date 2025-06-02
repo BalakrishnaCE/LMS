@@ -9,11 +9,21 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { useFrappeGetDocList, useFrappeUpdateDoc } from "frappe-react-sdk"
+import { useFrappeGetDocList, useFrappeUpdateDoc, useFrappeGetCall } from "frappe-react-sdk"
 import { BookOpen, Clock, Award, Calendar, Star, Target, Mail, Phone, MapPin, Flame, Camera } from "lucide-react"
 import { toast } from "sonner"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
+import AchievementShowcase from "@/components/AchievementShowcase";
+
+// Define Achievement type at the top if not already:
+type Achievement = {
+  id: string;
+  icon_name: string;
+  text: string;
+  description: string;
+  created_on?: string;
+};
 
 export default function Profile() {
   const { user, isLoading: userLoading } = useUser();
@@ -22,23 +32,46 @@ export default function Profile() {
   const [isUploading, setIsUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
-  // Fetch user's enrolled modules
-  const { data: enrolledModules, isLoading: modulesLoading } = useFrappeGetDocList(
-    "LMS Module",
-    {
-      fields: ["name", "name1", "description", "progress"],
-      filters: [["status", "=", "Published"]],
-    }
-  );
+  // Fetch module progress using LearnerModuleData API
+  const { data: learnerData, isLoading: learnerLoading } = useFrappeGetCall<any>("LearnerModuleData", {
+    user: user?.email,
+    limit: 100,
+    offset: 0,
+  });
+  const modules = learnerData?.data?.modules || [];
+  const meta = learnerData?.data?.meta || {};
+  const totalModules = meta.total_count || 0;
+  const completedModules = meta.completed_modules || 0;
+  const inProgressModules = meta.in_progress_modules || 0;
+  const averageProgress = meta.average_progress || 0;
 
-  // Fetch user's achievements
-  const { data: achievements, isLoading: achievementsLoading } = useFrappeGetDocList(
-    "LMS Achievement",
+  // Fetch achievements using User Achievement doctype (like in LearnerDashboard)
+  const { data: userAchievements, isLoading: achievementsLoading } = useFrappeGetDocList(
+    "User Achievement",
     {
-      fields: ["name", "title", "description", "date_earned"],
+      fields: [
+        "name",
+        "achievement",
+        "created_on",
+        "user",
+        "achievement.icon_name",
+        "achievement.text",
+        "achievement.description"
+      ],
       filters: [["user", "=", user?.name || ""]],
-    }
+    },
+    { enabled: !!user?.name }
   );
+  let achievements: Achievement[] = [];
+  if (userAchievements && Array.isArray(userAchievements)) {
+    achievements = userAchievements.map((ua: any) => ({
+      id: ua.name,
+      icon_name: ua.icon_name,
+      text: ua.text,
+      description: ua.description,
+      created_on: ua.created_on,
+    }));
+  }
 
   const { updateDoc } = useFrappeUpdateDoc()
 
@@ -113,9 +146,9 @@ export default function Profile() {
           className="flex flex-col gap-4"
         >
           {/* Profile Header */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
+          <Card className="bg-primary/5 border-0 shadow-none rounded-2xl">
+            <CardContent className="p-8">
+              <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
                 <div className="relative group">
                   <div 
                     className="cursor-pointer" 
@@ -128,12 +161,12 @@ export default function Profile() {
                       }
                     }}
                   >
-                    <Avatar className="h-24 w-24">
-                      <AvatarImage src={"http://10.80.4.72"+user?.user_image} alt={user?.full_name} />
-                      <AvatarFallback className="text-2xl">{user?.full_name?.charAt(0)}</AvatarFallback>
+                    <Avatar className="h-32 w-32 shadow-lg border-4 border-white">
+                      <AvatarImage src={user?.user_image ? `http://10.80.4.72${user.user_image}` : undefined} alt={user?.full_name} />
+                      <AvatarFallback className="text-3xl">{user?.full_name?.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Camera className="h-6 w-6 text-white" />
+                      <Camera className="h-8 w-8 text-white" />
                     </div>
                   </div>
                   <input
@@ -150,12 +183,24 @@ export default function Profile() {
                     </div>
                   )}
                 </div>
-                <div className="flex-1 space-y-1">
-                  <h2 className="text-2xl font-bold">{user?.full_name}</h2>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Mail className="h-4 w-4" />
+                <div className="flex-1 space-y-2">
+                  <h2 className="text-3xl font-bold leading-tight">{user?.full_name}</h2>
+                  <div className="flex items-center gap-2 text-muted-foreground text-lg">
+                    <Mail className="h-5 w-5" />
                     <span>{user?.email}</span>
                   </div>
+                  {typeof (user as any)?.phone === 'string' && (user as any).phone && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Phone className="h-4 w-4" />
+                      <span>{(user as any).phone}</span>
+                    </div>
+                  )}
+                  {typeof (user as any)?.location === 'string' && (user as any).location && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span>{(user as any).location}</span>
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-2 mt-2">
                     {user?.roles?.map((role) => (
                       <Badge key={role.role} variant="secondary">
@@ -167,12 +212,15 @@ export default function Profile() {
               </div>
             </CardContent>
           </Card>
+          {/* Achievements Showcase below header */}
+          <div className="mt-4">
+            <AchievementShowcase achievements={achievements as Achievement[]} loading={achievementsLoading} />
+          </div>
 
           {/* Profile Content */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
 
@@ -187,7 +235,7 @@ export default function Profile() {
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
                           <p className="text-sm font-medium">Enrolled Modules</p>
-                          <p className="text-2xl font-bold">{enrolledModules?.length || 0}</p>
+                          <p className="text-2xl font-bold">{totalModules}</p>
                         </div>
                         <BookOpen className="h-8 w-8 text-muted-foreground" />
                       </div>
@@ -195,62 +243,30 @@ export default function Profile() {
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
                           <p className="text-sm font-medium">Completed Modules</p>
-                          <p className="text-2xl font-bold">
-                            {enrolledModules?.filter(m => m.progress === 100).length || 0}
-                          </p>
+                          <p className="text-2xl font-bold">{completedModules}</p>
                         </div>
-                        <Target className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Achievements</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium">Total Achievements</p>
-                          <p className="text-2xl font-bold">{achievements?.length || 0}</p>
-                        </div>
-                        <Award className="h-8 w-8 text-muted-foreground" />
+                        <Award className="h-8 w-8 text-green-500" />
                       </div>
                       <Separator />
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
-                          <p className="text-sm font-medium">Learning Streak</p>
-                          <p className="text-2xl font-bold">7 days</p>
+                          <p className="text-sm font-medium">In Progress</p>
+                          <p className="text-2xl font-bold">{inProgressModules}</p>
                         </div>
-                        <Flame className="h-8 w-8 text-muted-foreground" />
+                        <Clock className="h-8 w-8 text-blue-500" />
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Avg. Progress</p>
+                          <p className="text-2xl font-bold">{Math.round(averageProgress)}%</p>
+                        </div>
+                        <Target className="h-8 w-8 text-blue-500" />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
-
-            <TabsContent value="activity" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {enrolledModules?.slice(0, 5).map((module) => (
-                      <div key={module.name} className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <p className="font-medium">{module.name1}</p>
-                          <p className="text-sm text-muted-foreground">{module.description}</p>
-                        </div>
-                        <Badge variant="secondary">{module.progress}%</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4">

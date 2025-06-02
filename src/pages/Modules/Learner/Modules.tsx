@@ -363,7 +363,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                                 variant={isCompleted ? "secondary" : isInProgress ? "default" : "outline"}
                                                 className={`w-full text-base font-semibold py-2 rounded-xl shadow-md transition-all duration-200
                                                     hover:bg-primary/90 hover:shadow-lg
-                                                    dark:hover:bg-primary/80 dark:hover:shadow-lg
+                                                    dark:hover:bg-primary/80 dark:hover:shadow-lg hover:text-white
                                                     focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
                                                     ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                                                 aria-label={buttonText + ' ' + module.name1}
