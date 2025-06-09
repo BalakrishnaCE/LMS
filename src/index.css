@@ -80,6 +80,8 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  --chart-6: oklch(0.7 0.18 320); /* New: purple/blue */
+  --chart-7: oklch(0.8 0.15 140); /* New: green/yellow */
 
   /* Sidebar – light look */
   --sidebar: oklch(0.99 0.005 180);             /* Light grayish */
@@ -125,6 +127,8 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+  --chart-6: oklch(0.6 0.18 320); /* New: purple/blue */
+  --chart-7: oklch(0.7 0.15 140); /* New: green/yellow */
 
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: var(--foreground);

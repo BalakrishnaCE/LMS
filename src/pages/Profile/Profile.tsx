@@ -15,6 +15,7 @@ import { toast } from "sonner"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import AchievementShowcase from "@/components/AchievementShowcase";
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 // Define Achievement type at the top if not already:
 type Achievement = {
@@ -101,7 +102,7 @@ export default function Profile() {
       formData.append('is_private', '0')
 
       // Upload the file
-      const response = await fetch('http://10.80.4.72/api/method/upload_file', {
+      const response = await fetch(`${LMS_API_BASE_URL}/api/method/upload_file`, {
         method: 'POST',
         body: formData,
         credentials: 'include'
@@ -162,7 +163,7 @@ export default function Profile() {
                     }}
                   >
                     <Avatar className="h-32 w-32 shadow-lg border-4 border-white">
-                      <AvatarImage src={user?.user_image ? `http://10.80.4.72${user.user_image}` : undefined} alt={user?.full_name} />
+                      <AvatarImage src={user?.user_image ? `${LMS_API_BASE_URL}${user.user_image}` : undefined} alt={user?.full_name} />
                       <AvatarFallback className="text-3xl">{user?.full_name?.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">

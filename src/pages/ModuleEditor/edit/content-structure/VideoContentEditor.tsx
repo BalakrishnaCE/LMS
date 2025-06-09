@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { uploadFileToFrappe } from '@/lib/uploadFileToFrappe';
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 interface VideoContentEditorProps {
   content: { title: string; video: string };
@@ -21,7 +22,7 @@ const VideoContentEditor: React.FC<VideoContentEditorProps> = ({ content, onSave
     if (file) {
       try {
         const url = await uploadFileToFrappe(file);
-        setPreview("http://10.80.4.72" + url);
+        setPreview(LMS_API_BASE_URL + url);
         setVideo(url);
         setFileName(file.name);
       } catch (err) {
@@ -35,7 +36,7 @@ const VideoContentEditor: React.FC<VideoContentEditorProps> = ({ content, onSave
       <div>
         <Label>Video</Label>
         <Input type="file" accept="video/*" onChange={handleFileChange} />
-        {preview && <video src={"http://10.80.4.72" + preview} controls className="max-w-xs mt-2 rounded" />}
+        {preview && <video src={LMS_API_BASE_URL + preview} controls className="max-w-xs mt-2 rounded" />}
       </div>
       <div className="flex gap-2 justify-start">
         <Button onClick={() => onSave({ title: fileName, video })} disabled={!video}>Save</Button>

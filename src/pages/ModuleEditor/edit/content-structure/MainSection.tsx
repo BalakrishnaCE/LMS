@@ -46,6 +46,7 @@ import QuestionAnswerContentEditor from '@/pages/ModuleEditor/edit/content-struc
 import SlideContentEditor from '@/pages/ModuleEditor/edit/content-structure/SlideContentEditor';
 import IframeContentEditor from '@/pages/ModuleEditor/edit/content-structure/IframeContentEditor';
 import { SlidePreview } from '@/pages/ModuleEditor/contents/slide';
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 const contentStyles = `
     .prose ul {
@@ -960,7 +961,7 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           <div className="font-bold mb-2">{content.title}</div>
-          {content.attach && <img src={"http://10.80.4.72" + content.attach} alt={content.title} className="max-h-48 mx-auto rounded" />}
+          {content.attach && <img src={LMS_API_BASE_URL + content.attach} alt={content.title} className="max-h-48 mx-auto rounded" />}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
@@ -968,7 +969,7 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           <div className="font-bold mb-2">{content.title}</div>
-          {content.video && <video src={"http://10.80.4.72" + content.video} controls className="max-h-48 mx-auto rounded" />}
+          {content.video && <video src={LMS_API_BASE_URL + content.video} controls className="max-h-48 mx-auto rounded" />}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
@@ -1024,8 +1025,6 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
           <SlidePreview 
             title={content.title} 
             description={content.description}
-            progress_enabled={content.progress_enabled}
-            is_active={content.is_active}
             slide_show_items={content.slide_show_items || []} 
           />
           <Button size="sm" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Edit</Button>
@@ -1137,28 +1136,55 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
             }))
           };
           break;
-        case 'Quiz':
+        case 'Quiz': {
           doctype = 'Quiz';
-          fields = { 
+          // For each question, create or update a Quiz Question doc
+          const createdQuestions = await Promise.all(
+            (Array.isArray(data.questions) ? data.questions : []).map(async (question: any) => {
+              if (question.name) {
+                // Update existing Quiz Question
+                await updateDoc('Quiz Question', question.name, {
+                  question_text: question.question_text,
+                  question_type: question.question_type,
+                  score: question.score,
+                  options: (Array.isArray(question.options) ? question.options : []).map((option: any) => ({
+                    option_text: option.option_text,
+                    correct: option.correct
+                  }))
+                });
+                console.log('[Quiz] Updated Quiz Question:', question.name);
+                return question.name;
+              } else {
+                // Create new Quiz Question
+                const quizQuestionDoc = await createDoc('Quiz Question', {
+                  question_text: question.question_text,
+                  question_type: question.question_type,
+                  score: question.score,
+                  options: (Array.isArray(question.options) ? question.options : []).map((option: any) => ({
+                    option_text: option.option_text,
+                    correct: option.correct
+                  }))
+                });
+                console.log('[Quiz] Created Quiz Question:', quizQuestionDoc?.name);
+                return quizQuestionDoc?.name;
+              }
+            })
+          );
+          // Build the Quiz's questions child table as references
+          fields = {
             title: data.title,
             description: data.description,
             total_score: data.total_score,
             randomize_questions: data.randomize_questions,
             time_limit_mins: data.time_limit_mins,
             is_active: data.is_active,
-            questions: (Array.isArray(data.questions) ? data.questions : []).map((question: any) => ({
-              question_text: question.question_text,
-              question_type: question.question_type,
-              score: question.score,
-              quiz_child: question.quiz_child,
-              options: (Array.isArray(question.options) ? question.options : []).map((option: any) => ({
-                option_text: option.option_text,
-                correct: option.correct,
-                quiz_question: option.quiz_question
-              }))
+            questions: createdQuestions.map((quizQuestionName: string) => ({
+              quiz_question: quizQuestionName
             }))
           };
+          console.log('[Quiz] Prepared Quiz fields:', fields);
           break;
+        }
         case 'Question Answer':
           doctype = 'Question Answer';
           fields = { 
@@ -1181,8 +1207,10 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
             progress_enabled: data.progress_enabled,
             is_active: data.is_active,
             slide_show_items: (Array.isArray(data.slide_show_items) ? data.slide_show_items : []).map((slide: any) => ({
-              option_text: slide.option_text,
-              slide_content: slide.slide_content
+              heading: slide.heading,
+              description: slide.description,
+              image: slide.image,
+              url: slide.url
             }))
           };
           break;

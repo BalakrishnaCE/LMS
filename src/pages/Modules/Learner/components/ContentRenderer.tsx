@@ -9,6 +9,7 @@ import FileAttachContent from "@/pages/Modules/Contents/FileAttachContent";
 import StepsContent from "@/pages/Modules/Contents/StepsContent";
 import CheckListContent from "@/pages/Modules/Contents/CheckListContent";
 import AccordionContent from "@/pages/Modules/Contents/AccordionContent";
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 const contentStyles = `
     .prose ul {
@@ -104,7 +105,7 @@ export function ContentRenderer({ contentType, contentReference }: ContentRender
           <motion.img
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            src={"http://10.80.4.72"+content.attach}
+            src={LMS_API_BASE_URL+content.attach}
             alt="Content"
             className="max-w-full h-auto rounded-lg shadow-lg"
           />
@@ -117,7 +118,7 @@ export function ContentRenderer({ contentType, contentReference }: ContentRender
             className="relative aspect-video"
           >
             <video
-              src={"http://10.80.4.72"+content.video}
+              src={LMS_API_BASE_URL+content.video}
               controls
               className="w-full h-full rounded-lg shadow-lg"
             />

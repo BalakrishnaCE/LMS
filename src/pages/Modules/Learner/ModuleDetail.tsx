@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ContentRenderer } from "@/pages/Modules/Learner/components/ContentRenderer";
 import { BookOpen, ArrowLeft, ArrowRight, Edit } from "lucide-react";
 import { Link } from "wouter";
-import { ROUTES } from "@/config/routes";
+import { ROUTES, LMS_API_BASE_URL } from "@/config/routes";
 import Lottie from "lottie-react";
 import learningAnimation from "@/assets/learning-bg.json"; // Place your Lottie JSON here
 import emptyAnimation from '@/assets/Empty.json';
@@ -507,12 +507,6 @@ export default function LearnerModuleDetail() {
                                             <BookOpen className="h-4 w-4" />
                                             <span>Admin Preview</span>
                                         </div>
-                                        <Link href={`/edit/${module.name}`}>
-                                            <Button variant="outline" size="sm" className="gap-2">
-                                                <Edit className="h-4 w-4" />
-                                                Edit Module
-                                            </Button>
-                                        </Link>
                                     </div>
                                 </div>
                                 
@@ -642,7 +636,7 @@ export default function LearnerModuleDetail() {
                             <div className="flex justify-center mb-2">
                                 {module.image ? (
                                     <img
-                                        src={module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`}
+                                        src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`}
                                         alt={module.name1}
                                         className="w-32 h-32 object-cover rounded-2xl shadow-lg border border-border bg-white"
                                     />

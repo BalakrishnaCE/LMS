@@ -14,6 +14,7 @@ import { ChevronRight, ChevronLeft, ArrowLeft, ChevronDown, ChevronUp } from "lu
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { useUser } from "@/hooks/use-user"
+import { LMS_API_BASE_URL } from "@/config/routes"
 
 // Add custom styles for the content
 const contentStyles = `
@@ -108,7 +109,7 @@ export default function ModuleDetail() {
             const details: Record<string, any> = {};
             for (const lesson of sortedLessons) {
                 try {
-                    const response = await fetch(`http://10.80.4.72/api/resource/Lesson/${lesson.lesson}`, {
+                    const response = await fetch(`${LMS_API_BASE_URL}/api/resource/Lesson/${lesson.lesson}`, {
                         credentials: 'include'
                     });
                     const data = await response.json();
@@ -143,7 +144,7 @@ export default function ModuleDetail() {
             const details: Record<string, any> = {};
             for (const chapter of chapters) {
                 try {
-                    const response = await fetch(`http://10.80.4.72/api/resource/Chapter/${chapter.chapter}`, {
+                    const response = await fetch(`${LMS_API_BASE_URL}/api/resource/Chapter/${chapter.chapter}`, {
                         credentials: 'include'
                     });
                     const data = await response.json();

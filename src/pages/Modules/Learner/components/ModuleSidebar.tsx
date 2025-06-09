@@ -75,7 +75,7 @@ export function ModuleSidebar({
     >
       <div className="p-4 space-y-6">
         <Link href={ROUTES.LEARNER_MODULES} className="inline-block">
-          <Button variant="ghost" size="sm" className="gap-2 hover:bg-primary/10">
+          <Button variant="outline" size="sm" className="gap-2 hover:bg-primary hover:text-secondary">
             <ArrowLeft className="h-4 w-4" />
             Back to Modules
           </Button>
@@ -91,11 +91,19 @@ export function ModuleSidebar({
             {module?.name1}
           </motion.h1>
           
-          {/* Admin Indicator */}
+          {/* Admin Indicator and Edit Button */}
           {mode === 'admin' && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-md">
               <BookOpen className="h-4 w-4" />
               <span>Admin Preview Mode</span>
+              {module?.name && (
+                <Link href={`/edit/${module.name}`}>
+                  <Button variant="outline" size="sm" className="gap-2 ml-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2.828 2.828 0 00-4-4l-8 8v3zm0 0v3a2 2 0 002 2h3" /></svg>
+                    Edit Module
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
           

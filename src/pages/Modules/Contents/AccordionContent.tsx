@@ -1,5 +1,6 @@
 import React from "react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent as ShadAccordionContent } from "@/components/ui/accordion";
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 interface AccordionItemType {
   header_title: string;
@@ -39,7 +40,7 @@ export default function AccordionContent({ content }: AccordionContentProps) {
                 <div className="flex gap-4 items-start py-2">
                   {item.image ? (
                     <img
-                      src={"http://10.80.4.72" + item.image}
+                      src={LMS_API_BASE_URL + item.image}
                       alt="Accordion Item"
                       className="max-w-[120px] h-auto rounded shadow border"
                     />

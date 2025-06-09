@@ -11,6 +11,7 @@ import Lottie from 'lottie-react';
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 interface QuestionAnswerProps {
   questionAnswerId: string;
@@ -122,7 +123,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
     if (!open) return;
     setLoading(true);
     setError(null);
-    fetch(`http://10.80.4.72/api/resource/Question Answer/${questionAnswerId}`, {
+    fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer/${questionAnswerId}`, {
       credentials: 'include',
     })
       .then(res => res.json())

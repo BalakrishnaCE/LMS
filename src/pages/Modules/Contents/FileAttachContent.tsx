@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 interface FileAttachContentProps {
   content: {
@@ -8,41 +9,7 @@ interface FileAttachContentProps {
 }
 
 export default function FileAttachContent({ content }: FileAttachContentProps) {
-  const fileUrl = content.attachment.startsWith('http') ? content.attachment : `http://10.80.4.72${content.attachment}`;
-  const fileExtension = content.attachment.split('.').pop()?.toLowerCase();
-  
-  const renderFilePreview = () => {
-    switch (fileExtension) {
-      case 'pdf':
-        return (
-          <iframe
-            src={fileUrl}
-            className="w-full h-[600px] rounded-lg shadow-lg"
-            title={content.title}
-          />
-        );
-      case 'doc':
-      case 'docx':
-        return (
-          <iframe
-            src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`}
-            className="w-full h-[600px] rounded-lg shadow-lg"
-            title={content.title}
-          />
-        );
-      case 'xls':
-      case 'xlsx':
-        return (
-          <iframe
-            src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`}
-            className="w-full h-[600px] rounded-lg shadow-lg"
-            title={content.title}
-          />
-        );
-      default:
-        return null;
-    }
-  };
+  const fileUrl = content.attachment.startsWith('http') ? content.attachment : `${LMS_API_BASE_URL}${content.attachment}`;
 
   return (
     <motion.div
@@ -51,7 +18,6 @@ export default function FileAttachContent({ content }: FileAttachContentProps) {
       className="bg-muted/30 rounded-lg p-4 flex flex-col gap-4"
     >
       <div className="font-semibold text-lg">{content.title}</div>
-      {renderFilePreview()}
       <a
         href={fileUrl}
         target="_blank"

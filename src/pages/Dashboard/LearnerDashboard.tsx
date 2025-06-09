@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Link } from "wouter"
 import { BookOpen, Clock, Award, Calendar, Target, Lock, PlayCircle, FastForward, Eye, CheckCircle } from "lucide-react"
-import { ROUTES } from "@/config/routes"
+import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import { useFrappeGetCall, useFrappeGetDocList } from "frappe-react-sdk"
@@ -274,7 +274,7 @@ export default function LearnerDashboard() {
                                   {/* Image or Avatar */}
                                   {module.image ? (
                                     <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 relative">
-                                      <img src={module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`} alt={module.name1 + ' image'} className="object-cover w-full h-full rounded-r-xl" loading="lazy" />
+                                      <img src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`} alt={module.name1 + ' image'} className="object-cover w-full h-full rounded-r-xl" loading="lazy" />
                                     </div>
                                   ) : (
                                     <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 flex items-center justify-center bg-primary/10 dark:bg-primary/20 rounded-r-xl">
@@ -403,7 +403,7 @@ export default function LearnerDashboard() {
                                     {/* Image or Avatar */}
                                     {module.image ? (
                                       <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 relative">
-                                        <img src={module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`} alt={moduleName + ' image'} className="object-cover w-full h-full rounded-r-xl" loading="lazy" />
+                                        <img src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`} alt={moduleName + ' image'} className="object-cover w-full h-full rounded-r-xl" loading="lazy" />
                                       </div>
                                     ) : (
                                       <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 flex items-center justify-center bg-primary/10 dark:bg-primary/20 rounded-r-xl">
@@ -510,7 +510,7 @@ export default function LearnerDashboard() {
                                     {/* Image or Avatar */}
                                     {module.image ? (
                                       <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 relative">
-                                        <img src={module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`} alt={module.name1 + ' image'} className="object-cover w-full h-full rounded-r-xl" loading="lazy" />
+                                        <img src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`} alt={module.name1 + ' image'} className="object-cover w-full h-full rounded-r-xl" loading="lazy" />
                                       </div>
                                     ) : (
                                       <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 flex items-center justify-center bg-primary/10 dark:bg-primary/20 rounded-r-xl">

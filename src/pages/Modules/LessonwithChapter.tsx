@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import StepsContent from './Contents/StepsContent';
 import CheckListContent from './Contents/CheckListContent';
 import AccordionContent from './Contents/AccordionContent';
+import { LMS_API_BASE_URL } from "@/config/routes";
 const contentStyles = `
     .prose ul {
         list-style-type: disc;
@@ -61,7 +62,7 @@ export function useLessonDoc(lessonName: string) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://10.80.4.72/api/resource/Lesson/${lessonName}`, {
+    fetch(`${LMS_API_BASE_URL}/api/resource/Lesson/${lessonName}`, {
       credentials: 'include'
     })
       .then(res => res.json())
@@ -85,7 +86,7 @@ export function useChapterDoc(chapterName: string) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://10.80.4.72/api/resource/Chapter/${chapterName}`, {
+    fetch(`${LMS_API_BASE_URL}/api/resource/Chapter/${chapterName}`, {
       credentials: 'include'
     })
       .then(res => res.json())
@@ -125,7 +126,7 @@ function ContentRenderer({ contentType, contentReference }: { contentType: strin
           <motion.img
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            src={"http://10.80.4.72"+content.attach}
+            src={LMS_API_BASE_URL+content.attach}
             alt="Content"
             className="max-w-full h-auto rounded-lg shadow-lg"
           />
@@ -138,7 +139,7 @@ function ContentRenderer({ contentType, contentReference }: { contentType: strin
             className="relative aspect-video"
           >
             <video
-              src={"http://10.80.4.72"+content.video}
+              src={LMS_API_BASE_URL+content.video}
               controls
               className="w-full h-full rounded-lg shadow-lg"
             />

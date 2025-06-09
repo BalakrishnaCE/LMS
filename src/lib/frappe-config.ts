@@ -3,7 +3,7 @@
  */
 export const frappeConfig = {
   // Replace with actual Frappe server URL for production
-  url: import.meta.env.VITE_FRAPPE_URL || 'http://10.80.4.53',
+  url: import.meta.env.VITE_FRAPPE_URL || 'https://lms.noveloffice.in',
   
   // Socket connection for real-time updates (replace port for production)
   socketPort: import.meta.env.VITE_FRAPPE_SOCKET_PORT || 9000,

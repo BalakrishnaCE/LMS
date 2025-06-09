@@ -15,7 +15,7 @@ import { toast } from "sonner"
 import { navigate } from "wouter/use-browser-location"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { motion, HTMLMotionProps } from "framer-motion"
-import { ROUTES, getFullPath } from "@/config/routes"
+import { ROUTES, getFullPath, LMS_API_BASE_URL } from "@/config/routes"
 import Lottie from 'lottie-react';
 import errorAnimation from '@/assets/Error.json';
 
@@ -70,7 +70,7 @@ export function LoginForm({
       try {
         // Use direct fetch for user doc
         // add with credentials true 
-        const res = await fetch(`http://10.80.4.72/api/resource/User/${currentUser}`, {
+        const res = await fetch(`${LMS_API_BASE_URL}/api/resource/User/${currentUser}`, {
           credentials: "include"
         });
         const userDoc = await res.json();

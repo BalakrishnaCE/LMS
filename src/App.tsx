@@ -19,14 +19,18 @@ import LearnerModuleDetail from "@/pages/Modules/Learner/ModuleDetail";
 import ModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
 import ModuleCreationForm from "@/pages/ModuleEditor/edit/ModuleCreationForm";
 import AnalyticsDashboard from "@/pages/Analytics/AnalyticsDashboard";
+// import H5PReactDemo from '@/pages/Test/H5PReactDemo';
 // import TESTH5P from '@/pages/Test/TESTH5P';
 
 function App() {
   return (
-    <ThemeProvider storageKey="novel-lms-theme">
+    <ThemeProvider storageKey="novel-lms-theme" defaultTheme="light">
       <div className="flex flex-col items-center justify-center min-h-svh">
         <NovelLMSFrappeProvider>
           <Router base={BASE_PATH}>
+            {/* <div className="w-full flex justify-center py-2 bg-muted/30">
+              <a href="/test/h5p-react-demo" className="text-primary underline font-medium mx-2">Test H5P React Demo</a>
+            </div> */}
             <Switch>
               <Route path="/login">
                 <LoginForm />
@@ -83,11 +87,8 @@ function App() {
                   <AnalyticsDashboard />
                 </Layout>
               )} allowedRoles={["LMS Admin"]} />
-              {/* <ProtectedRoute path="/test/h5p" component={() => (
-                <Layout>
-                  <TESTH5P />
-                </Layout>
-              )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} /> */}
+              {/* Test H5P React Demo route */}
+              {/* <Route path="/test/h5p-react-demo" component={H5PReactDemo} /> */}
               {/* Show 404 for all unrecognized routes */}
               <Route path="/:path*" component={NotFound} />
             </Switch>

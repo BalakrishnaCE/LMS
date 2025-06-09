@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion"
 import { Download } from "lucide-react"
 import { toast } from "sonner"
+import { LMS_API_BASE_URL } from "@/config/routes"
 
 interface ModulesProps {
     itemsPerPage: number;
@@ -230,7 +231,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
 
                     // Use imageErrors state for this module
                     const imageUrl = module.image
-                        ? (module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`)
+                        ? (module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`)
                         : null;
                     const hasError = imageErrors[module.name];
 

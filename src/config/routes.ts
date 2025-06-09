@@ -7,6 +7,9 @@ export const getFullPath = (path: string) => `${BASE_PATH}${path}`;
 // Helper function to get the relative path (removes base path)
 export const getRelativePath = (fullPath: string) => fullPath.replace(BASE_PATH, '');
 
+// LMS API base URL
+export const LMS_API_BASE_URL =  "http://10.80.4.72";
+
 // Common routes
 export const ROUTES = {
   HOME: '/',

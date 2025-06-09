@@ -34,6 +34,7 @@ import { FontFamily } from 'reactjs-tiptap-editor/fontfamily';
 import { SlashCommand } from 'reactjs-tiptap-editor/slashcommand'; 
 import { Strike } from 'reactjs-tiptap-editor/strike'; 
 import { Emoji } from 'reactjs-tiptap-editor/emoji'; 
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 import 'reactjs-tiptap-editor/style.css';
 
@@ -82,7 +83,7 @@ const extensions = [
         formData.append('file', files);
 
         try {
-          const response = await fetch('http://10.80.4.72/api/method/upload_file', {
+          const response = await fetch(`${LMS_API_BASE_URL}/api/method/upload_file`, {
             method: 'POST',
             headers: {
               'Accept': 'application/json',
@@ -95,7 +96,7 @@ const extensions = [
             throw new Error('Failed to upload file');
           }
           const data = await response.json();
-          return "http://10.80.4.72" + data.message.file_url
+          return LMS_API_BASE_URL + data.message.file_url
         } catch (e) {
           console.error(e);
           throw new Error('Failed to upload file');
@@ -108,7 +109,7 @@ const extensions = [
             const formData = new FormData();
             formData.append('file', files);
             try {
-                const response = await fetch('http://10.80.4.72/api/method/upload_file', {
+                const response = await fetch(`${LMS_API_BASE_URL}/api/method/upload_file`, {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
@@ -121,7 +122,7 @@ const extensions = [
                     throw new Error('Failed to upload file');
                 }
                 const data = await response.json();
-                return "http://10.80.4.72" + data.message.file_url
+                return LMS_API_BASE_URL + data.message.file_url
             } catch (e) {
                 console.error(e);
                 throw new Error('Failed to upload file');

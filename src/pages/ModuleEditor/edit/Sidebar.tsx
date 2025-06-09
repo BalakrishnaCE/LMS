@@ -438,21 +438,29 @@ function SettingsDialog({
 }
 
 // Update the Add Lesson Dialog to use Sheet
-function AddLessonDialog({ 
-  open, 
-  onOpenChange, 
-  onSubmit, 
-  loading 
-}: { 
+function AddLessonDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  loading,
+  lessonTitle,
+  setLessonTitle,
+  lessonDesc,
+  setLessonDesc,
+  chapterTitle,
+  setChapterTitle,
+}: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (e: React.FormEvent) => void;
   loading: boolean;
+  lessonTitle: string;
+  setLessonTitle: (v: string) => void;
+  lessonDesc: string;
+  setLessonDesc: (v: string) => void;
+  chapterTitle: string;
+  setChapterTitle: (v: string) => void;
 }) {
-  const [lessonTitle, setLessonTitle] = useState("");
-  const [lessonDesc, setLessonDesc] = useState("");
-  const [chapterTitle, setChapterTitle] = useState("");
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-full p-0 ">
@@ -467,7 +475,6 @@ function AddLessonDialog({
               </SheetClose>
             </div>
           </SheetHeader>
-          
           <div className="flex-1 overflow-y-auto p-6">
             <form className="space-y-4 max-w-3xl mx-auto" onSubmit={onSubmit}>
               <div>
@@ -972,43 +979,61 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                       <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: moduleInfo.description || "" }} />
                     </div>
 
-                    {/* Lessons/Chapters Hierarchy */}
-                    {module?.lessons && module.lessons.length > 0 && (
+                    {/* Lessons/Chapters Hierarchy */}                    {module?.lessons && (
                       <div className="mt-6">
                         <h4 className="text-sm font-semibold mb-2">Lessons</h4>
-                        <DndContext
-                          collisionDetection={closestCenter}
-                          onDragStart={event => setDragLessonActiveId(String(event.active.id))}
-                          onDragEnd={handleLessonDragEnd}
-                        >
-                          <SortableContext
-                            items={(module.lessons ?? []).map((l: any) => l.id)}
-                            strategy={verticalListSortingStrategy}
+                        {module.lessons.length > 0 && (
+                          <DndContext
+                            collisionDetection={closestCenter}
+                            onDragStart={event => setDragLessonActiveId(String(event.active.id))}
+                            onDragEnd={handleLessonDragEnd}
                           >
-                            <ul className="space-y-2">
-                              {module.lessons && module.lessons.map((lesson, lessonIndex) => (
-                                <SortableLesson
-                                  key={lesson.id || `lesson-${lessonIndex}`}
-                                  lesson={lesson}
-                                  activeLessonId={activeLessonId}
-                                  setActiveLessonId={setActiveLessonId}
-                                  setActiveChapterId={setActiveChapterId}
-                                  onDelete={() => { setLessonToDelete(lesson.id); setShowDeleteLessonDialog(true); }}
-                                  activeChapterId={activeChapterId}
-                                  setChapterToDelete={setChapterToDelete}
-                                  setShowDeleteChapterDialog={setShowDeleteChapterDialog}
-                                  onChapterReorder={handleChapterDragEnd}
-                                />
-                              ))}
-                            </ul>
-                          </SortableContext>
-                        </DndContext>
-                        {/* Add Lesson Button and Dialog */}
+                            <SortableContext
+                              items={(module.lessons ?? []).map((l: any) => l.id)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              <ul className="space-y-2">
+                                {module.lessons.map((lesson, lessonIndex) => (
+                                  <SortableLesson
+                                    key={lesson.id || `lesson-${lessonIndex}`}
+                                    lesson={lesson}
+                                    activeLessonId={activeLessonId}
+                                    setActiveLessonId={setActiveLessonId}
+                                    setActiveChapterId={setActiveChapterId}
+                                    onDelete={() => { setLessonToDelete(lesson.id); setShowDeleteLessonDialog(true); }}
+                                    activeChapterId={activeChapterId}
+                                    setChapterToDelete={setChapterToDelete}
+                                    setShowDeleteChapterDialog={setShowDeleteChapterDialog}
+                                    onChapterReorder={handleChapterDragEnd}
+                                  />
+                                ))}
+                              </ul>
+                            </SortableContext>
+                          </DndContext>
+                        )}
+                        {/* Add Lesson Button */}
+                        <Button
+                          className="w-full mt-4"
+                          variant="default"
+                          onClick={() => setAddingLesson(true)}
+                        >
+                          <span className="flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                            Add Lesson
+                          </span>
+                        </Button>
+                        {/* Add Lesson Dialog */}
                         <AddLessonDialog
                           open={addingLesson}
                           onOpenChange={setAddingLesson}
                           onSubmit={handleAddLesson}
                           loading={addingLessonLoading}
+                          lessonTitle={lessonTitle}
+                          setLessonTitle={setLessonTitle}
+                          lessonDesc={lessonDesc}
+                          setLessonDesc={setLessonDesc}
+                          chapterTitle={chapterTitle}
+                          setChapterTitle={setChapterTitle}
                         />
                       </div>
                     )}

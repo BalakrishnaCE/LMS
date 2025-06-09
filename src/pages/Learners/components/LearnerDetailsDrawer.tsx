@@ -5,7 +5,9 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X, Mail, Users, TrendingUp, BookOpen, Award } from "lucide-react";
-import { useFrappeGetCall } from "frappe-react-sdk";
+import { useFrappeGetCall, useFrappeUpdateDoc } from "frappe-react-sdk";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, open: boolean, onClose: () => void }) {
   // Fetch module progress/activity for this learner
@@ -19,6 +21,44 @@ export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, op
   const completionRate = totalModules ? Math.round((completedModules / totalModules) * 100) : 0;
   // Recent activity: last 5 modules
   const recent = modules.slice(0, 5);
+
+  const { updateDoc } = useFrappeUpdateDoc();
+  const [editMode, setEditMode] = React.useState(false);
+  const [fullName, setFullName] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (learner) {
+      setFullName(learner.full_name || "");
+      setPassword("");
+      setEditMode(false);
+    }
+  }, [learner]);
+
+  const handleSave = async () => {
+    if (!fullName.trim()) {
+      toast.error("Full name is required");
+      return;
+    }
+    setSaving(true);
+    try {
+      // Update full name
+      await updateDoc("User", learner.name, { full_name: fullName });
+      // Update password if provided
+      if (password.trim()) {
+        await updateDoc("User", learner.name, { new_password: password });
+      }
+      toast.success("Learner updated successfully");
+      setEditMode(false);
+      setPassword("");
+      // Optionally, trigger a refresh in parent
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update learner");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -51,7 +91,17 @@ export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, op
               <div className="flex items-center gap-3">
                 <Users className="w-8 h-8 text-primary" />
                 <div>
-                  <div className="text-xl font-bold">{learner.full_name}</div>
+                  {editMode ? (
+                    <Input
+                      className="text-xl font-bold mb-1"
+                      value={fullName}
+                      onChange={e => setFullName(e.target.value)}
+                      disabled={saving}
+                      placeholder="Full Name"
+                    />
+                  ) : (
+                    <div className="text-xl font-bold">{learner.full_name}</div>
+                  )}
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
                     <Mail className="w-4 h-4" /> {learner.email}
                     <Badge variant={learner.enabled === 1 ? "secondary" : "destructive"} className="ml-2">
@@ -60,9 +110,41 @@ export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, op
                   </div>
                 </div>
               </div>
-              <Button variant="ghost" onClick={onClose} aria-label="Close"><X className="w-6 h-6" /></Button>
+              <div className="flex gap-2">
+                {!editMode && (
+                  <Button variant="outline" size="sm" onClick={() => setEditMode(true)}>
+                    Edit
+                  </Button>
+                )}
+                <Button variant="ghost" onClick={onClose} aria-label="Close"><X className="w-6 h-6" /></Button>
+              </div>
             </div>
             <div className="p-6 space-y-6">
+              {editMode && (
+                <Card className="mb-4">
+                  <CardHeader>
+                    <CardTitle>Edit Learner</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="block mb-1 font-medium">Full Name</label>
+                      <Input value={fullName} onChange={e => setFullName(e.target.value)} disabled={saving} />
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-medium">Password</label>
+                      <Input type="password" value={password} onChange={e => setPassword(e.target.value)} disabled={saving} placeholder="Leave blank to keep unchanged" />
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <Button onClick={handleSave} disabled={saving}>
+                        {saving ? "Saving..." : "Save"}
+                      </Button>
+                      <Button variant="outline" onClick={() => setEditMode(false)} disabled={saving}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> Completion Rate</CardTitle>

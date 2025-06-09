@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { uploadFileToFrappe } from '@/lib/uploadFileToFrappe';
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 interface ImageContentEditorProps {
   content: { title: string; attach: string };
@@ -21,7 +22,7 @@ const ImageContentEditor: React.FC<ImageContentEditorProps> = ({ content, onSave
     if (file) {
       try {
         const url = await uploadFileToFrappe(file);
-        setPreview("http://10.80.4.72" + url);
+        setPreview(LMS_API_BASE_URL + url);
         setAttach(url);
         setFileName(file.name);
       } catch (err) {
@@ -35,7 +36,7 @@ const ImageContentEditor: React.FC<ImageContentEditorProps> = ({ content, onSave
       <div>
         <Label>Image</Label>
         <Input type="file" accept="image/*" onChange={handleFileChange} />
-        {preview && <img src={"http://10.80.4.72" + preview} alt="Preview" className="max-w-xs mt-2 rounded" />}
+        {preview && <img src={LMS_API_BASE_URL + preview} alt="Preview" className="max-w-xs mt-2 rounded" />}
       </div>
       <div className="flex gap-2 justify-start">
         <Button onClick={() => onSave({ title: fileName, attach })} disabled={!attach}>Save</Button>

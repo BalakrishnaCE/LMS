@@ -121,18 +121,24 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
       title,
       description,
       total_score: totalScore,
-      randomize_questions: randomizeQuestions,
+      randomize_questions: randomizeQuestions ?? false,
       time_limit_mins: timeLimitMins,
-      is_active: isActive,
-      questions: questions.map((question, idx) => ({
-        ...question,
-        quiz_child: question.quiz_child || `question_${idx + 1}`,
+      is_active: isActive ?? true,
+      questions: questions.map((question) => ({
+        question_text: question.question_text,
+        question_type: question.question_type,
+        score: question.score,
         options: question.options.map(option => ({
-          ...option,
-          quiz_question: question.quiz_child || `question_${idx + 1}`
+          option_text: option.option_text,
+          correct: option.correct
         }))
       }))
     };
+    // Debug log
+    console.log('[QuizContentEditor] handleSave cleaned payload:', payload);
+    if (typeof onSave === 'function') {
+      console.log('[QuizContentEditor] Calling onSave with cleaned payload');
+    }
     onSave(payload);
   };
 

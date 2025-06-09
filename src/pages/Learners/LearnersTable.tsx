@@ -18,6 +18,7 @@ interface User {
   full_name: string;
   email: string;
   enabled: number;
+  department?: string;
 }
 
 interface LearnersTableProps {
@@ -34,6 +35,7 @@ export function LearnersTable({ learners, isLoading, onRowClick }: LearnersTable
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
+            <TableHead>Department</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -62,6 +64,7 @@ export function LearnersTable({ learners, isLoading, onRowClick }: LearnersTable
                 >
                   <TableCell className="group-hover:text-primary transition-colors duration-200">{learner.full_name}</TableCell>
                   <TableCell className="group-hover:text-primary transition-colors duration-200">{learner.email}</TableCell>
+                  <TableCell>{learner.department || '-'}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs transition-all duration-200 ${
                       learner.enabled === 1 

@@ -1,0 +1,20 @@
+/* --- LMS Analytics Dashboard Chart Colors --- */
+:root {
+  --chart-1: hsl(221.2 83.2% 53.3%);      /* Blue */
+  --chart-2: hsl(142.1 70.6% 45.3%);      /* Green */
+  --chart-3: hsl(24.6 95% 53.1%);         /* Orange */
+  --chart-4: hsl(243.4 83.9% 66.1%);      /* Indigo/Purple */
+  --chart-positive: hsl(142.1 70.6% 45.3%); /* Green */
+  --chart-negative: hsl(0 84.2% 60.2%);     /* Red */
+  --chart-warning: hsl(24.6 95% 53.1%);     /* Orange */
+}
+
+[data-theme="dark"], .dark {
+  --chart-1: hsl(221.2 83.2% 63.3%);      /* Lighter Blue for dark bg */
+  --chart-2: hsl(142.1 70.6% 55.3%);      /* Lighter Green */
+  --chart-3: hsl(24.6 95% 63.1%);         /* Lighter Orange */
+  --chart-4: hsl(243.4 83.9% 76.1%);      /* Lighter Indigo/Purple */
+  --chart-positive: hsl(142.1 70.6% 55.3%); /* Lighter Green */
+  --chart-negative: hsl(0 84.2% 70.2%);     /* Lighter Red */
+  --chart-warning: hsl(24.6 95% 63.1%);     /* Lighter Orange */
+} 

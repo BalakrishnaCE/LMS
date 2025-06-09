@@ -19,7 +19,7 @@ import { useState, useMemo, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { motion, AnimatePresence } from "framer-motion"
 import { useUser } from "@/hooks/use-user"
-import { ROUTES } from "@/config/routes"
+import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Progress } from "@/components/ui/progress"
 import { useFrappeGetCall } from "frappe-react-sdk"
@@ -323,7 +323,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                 {/* Image or Letter Avatar */}
                                 {hasImage ? (
                                     <div className="w-full h-44 relative" style={{ marginTop: '2rem' }}>
-                                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${module.image.startsWith('http') ? module.image : `http://10.80.4.72${module.image}`})` }} />
+                                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`})` }} />
                                         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/60" />
                                     </div>
                                 ) : (
