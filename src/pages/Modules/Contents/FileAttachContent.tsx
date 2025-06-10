@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { LMS_API_BASE_URL } from "@/config/routes";
-
 interface FileAttachContentProps {
   content: {
     title: string;

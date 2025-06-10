@@ -15,6 +15,7 @@ import learningAnimation from "@/assets/learning-bg.json"; // Place your Lottie 
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
+import { toast } from "sonner";
 
 // TypeScript interfaces
 interface Content {
@@ -78,6 +79,128 @@ function getInitialProgress(module: Module): ModuleProgress {
     };
 }
 
+// Utility: Check for Quiz/QA content and completion
+function getQuizQAContents(module: Module) {
+    const quizQAContents: { content: Content; lessonIdx: number; chapterIdx: number; }[] = [];
+    module.lessons.forEach((lesson, lessonIdx) => {
+        lesson.chapters.forEach((chapter, chapterIdx) => {
+            chapter.contents.forEach((content) => {
+                if (content.content_type === "Quiz" || content.content_type === "Question Answer") {
+                    quizQAContents.push({ content, lessonIdx, chapterIdx });
+                }
+            });
+        });
+    });
+    return quizQAContents;
+}
+
+// Utility: Get incomplete Quiz/QA titles (fetch all progress for user, filter in JS)
+async function getIncompleteQuizQATitles(module: Module, user: any) {
+    const quizQAContents = getQuizQAContents(module);
+    const incompleteTitles: string[] = [];
+    // Fetch all quiz progress for user
+    let quizProgressList: any[] = [];
+    let qaProgressList: any[] = [];
+    try {
+        const quizRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Quiz Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"name\",\"quiz_id\"]`, { credentials: 'include' });
+        quizProgressList = (await quizRes.json())?.data || [];
+    } catch {}
+    try {
+        const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"score_added\",\"name\",\"question_answer\"]`, { credentials: 'include' });
+        qaProgressList = (await qaRes.json())?.data || [];
+    } catch {}
+    for (const { content } of quizQAContents) {
+        let displayTitle = content.name;
+        if ((content as any).title) {
+            displayTitle = (content as any).title;
+        } else if ((content as any).content_type) {
+            displayTitle = `${content.content_type}`;
+        }
+        if (content.content_type === "Quiz") {
+            const progress = quizProgressList.find(p => p.quiz_id === content.name);
+            if (!progress || typeof progress.score !== 'number') {
+                incompleteTitles.push(displayTitle);
+            }
+        } else if (content.content_type === "Question Answer") {
+            // Only require a progress record to exist, not score_added
+            const progress = qaProgressList.find(p => p.question_answer === content.name);
+            if (!progress) {
+                incompleteTitles.push(displayTitle);
+            }
+        }
+    }
+    return incompleteTitles;
+}
+
+// Utility: Check Quiz/QA completion (fetch all progress for user, filter in JS)
+async function checkQuizQACompletion(module: Module, user: any) {
+    const quizQAContents = getQuizQAContents(module);
+    if (quizQAContents.length === 0) return { allCompleted: true, scores: [] };
+    let quizProgressList: any[] = [];
+    let qaProgressList: any[] = [];
+    try {
+        const quizRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Quiz Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"name\",\"quiz_id\"]`, { credentials: 'include' });
+        quizProgressList = (await quizRes.json())?.data || [];
+    } catch {}
+    try {
+        const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"score_added\",\"name\",\"question_answer\"]`, { credentials: 'include' });
+        qaProgressList = (await qaRes.json())?.data || [];
+    } catch {}
+    const scores: Array<{title: string, score: number, maxScore: number, type: string}> = [];
+    let allCompleted = true;
+    for (const { content } of quizQAContents) {
+        let displayTitle = content.name;
+        if ((content as any).title) {
+            displayTitle = (content as any).title;
+        } else if ((content as any).content_type) {
+            displayTitle = `${content.content_type}`;
+        }
+        if (content.content_type === "Quiz") {
+            const progress = quizProgressList.find(p => p.quiz_id === content.name);
+            if (!progress || typeof progress.score !== 'number') {
+                allCompleted = false;
+            } else {
+                scores.push({ title: displayTitle, score: progress.score, maxScore: progress.max_score || 0, type: 'Quiz' });
+            }
+        } else if (content.content_type === "Question Answer") {
+            // Only require a progress record to exist, not score_added
+            const progress = qaProgressList.find(p => p.question_answer === content.name);
+            if (!progress) {
+                allCompleted = false;
+            } else {
+                // Only show score if score_added is set
+                if (progress.score_added === 1) {
+                    scores.push({ title: displayTitle, score: progress.score, maxScore: progress.max_score || 0, type: 'Question Answer' });
+                }
+            }
+        }
+    }
+    return { allCompleted, scores };
+}
+
+function getAllQuizQAItems(module: Module) {
+    const items: Array<{title: string, type: string}> = [];
+    if (!module || !Array.isArray(module.lessons)) return items;
+    module.lessons.forEach((lesson) => {
+        if (!lesson || !Array.isArray(lesson.chapters)) return;
+        lesson.chapters.forEach((chapter) => {
+            if (!chapter || !Array.isArray(chapter.contents)) return;
+            chapter.contents.forEach((content) => {
+                if (content.content_type === "Quiz" || content.content_type === "Question Answer") {
+                    let displayTitle = content.name;
+                    if ((content as any).title) {
+                        displayTitle = (content as any).title;
+                    } else if ((content as any).content_type) {
+                        displayTitle = `${content.content_type}`;
+                    }
+                    items.push({ title: displayTitle, type: content.content_type });
+                }
+            });
+        });
+    });
+    return items;
+}
+
 export default function LearnerModuleDetail() {
     const params = useParams<{ moduleName: string }>();
     const moduleName = params.moduleName;
@@ -92,6 +215,10 @@ export default function LearnerModuleDetail() {
     const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
     const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
     const [reviewing, setReviewing] = useState(false);
+    const [quizQAScores, setQuizQAScores] = useState<Array<{title: string, score: number, maxScore: number, type: string}>>([]);
+    const [quizQAIncomplete, setQuizQAIncomplete] = useState(false);
+    const [showQuizQAAlert, setShowQuizQAAlert] = useState(false);
+    const [incompleteQuizQATitles, setIncompleteQuizQATitles] = useState<string[]>([]);
 
     // Fetch module data
     const { data: moduleListData, error: moduleListError } = useFrappeGetCall<ApiResponse<{ modules: Module[] }>>("LearnerModuleData", {
@@ -240,7 +367,51 @@ export default function LearnerModuleDetail() {
         let chapterIdx = currentChapterIdx;
         const currentLesson = module.lessons[lessonIdx];
         const currentChapter = currentLesson.chapters[chapterIdx];
-        // Mark current chapter as completed
+        // If this is the last chapter of the last lesson, check Quiz/QA completion BEFORE calling updateProgress
+        const isLastLesson = lessonIdx === module.lessons.length - 1;
+        const isLastChapter = chapterIdx === currentLesson.chapters.length - 1;
+        if (isLastLesson && isLastChapter) {
+            setQuizQAIncomplete(false);
+            setShowQuizQAAlert(false);
+            setIncompleteQuizQATitles([]);
+            const { allCompleted, scores } = await checkQuizQACompletion(module, user);
+            if (!allCompleted) {
+                const incompleteTitles = await getIncompleteQuizQATitles(module, user);
+                setIncompleteQuizQATitles(incompleteTitles);
+                setQuizQAIncomplete(true);
+                setShowQuizQAAlert(true);
+                toast.warning(
+                    <div>
+                        <div>You must complete all Quiz and Question/Answer sections before completing this module.</div>
+                        {incompleteTitles.length > 0 && (
+                            <ul className="list-disc ml-6 mt-2">
+                                {incompleteTitles.map((title, idx) => (
+                                    <li key={title + idx}>{title}</li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                );
+                // Do NOT call updateProgress for module completion
+                return;
+            }
+            setQuizQAScores(scores);
+            setCompleted(true);
+            setProgress({
+                ...progress!,
+                status: "Completed"
+            });
+            // Now call updateProgress to mark module as completed
+            await updateProgress({
+                user: user.email,
+                module: moduleName,
+                lesson: currentLesson.name,
+                chapter: currentChapter.name,
+                status: "Completed"
+            });
+            return;
+        }
+        // Otherwise, normal chapter/lesson progress update
         await updateProgress({
             user: user.email,
             module: moduleName,
@@ -297,12 +468,6 @@ export default function LearnerModuleDetail() {
             });
             return;
         }
-        // End of module: mark as completed and show CompletionScreen
-        setCompleted(true);
-        setProgress({
-            ...progress!,
-            status: "Completed"
-        });
     };
 
     const handleStartModule = async () => {
@@ -394,6 +559,15 @@ export default function LearnerModuleDetail() {
             setIsLoading(false);
         }
     }, [moduleListData, moduleListError]);
+
+    useEffect(() => {
+        if (module && user && progress?.status === "Completed") {
+            (async () => {
+                const { scores } = await checkQuizQACompletion(module, user);
+                setQuizQAScores(scores);
+            })();
+        }
+    }, [module, user, progress?.status]);
 
     // --- ADMIN: UI-only navigation, no progress, no welcome, no completion ---
     if (isLMSAdmin) {
@@ -589,6 +763,7 @@ export default function LearnerModuleDetail() {
 
     // If module is completed, show completion screen immediately
     if (progress?.status === "Completed" && !reviewing) {
+        const allQuizQAItems = module ? getAllQuizQAItems(module) : [];
         return (
             <div className="flex min-h-screen bg-muted gap-6 w-full items-center justify-center">
                 <CompletionScreen
@@ -596,6 +771,10 @@ export default function LearnerModuleDetail() {
                         setReviewing(true);
                         setCurrentLessonIdx(0);
                         setCurrentChapterIdx(0);
+                    }}
+                    quizQAScores={{
+                        allItems: allQuizQAItems,
+                        scores: quizQAScores
                     }}
                 />
             </div>

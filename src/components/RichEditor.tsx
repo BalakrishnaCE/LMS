@@ -1,6 +1,6 @@
 import RichTextEditor from 'reactjs-tiptap-editor';
 import { BaseKit } from 'reactjs-tiptap-editor';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Bold } from 'reactjs-tiptap-editor/bold';
 import { BulletList } from 'reactjs-tiptap-editor/bulletlist';
 import { Code } from 'reactjs-tiptap-editor/code';
@@ -35,6 +35,7 @@ import { SlashCommand } from 'reactjs-tiptap-editor/slashcommand';
 import { Strike } from 'reactjs-tiptap-editor/strike'; 
 import { Emoji } from 'reactjs-tiptap-editor/emoji'; 
 import { LMS_API_BASE_URL } from "@/config/routes";
+import { useTheme } from "@/components/theme-provider";
 
 import 'reactjs-tiptap-editor/style.css';
 
@@ -154,18 +155,34 @@ const extensions = [
 
 const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, disabled = false }) => {
     const [isMounted, setIsMounted] = useState(false);
-    // const [debouncedContent, setDebouncedContent] = useState(content);
+    const { theme } = useTheme();
+    const observerRef = useRef<MutationObserver | null>(null);
 
     useEffect(() => {
         setIsMounted(true);
     }, []);
 
-    // useEffect(() => {
-    //     const timer = setTimeout(() => {
-    //         setDebouncedContent(content);
-    //     }, 300);
-    //     return () => clearTimeout(timer);
-    // }, [content]);
+    useEffect(() => {
+        if (!isMounted) return;
+        const root = window.document.documentElement;
+
+        // Initial enforcement
+        root.classList.remove("light", "dark");
+        root.classList.add(theme === "dark" ? "dark" : "light");
+
+        // Set up MutationObserver to enforce only one class
+        if (observerRef.current) observerRef.current.disconnect();
+        observerRef.current = new MutationObserver(() => {
+            if (root.classList.contains("light") && root.classList.contains("dark")) {
+                root.classList.remove(theme === "dark" ? "light" : "dark");
+            }
+        });
+        observerRef.current.observe(root, { attributes: true, attributeFilter: ["class"] });
+
+        return () => {
+            if (observerRef.current) observerRef.current.disconnect();
+        };
+    }, [theme, isMounted]);
 
     if (!isMounted) {
         return null;
@@ -176,10 +193,10 @@ const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, disabled = f
             <RichTextEditor
                 output='html'
                 content={content || ''}
-                // content={debouncedContent || ''}
                 onChangeContent={onChange}
                 extensions={extensions}
                 minHeight="500px"
+                dark={theme === 'dark'}
                 bubbleMenu={{
                     render({ extensionsNames, editor, disabled }, bubbleDefaultDom) {
                       return <>

@@ -24,11 +24,12 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { Progress } from "@/components/ui/progress"
 import { useFrappeGetCall } from "frappe-react-sdk"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { CheckCircle, Clock, MinusCircle } from 'lucide-react';
+import { CheckCircle, Clock, MinusCircle, ChevronDown, ChevronUp, Calendar, AlertTriangle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
+import { toast } from "sonner";
 
 interface ModulesProps {
     itemsPerPage?: number;
@@ -57,6 +58,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
     const [page, setPage] = useState(1)
     const [searchQuery, setSearchQuery] = useState("")
     const { user } = useUser()
+    const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
     const offset = (page - 1) * itemsPerPage
 
@@ -268,14 +270,14 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                 {sortedModules.map((module: any, idx: number) => {
                     const status = module.progress?.status || "Not Started";
                     let progress = module.progress?.progress || 0;
+                    if (progress == null) progress = 0;
                     const isCompleted = status === "Completed";
                     const isInProgress = status === "In Progress";
                     const isNotStarted = status === "Not Started";
                     if (isCompleted) progress = 100;
                     let buttonText = "Start";
                     if (isInProgress) buttonText = "Continue";
-                    if (isCompleted && module.has_scoring) buttonText = "Review";
-                    if (isCompleted && !module.has_scoring) buttonText = "Completed";
+                    if (isCompleted) buttonText = "Completed";
                     const hasImage = !!module.image;
 
                     // Locking logic
@@ -305,6 +307,33 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                     else if (isInProgress) statusDarkColor = "dark:bg-blue-900 dark:text-blue-200";
                     else if (isNotStarted) statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
 
+                    // Utility: robustly check if module has Quiz/QA
+                    const hasQuizQA = (
+                        (module.contents && module.contents.length > 0 && module.contents.some((c: any) => c.content_type === "Quiz" || c.content_type === "Question Answer")) ||
+                        (module.structure && module.structure.lessons && module.structure.lessons.some((lesson: any) =>
+                            lesson.chapters && lesson.chapters.some((chapter: any) => {
+                                const ct = chapter.content_types || {};
+                                return (ct["Quiz"] > 0 || ct["Question Answer"] > 0);
+                            })
+                        ))
+                    );
+
+                    // Enhanced status/date logic
+                    const completedOn = module.progress?.completed_on ? new Date(module.progress.completed_on) : null;
+                    const startedOn = module.progress?.started_on ? new Date(module.progress.started_on) : null;
+                    const dueDate = startedOn && module.duration ? new Date(startedOn.getTime() + module.duration * 24 * 60 * 60 * 1000) : null;
+                    const now = new Date();
+                    let daysLeft = null;
+                    let isOverdue = false;
+                    if (dueDate) {
+                        const diff = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        daysLeft = diff;
+                        isOverdue = diff < 0;
+                    }
+                    // Lessons/Chapters summary
+                    const lessonCount = module.structure?.summary?.lesson_count || 0;
+                    const chapterCount = module.structure?.summary?.chapter_count || 0;
+
                     return (
                         <motion.div
                             key={module.name}
@@ -318,7 +347,18 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                             <Card className={`relative h-full shadow-2xl rounded-2xl overflow-hidden border-0 !pt-0 !py-0 flex flex-col`}>
                                 {/* Status Bar */}
                                 <div className={`w-full h-8 flex items-center justify-center text-sm font-medium ${statusColor} ${statusDarkColor} z-10`} style={{ position: 'absolute', top: 0, left: 0 }}>
-                                    {status}
+                                    {isCompleted && (
+                                        <span className="flex items-center gap-1 text-green-700 dark:text-green-300"><CheckCircle className="h-4 w-4" /> Completed{completedOn && <span className="ml-2 text-xs">on {completedOn.toLocaleDateString()}</span>}</span>
+                                    )}
+                                    {isInProgress && !isOverdue && (
+                                        <span className="flex items-center gap-1 text-blue-700 dark:text-blue-200"><Clock className="h-4 w-4" /> Time Left: {daysLeft} days{startedOn && <span className="ml-2 text-xs">Started: {startedOn.toLocaleDateString()}</span>}</span>
+                                    )}
+                                    {isInProgress && isOverdue && (
+                                        <span className="flex items-center gap-1 text-orange-700 dark:text-orange-300"><AlertTriangle className="h-4 w-4" /> Overdue by {Math.abs(daysLeft ?? 0)} days{startedOn && <span className="ml-2 text-xs">Started: {startedOn.toLocaleDateString()}</span>}</span>
+                                    )}
+                                    {isNotStarted && (
+                                        <span className="flex items-center gap-1 text-muted-foreground"><Calendar className="h-4 w-4" /> Duration: {module.duration || '-'} days</span>
+                                    )}
                                 </div>
                                 {/* Image or Letter Avatar */}
                                 {hasImage ? (
@@ -344,34 +384,61 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                     <div className="px-6 pb-2">
                                         <div className="flex justify-between items-center text-xs mb-1">
                                             <span className="text-muted-foreground">Progress</span>
-                                            <span className="font-semibold text-base">{progress}%</span>
+                                            <span className="font-semibold text-base">{Number(progress ?? 0)}%</span>
                                         </div>
-                                        <Progress value={progress} className="h-3" aria-label={`Progress: ${progress}%`} />
+                                        <Progress value={Number(progress ?? 0)} className="h-3" aria-label={`Progress: ${Number(progress ?? 0)}%`} />
+                                    </div>
+                                    {/* Expandable Summary Section */}
+                                    <div className="px-6 pb-2">
+                                        <button
+                                            className="flex items-center gap-2 text-sm text-primary hover:underline focus:outline-none"
+                                            onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
+                                            aria-expanded={expandedIdx === idx}
+                                            aria-controls={`summary-${module.name}`}
+                                        >
+                                            {expandedIdx === idx ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                            Summary
+                                        </button>
+                                        <AnimatePresence>
+                                            {expandedIdx === idx && (
+                                                <motion.div
+                                                    id={`summary-${module.name}`}
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1, transition: { duration: 0.05, ease: 'easeInOut' } }}
+                                                    exit={{ height: 0, opacity: 0, transition: { duration: 0.05, ease: 'easeInOut' } }}
+                                                    className="overflow-hidden mt-2 text-xs text-muted-foreground rounded bg-muted/40 p-2"
+                                                >
+                                                    <div><span className="font-semibold">{lessonCount}</span> Lessons, <span className="font-semibold">{chapterCount}</span> Chapters</div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
                                     <CardFooter className="flex flex-col gap-2 pb-4 px-4">
                                     {isLocked && (
                                             <div className="text-xs text-gray-400 mt-1 text-center">{lockReason}</div>
                                         )}
-                                        <Link
-                                            href={isLocked ? '#' : ROUTES.LEARNER_MODULE_DETAIL(module.name)}
-                                            className="w-full"
-                                            tabIndex={isLocked ? -1 : 0}
-                                            aria-disabled={isLocked}
-                                            onClick={e => { if (isLocked) e.preventDefault(); }}
-                                        >
-                                            <Button
-                                                variant={isCompleted ? "secondary" : isInProgress ? "default" : "outline"}
-                                                className={`w-full text-base font-semibold py-2 rounded-xl shadow-md transition-all duration-200
-                                                    hover:bg-primary/90 hover:shadow-lg
-                                                    dark:hover:bg-primary/80 dark:hover:shadow-lg hover:text-white
-                                                    focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
-                                                    ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                                aria-label={buttonText + ' ' + module.name1}
-                                                disabled={isLocked}
+                                        <div className="flex gap-2 w-full">
+                                            <Link
+                                                href={isLocked ? '#' : ROUTES.LEARNER_MODULE_DETAIL(module.name)}
+                                                className="flex-1"
+                                                tabIndex={isLocked ? -1 : 0}
+                                                aria-disabled={isLocked}
+                                                onClick={e => { if (isLocked) e.preventDefault(); }}
                                             >
-                                                {buttonText}
-                                            </Button>
-                                        </Link>
+                                                <Button
+                                                    variant={isCompleted ? "secondary" : isInProgress ? "default" : "outline"}
+                                                    className={`w-full text-base font-semibold py-2 rounded-xl shadow-md transition-all duration-200
+                                                        hover:bg-primary/90 hover:shadow-lg
+                                                        dark:hover:bg-primary/80 dark:hover:shadow-lg hover:text-white
+                                                        focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
+                                                        ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                                    aria-label={(isCompleted && hasQuizQA ? 'Check Final Score' : buttonText) + ' ' + module.name1}
+                                                    disabled={isLocked}
+                                                >
+                                                    {isCompleted && hasQuizQA ? 'Check Final Score' : buttonText}
+                                                </Button>
+                                            </Link>
+                                        </div>
                                         
                                     </CardFooter>
                                 </div>
