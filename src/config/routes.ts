@@ -8,7 +8,8 @@ export const getFullPath = (path: string) => `${BASE_PATH}${path}`;
 export const getRelativePath = (fullPath: string) => fullPath.replace(BASE_PATH, '');
 
 // LMS API base URL
-export const LMS_API_BASE_URL =  "http://10.80.4.72";
+// export const LMS_API_BASE_URL =  "http://10.80.4.72";
+export const LMS_API_BASE_URL =  "https://lms.noveloffice.in";
 
 // Common routes
 export const ROUTES = {
