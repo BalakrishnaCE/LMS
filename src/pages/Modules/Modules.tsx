@@ -1,17 +1,11 @@
 import {
     Card,
-    CardAction,
-    CardContent,
-    CardDescription,
     CardFooter,
     CardHeader,
     CardTitle,
   } from "@/components/ui/card"
-import { IconPointFilled } from "@tabler/icons-react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {  useFrappeGetDocList } from "frappe-react-sdk"
-import { Progress } from "@/components/ui/progress"
 import { Link } from "wouter"
 import {
   Pagination,
@@ -39,13 +33,14 @@ type Filter = [string, FilterOperator, string | number];
 
 // Helper function to convert module data to CSV
 function convertToCSV(modules: any[]) {
-  const headers = ["Name", "Short Text", "Description", "Status", "Department"];
+  const headers = ["Name", "Short Text", "Description", "Status", "Department", "Image"];
   const rows = modules.map(module => [
     module.name1,
     module.short_text,
     module.description,
     module.status,
-    module.department
+    module.department,
+    module.image
   ]);
   
   return [
@@ -81,6 +76,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
     // Get departments for filter
     const { data: departments } = useFrappeGetDocList("Department", {
         fields: ["name"],
+        limit: 100,
     })
     const filters: Filter[] = []
     if (selectedDepartment && selectedDepartment !== "all") {
@@ -93,7 +89,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
         filters.push(["name1", "like", `%${searchQuery}%`])
     }
 
-    const { data: module_data, error: module_error, isValidating } = useFrappeGetDocList("LMS Module",
+    const { data: module_data } = useFrappeGetDocList("LMS Module",
         {
           fields: ["name", "name1", "short_text", "description", "status", "image", "department"],
           limit: itemsPerPage,
@@ -136,20 +132,37 @@ function Modules({ itemsPerPage }: ModulesProps) {
             setIsExporting(true);
             toast.loading("Preparing export...");
 
-            // Fetch all modules for export, ignoring pagination
-            const { data: exportData } = await useFrappeGetDocList("LMS Module", {
-                fields: ["name", "name1", "short_text", "description", "status", "department"],
-                limit: 0, // No limit to get all records
-                filters: filters
+            // Prepare fields and filters for the API call
+            const exportFields = ["name", "name1", "short_text", "description", "status", "department", "is_published", "image"];
+            const query = new URLSearchParams({
+                fields: JSON.stringify(exportFields),
+                filters: JSON.stringify(filters),
+                limit: "0"
+            }).toString();
+
+            // Fetch all modules for export using regular fetch with fields and filters
+            const response = await fetch(`${LMS_API_BASE_URL}/api/resource/LMS Module?${query}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                credentials: 'include',
             });
 
-            const exportModules = exportData?.map((module: any) => ({
+            if (!response.ok) {
+                throw new Error('Failed to fetch modules');
+            }
+
+            const data = await response.json();
+            const exportModules = data.data?.map((module: any) => ({
                 name: module.name,
                 name1: module.name1,
                 description: module.description,
                 status: module.status,
                 short_text: module.short_text,
                 department: module.department,
+                is_published: module.is_published,
+                image: module.image,
             })) || [];
 
             const csv = convertToCSV(exportModules);

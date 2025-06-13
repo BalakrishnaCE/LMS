@@ -3,7 +3,7 @@
 export { default as IframePreview } from './Preview';
 
 export const iframeContentInfo = {
-  id: 'iframe',
+  id: 'Iframe Content',
   name: 'Iframe Content',
   icon: '🌐',
   description: 'Embed external web content using iframe.'

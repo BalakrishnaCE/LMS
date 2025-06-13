@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUser } from "@/hooks/use-user";
+import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 export default function ModuleCreationForm() {
   const [, setLocation] = useLocation();
@@ -24,6 +26,9 @@ export default function ModuleCreationForm() {
   const [duration, setDuration] = useState("");
   const [assignmentBased, setAssignmentBased] = useState("Everyone");
   const [department, setDepartment] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const { data: departments } = useFrappeGetDocList("Department", {
     fields: ["name", "department"],
@@ -44,6 +49,7 @@ export default function ModuleCreationForm() {
         assignment_based: assignmentBased,
         department: assignmentBased === "Department" ? department : "",
         created_by: user?.email,
+        image: imageUrl,
       });
 
       if (response?.name) {
@@ -55,6 +61,24 @@ export default function ModuleCreationForm() {
     } catch (error) {
       toast.error("Failed to create module");
       console.error("Creation error:", error);
+    }
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setUploading(true);
+    try {
+      const url = await uploadFileToFrappe(file);
+      setImageUrl(`${LMS_API_BASE_URL}${url}`);
+      toast.success("Image uploaded successfully");
+    } catch (err) {
+      toast.error("Failed to upload image");
+      setImageFile(null);
+      setImageUrl("");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -122,6 +146,21 @@ export default function ModuleCreationForm() {
             </Select>
           </div>
         )}
+
+        <div className="space-y-2">
+          <Label htmlFor="image">Module Image</Label>
+          <Input
+            id="image"
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            disabled={uploading}
+          />
+          {uploading && <div className="text-sm text-muted-foreground">Uploading...</div>}
+          {imageUrl && (
+            <img src={imageUrl} alt="Module" className="mt-2 max-h-32 rounded" />
+          )}
+        </div>
 
         <Button
           onClick={handleCreateModule}

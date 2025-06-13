@@ -221,10 +221,7 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Questions ({questions.length})</h3>
-          <Button onClick={addQuestion} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Question
-          </Button>
+          
         </div>
 
         {questions.map((question, questionIndex) => (
@@ -292,10 +289,11 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
                 </div>
                 
                 {question.options.map((option, optionIndex) => (
-                  <div key={optionIndex} className="flex items-center gap-2 p-2 border rounded">
+                  <div key={optionIndex} className="flex items-center gap-2 p-2 border rounded bg-muted/30">
                     <Checkbox
                       checked={option.correct}
                       onCheckedChange={(checked) => updateOption(questionIndex, optionIndex, 'correct', checked)}
+                      className="border-border border-2"
                     />
                     <Input
                       value={option.option_text}
@@ -317,6 +315,10 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
             </CardContent>
           </Card>
         ))}
+        <Button onClick={addQuestion} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Question
+          </Button>
       </div>
 
       {/* Actions */}

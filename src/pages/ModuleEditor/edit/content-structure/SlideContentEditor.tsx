@@ -145,7 +145,7 @@ export default function SlideContentEditor({ content, onSave, onCancel }: SlideC
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="Enter presentation title"
-            className="w-full px-4 py-3 rounded border border-border bg-background text-foreground text-2xl font-bold focus:outline-none focus:border-primary mb-4"
+            className="w-full px-4 py-3 rounded border border-border bg-background text-foreground text-md font-bold focus:outline-none focus:border-primary mb-4"
           />
           <label className="block text-base font-medium text-foreground mb-2" htmlFor="slide-block-description">Presentation Description</label>
           <textarea
@@ -197,13 +197,13 @@ export default function SlideContentEditor({ content, onSave, onCancel }: SlideC
                 onBlur={() => setEditingHeading(false)}
                 onKeyDown={e => { if (e.key === 'Enter') setEditingHeading(false); }}
                 onChange={e => updateSlide(currentSlide, 'heading', e.target.value)}
-                className="text-4xl md:text-5xl font-extrabold text-center w-full bg-transparent border-b-2 border-border focus:border-primary outline-none py-2 px-4 transition"
+                className="text-4xl md:text-xl font-extrabold text-center w-full bg-transparent border-b-2 border-border focus:border-primary outline-none py-2 px-4 transition"
                 style={{ background: 'rgba(255,255,255,0.7)' }}
                 placeholder="Add Slide Title"
               />
             ) : (
               <h2
-                className={`text-4xl md:text-5xl font-extrabold text-center w-full cursor-pointer select-text ${!slideShowItems[currentSlide]?.heading ? 'text-muted-foreground italic' : ''}`}
+                className={`text-4xl md:text-xl font-extrabold text-center w-full cursor-pointer select-text ${!slideShowItems[currentSlide]?.heading ? 'text-muted-foreground italic' : ''}`}
                 onClick={() => setEditingHeading(true)}
                 style={{ minHeight: 56 }}
               >

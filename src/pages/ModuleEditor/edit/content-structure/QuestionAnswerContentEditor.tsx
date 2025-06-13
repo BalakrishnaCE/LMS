@@ -136,13 +136,7 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
 
       {/* Questions */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Questions ({questions.length})</h3>
-          <Button onClick={addQuestion} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Question
-          </Button>
-        </div>
+        
 
         {questions.map((question, questionIndex) => (
           <Card key={questionIndex}>
@@ -188,6 +182,13 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
             </CardContent>
           </Card>
         ))}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Questions ({questions.length})</h3>
+          <Button onClick={addQuestion} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Question
+          </Button>
+        </div>
       </div>
 
       {/* Actions */}

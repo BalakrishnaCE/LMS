@@ -1,20 +1,15 @@
 import { useParams, Link } from "wouter"
 import { useFrappeGetDoc } from "frappe-react-sdk"
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { LessonWithChapters } from "@/pages/Modules/LessonwithChapter"
 import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button"
-import { ChevronRight, ChevronLeft, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { useUser } from "@/hooks/use-user"
-import { LMS_API_BASE_URL } from "@/config/routes"
+import { LMS_API_BASE_URL, BASE_PATH } from "@/config/routes"
+
 
 // Add custom styles for the content
 const contentStyles = `
@@ -341,7 +336,7 @@ export default function ModuleDetail() {
                     </div>
 
                     {enableEditing && (
-                        <Link href={`/edit/${module.name}`} className="block">
+                        <Link href={`${BASE_PATH}/edit/${module.name}`} className="block">
                             <Button variant="outline" className="w-full hover:bg-primary/10">
                                 Edit Module
                             </Button>

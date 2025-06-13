@@ -33,6 +33,7 @@ export interface ModuleInfo {
   created_by?: string;
   creation?: string;
   lessons?: Lesson[];
+  image?: string;
 }
 
 export default function ModuleEdit() {

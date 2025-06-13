@@ -66,14 +66,6 @@ export default function SlidePreview({
                 transition={{ duration: 0.3 }}
                 className="absolute inset-0 p-6 flex flex-col items-center justify-center"
               >
-                {slide_show_items[currentSlide]?.image && (
-                  <img
-                    src={`${LMS_API_BASE_URL}/${slide_show_items[currentSlide].image}`}
-                    alt={slide_show_items[currentSlide].heading || `Slide ${currentSlide + 1}`}
-                    className="max-h-56 md:max-h-72 rounded-lg shadow mb-4 object-contain"
-                    style={{ maxWidth: 400, width: '100%' }}
-                  />
-                )}
                 <h4 className="text-xl font-bold mb-2 text-foreground text-center">
                   {slide_show_items[currentSlide]?.url ? (
                     <a href={slide_show_items[currentSlide].url} target="_blank" rel="noopener noreferrer" className="underline">
@@ -83,6 +75,15 @@ export default function SlidePreview({
                     slide_show_items[currentSlide]?.heading || `Slide ${currentSlide + 1}`
                   )}
                 </h4>
+                {slide_show_items[currentSlide]?.image && (
+                  <img
+                    src={`${LMS_API_BASE_URL}/${slide_show_items[currentSlide].image}`}
+                    alt={slide_show_items[currentSlide].heading || `Slide ${currentSlide + 1}`}
+                    className="max-h-56 md:max-h-72 rounded-lg shadow mb-4 object-contain"
+                    style={{ maxWidth: 400, width: '100%' }}
+                  />
+                )}
+                
                 <div
                   className="text-base text-muted-foreground prose dark:prose-invert max-w-none text-center"
                   dangerouslySetInnerHTML={{

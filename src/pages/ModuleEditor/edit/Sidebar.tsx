@@ -8,7 +8,7 @@ import type { ModuleInfo } from "./ModuleEdit";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { ArrowLeftIcon, Settings, X, Pencil } from "lucide-react";
-import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc } from "frappe-react-sdk";
+import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc, useFrappeGetDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
 import {
   Select,
@@ -25,16 +25,6 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import { BookIcon, FileTextIcon, Trash2 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -42,12 +32,6 @@ import { GripVertical } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Info, Settings as SettingsIcon } from "lucide-react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
@@ -59,6 +43,8 @@ import {
 } from "@/components/ui/command";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 interface Lesson {
   id: string;
@@ -184,7 +170,10 @@ function SettingsDialog({
   editState, 
   setEditState, 
   onSave,
-  departments 
+  departments,
+  handleFieldChange,
+  uploadingImage,
+  setUploadingImage
 }: { 
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -193,12 +182,10 @@ function SettingsDialog({
   setEditState: (state: ModuleInfo | null) => void;
   onSave: () => Promise<void>;
   departments: any[];
+  handleFieldChange: (field: keyof ModuleInfo, value: any) => void;
+  uploadingImage: boolean;
+  setUploadingImage: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const handleFieldChange = (field: keyof ModuleInfo, value: any) => {
-    if (!editState) return;
-    setEditState({ ...editState, [field]: value });
-  };
-
   // Fetch all users with LMS Student role
   const { data: lmsStudents, isLoading: loadingStudents } = useFrappeGetDocList("User", {
     fields: ["name", "full_name", "email", "enabled"],
@@ -268,12 +255,41 @@ function SettingsDialog({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Description</Label>
+                    <Label>Module Image</Label>
+                    {editState?.image && (
+                      <img
+                        src={editState.image.startsWith('http') ? editState.image : `${LMS_API_BASE_URL}${editState.image}`}
+                        alt="Module"
+                        className="mb-2 max-h-32 rounded"
+                      />
+                    )}
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingImage(true);
+                        try {
+                          const url = await uploadFileToFrappe(file);
+                          const fullUrl = url.startsWith('http') ? url : `${LMS_API_BASE_URL}${url}`;
+                          handleFieldChange("image", fullUrl);
+                          toast.success("Image uploaded successfully");
+                        } catch (err) {
+                          toast.error("Failed to upload image");
+                        } finally {
+                          setUploadingImage(false);
+                        }
+                      }}
+                      disabled={uploadingImage}
+                    />
+                    {uploadingImage && <div className="text-sm text-muted-foreground">Uploading...</div>}
+                  </div>
+                  <Label>Description</Label>
                     <RichEditor
                       content={editState?.description || ""}
                       onChange={(content) => handleFieldChange("description", content)}
                     />
-                  </div>
                 </div>
               </TabsContent>
               <TabsContent value="settings">
@@ -718,11 +734,20 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   const [lessonToDelete, setLessonToDelete] = useState<string | null>(null);
   const [chapterToDelete, setChapterToDelete] = useState<{ lessonId: string; chapterId: string } | null>(null);
   const [dragLessonActiveId, setDragLessonActiveId] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Fetch departments for the department selector
   const { data: departments } = useFrappeGetDocList("Department", {
     fields: ["name", "department"],
   });
+
+  // In Sidebar component, add a refetch function for moduleInfo
+  type LMSModule = ModuleInfo; // or import the correct type if available
+  const { data: freshModuleInfo, mutate: refetchModuleInfo } = useFrappeGetDoc<LMSModule>(
+    "LMS Module",
+    moduleInfo?.id || "",
+    { swrConfig: { revalidateOnFocus: false } }
+  );
 
   // Initialize edit state when moduleInfo changes
   useEffect(() => {
@@ -758,6 +783,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         status: editState.status,
         assignment_based: editState.assignment_based,
         department: editState.department,
+        image: editState.image,
       };
 
       // Only include lessons if they exist in the current module state
@@ -782,6 +808,11 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       toast.success("Module saved successfully");
       setHasChanges(false);
       setShowSettings(false);
+      // Refetch the latest module info from backend
+      await refetchModuleInfo();
+      if (freshModuleInfo) {
+        setEditState({ ...freshModuleInfo });
+      }
       onFinishSetup?.(editState);
     } catch (err) {
       console.error("Save error:", err);
@@ -818,7 +849,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       ];
       // 4. Update the Module with the new lessons array
       await updateDoc("LMS Module", moduleInfo.id, {
-        lessons: updatedLessons
+        lessons: updatedLessons 
       });
       // 5. Update the Lesson with the new chapter
       await updateDoc("Lesson", lessonResponse.name, {
@@ -928,6 +959,11 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     }
   };
 
+  const handleFieldChange = (field: keyof ModuleInfo, value: any) => {
+    if (!editState) return;
+    setEditState({ ...editState, [field]: value });
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -962,7 +998,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                     className="space-y-4"
                   >
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between">
                         <div className="font-bold text-lg break-words whitespace-pre-wrap" title={moduleInfo.name}>
                           {moduleInfo.name}
                         </div>
@@ -976,6 +1012,17 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                       </div>
                     </div>
                     <div className="space-y-2">
+                      <Label>Module Image</Label>
+                      {moduleInfo?.image && (
+                        <img
+                          src={moduleInfo.image.startsWith('http') ? moduleInfo.image : `${LMS_API_BASE_URL}${moduleInfo.image}`}
+                          alt="Module"
+                          className="mb-2 max-h-32 rounded"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description</Label>
                       <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: moduleInfo.description || "" }} />
                     </div>
 
@@ -1054,6 +1101,9 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         setEditState={setEditState}
         onSave={handleSave}
         departments={departments || []}
+        handleFieldChange={handleFieldChange}
+        uploadingImage={uploadingImage}
+        setUploadingImage={setUploadingImage}
       />
 
       {/* Delete Lesson Dialog */}

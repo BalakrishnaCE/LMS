@@ -36,7 +36,7 @@ const ImageContentEditor: React.FC<ImageContentEditorProps> = ({ content, onSave
       <div>
         <Label>Image</Label>
         <Input type="file" accept="image/*" onChange={handleFileChange} />
-        {preview && <img src={LMS_API_BASE_URL + preview} alt="Preview" className="max-w-xs mt-2 rounded" />}
+        {preview && <img src={preview} alt="Preview" className="max-w-xs mt-2 rounded" />}
       </div>
       <div className="flex gap-2 justify-start">
         <Button onClick={() => onSave({ title: fileName, attach })} disabled={!attach}>Save</Button>

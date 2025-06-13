@@ -960,7 +960,6 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
     case 'Image Content':
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
-          <div className="font-bold mb-2">{content.title}</div>
           {content.attach && <img src={LMS_API_BASE_URL + content.attach} alt={content.title} className="max-h-48 mx-auto rounded" />}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
@@ -968,7 +967,6 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
     case 'Video Content':
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
-          <div className="font-bold mb-2">{content.title}</div>
           {content.video && <video src={LMS_API_BASE_URL + content.video} controls className="max-h-48 mx-auto rounded" />}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
@@ -977,7 +975,7 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           <div className="font-bold mb-2">{content.title}</div>
-          {content.attachment && <a href={content.attachment} target="_blank" rel="noopener noreferrer" className="text-primary underline">Download File</a>}
+          {content.attachment && <div className="mt-2"><a href={content.attachment} target="_blank" rel="noopener noreferrer" className="text-primary underline">Download File</a></div>}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
@@ -1046,8 +1044,15 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
       );
     case 'Iframe Content':
       return (
-        <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto">
+        <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           <div className="font-bold mb-2">{content.title}</div>
+          <div className="border rounded-lg overflow-hidden bg-muted/30">
+            <div className="p-3 bg-muted/50 border-b">
+              <div className="flex items-center gap-2 text-sm">
+                <iframe src={content.url} className="w-full h-full" title={content.title || 'Embedded Content'} sandbox="allow-scripts allow-same-origin" />
+              </div>
+            </div>
+          </div>
           <Button size="sm" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );

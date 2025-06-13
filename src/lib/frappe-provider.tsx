@@ -20,7 +20,7 @@ export function NovelLMSFrappeProvider({ children }: NovelLMSFrappeProviderProps
 
   return (
     <FrappeProvider
-      // url={LMS_API_BASE_URL}
+      url={LMS_API_BASE_URL}
       tokenParams={tokenParams}
       // enableSocket={false}
       socketPort='9000'
