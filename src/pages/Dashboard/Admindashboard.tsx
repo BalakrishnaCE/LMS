@@ -129,6 +129,7 @@ function Admindashboard() {
                                                 <LearnersTable
                                                     learners={users}
                                                     isLoading={studentsLoading}
+                                                    showActions={false}
                                                 />
                                             </motion.div>
                                         </TabsContent>

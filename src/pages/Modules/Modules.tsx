@@ -337,7 +337,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
                             if (startPage > 1) {
                                 pageButtons.push(
                                     <PaginationItem key={1}>
-                                        <PaginationLink onClick={() => handlePageChange(1)} isActive={page === 1}>{1}</PaginationLink>
+                                        <PaginationLink onClick={() => handlePageChange(1)} isActive={page === 1} className="cursor-pointer">{1}</PaginationLink>
                                     </PaginationItem>
                                 );
                                 if (startPage > 2) {
@@ -353,7 +353,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
                             for (let i = startPage; i <= endPage; i++) {
                                 pageButtons.push(
                                     <PaginationItem key={i}>
-                                        <PaginationLink onClick={() => handlePageChange(i)} isActive={page === i}>{i}</PaginationLink>
+                                        <PaginationLink onClick={() => handlePageChange(i)} isActive={page === i} className="cursor-pointer">{i}</PaginationLink>
                                     </PaginationItem>
                                 );
                             }
@@ -369,7 +369,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
                                 }
                                 pageButtons.push(
                                     <PaginationItem key={totalPages}>
-                                        <PaginationLink onClick={() => handlePageChange(totalPages)} isActive={page === totalPages}>{totalPages}</PaginationLink>
+                                        <PaginationLink onClick={() => handlePageChange(totalPages)} isActive={page === totalPages} className="cursor-pointer">{totalPages}</PaginationLink>
                                     </PaginationItem>
                                 );
                             }

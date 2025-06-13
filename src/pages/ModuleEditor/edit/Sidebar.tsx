@@ -45,6 +45,8 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
 import { LMS_API_BASE_URL } from "@/config/routes";
+// @ts-ignore
+import isEqual from 'lodash/isEqual';
 
 interface Lesson {
   id: string;
@@ -219,6 +221,7 @@ function SettingsDialog({
 
   // On save, sync learners to editState
   const handleSaveWithLearners = async () => {
+    if (!hasChanges) return;
     if (!editState) return;
     // @ts-ignore
     setEditState({ ...editState, learners });
@@ -227,8 +230,26 @@ function SettingsDialog({
 
   const [search, setSearch] = useState("");
 
+  // Assume originalModule and originalLearners are set when the sidebar opens
+  const [originalModule, setOriginalModule] = useState(editState);
+  const [originalLearners, setOriginalLearners] = useState(learners);
+
+  useEffect(() => {
+    if (open) {
+      setOriginalModule(editState);
+      setOriginalLearners(learners);
+    }
+  }, [open]);
+
+  const hasChanges = !isEqual(editState, originalModule) || !isEqual(learners, originalLearners);
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(open) => {
+      if (!open) {
+        setEditState(moduleInfo);
+      }
+      onOpenChange(open);
+    }}>
       <SheetContent side="right" className="w-full sm:max-w-full p-0 overflow-y-auto">
         <div className="h-full flex flex-col overflow-y-auto">
           <SheetHeader className="p-6 border-b">
@@ -445,7 +466,7 @@ function SettingsDialog({
           </Tabs>
           <div className="p-6 border-t flex justify-end gap-2 max-w-3xl mx-auto w-full">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSaveWithLearners}>Save Changes</Button>
+            <Button onClick={handleSaveWithLearners} disabled={!hasChanges}>Save Changes</Button>
           </div>
         </div>
       </SheetContent>
@@ -484,11 +505,6 @@ function AddLessonDialog({
           <SheetHeader className="p-6 border-b">
             <div className="flex items-center justify-between">
               <SheetTitle>Add Lesson & Chapter</SheetTitle>
-              <SheetClose asChild>
-                <Button variant="ghost" size="icon">
-                  <X className="h-4 w-4" />
-                </Button>
-              </SheetClose>
             </div>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto p-6">
@@ -500,12 +516,12 @@ function AddLessonDialog({
                   value={lessonTitle}
                   onChange={e => setLessonTitle(e.target.value)}
                   placeholder="Enter lesson title"
-                  className="w-full text-sm"
+                  className="w-full text-sm focus-visible:ring-0"
                   required
                 />
               </div>
               <div>
-                <Label htmlFor="sidebar-lesson-desc" className="text-sm font-semibold mb-1 block">Lesson Description</Label>
+                <Label htmlFor="sidebar-lesson-desc" className="text-sm font-semibold mb-1 block mb-2">Lesson Description</Label>
                 <RichEditor
                   content={lessonDesc}
                   onChange={setLessonDesc}
@@ -762,7 +778,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     if (!moduleInfo || !editState) return setHasChanges(false);
     
     // Check module info changes
-    const moduleFields = ["name1", "description", "duration", "status", "assignment_based", "department"];
+    const moduleFields = ["name", "description", "duration", "status", "assignment_based", "department"];
     const moduleChanged = moduleFields.some(f => (editState as any)[f] !== (moduleInfo as any)[f]);
     
     // Check content structure changes (lessons, chapters, contents)
@@ -777,7 +793,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     try {
       // Prepare the update data
       const updateData: any = {
-        name1: editState.name1,
+        name: editState.name,
         description: editState.description,
         duration: editState.duration,
         status: editState.status,

@@ -32,6 +32,7 @@ export default function ModuleCreationForm() {
 
   const { data: departments } = useFrappeGetDocList("Department", {
     fields: ["name", "department"],
+    limit: 100,
   });
 
   const handleCreateModule = async () => {
@@ -112,6 +113,7 @@ export default function ModuleCreationForm() {
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             placeholder="Enter duration in days"
+            min={1}
           />
         </div>
 

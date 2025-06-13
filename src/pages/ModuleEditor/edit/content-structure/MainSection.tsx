@@ -246,19 +246,21 @@ function FloatingDraggableBar() {
   const [barHovered, setBarHovered] = useState(false);
   return (
     <div
-      className="fixed right-6 top-1/3 z-40 flex flex-col gap-4 items-center bg-transparent"
+      className="fixed right-0 top-1/3 z-40 flex flex-col gap-2 items-end bg-transparent transition-all duration-200"
       onMouseEnter={() => setBarHovered(true)}
       onMouseLeave={() => { setBarHovered(false); setHovered(null); }}
     >
-      {alwaysVisibleContentTypes.map((content) => (
-        <DraggableContentIcon
-          key={content.id}
-          content={content}
-          showLabel={barHovered || hovered === content.id}
-          onHover={() => setHovered(content.id)}
-          onUnhover={() => setHovered(null)}
-        />
-      ))}
+      <div className={`flex flex-col gap-2 items-end pr-2 transition-all duration-200 ${barHovered ? 'translate-x-0' : 'translate-x-[calc(100%-3rem)]'}`}>
+        {alwaysVisibleContentTypes.map((content) => (
+          <DraggableContentIcon
+            key={content.id}
+            content={content}
+            showLabel={barHovered || hovered === content.id}
+            onHover={() => setHovered(content.id)}
+            onUnhover={() => setHovered(null)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -522,7 +524,7 @@ export default function MainSection({
                 />
               </div>
               <div>
-                <Label htmlFor="lessonDesc">Lesson Description</Label>
+                <Label htmlFor="lessonDesc" className="mb-2">Lesson Description</Label>
                 <RichEditor
                   content={lessonDesc}
                   onChange={setLessonDesc}
@@ -575,7 +577,10 @@ export default function MainSection({
                     className="text-2xl font-bold text-center"
                   />
                   <Button size="sm" onClick={handleLessonNameSave}>Save</Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditingLessonName(false)}>Cancel</Button>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setLessonNameValue(activeLesson.title);
+                    setEditingLessonName(false);
+                  }}>Cancel</Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
@@ -611,7 +616,10 @@ export default function MainSection({
                   />
                   <div className="flex gap-2">
                     <Button size="sm" onClick={handleLessonDescSave}>Save</Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingLessonDesc(false)}>Cancel</Button>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setLessonDescValue(activeLesson.description);
+                      setEditingLessonDesc(false);
+                    }}>Cancel</Button>
                   </div>
                 </div>
               ) : (
@@ -643,7 +651,10 @@ export default function MainSection({
                         className="text-lg font-semibold text-center"
                       />
                       <Button size="sm" onClick={handleChapterNameSave}>Save</Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingChapterName(false)}>Cancel</Button>
+                      <Button size="sm" variant="outline" onClick={() => {
+                        setChapterNameValue(activeChapter.title);
+                        setEditingChapterName(false);
+                      }}>Cancel</Button>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center gap-2">
@@ -788,68 +799,34 @@ export default function MainSection({
               <div className="grid grid-cols-2 gap-4 flex-1">
                 {contentsList.map((content) => {
                   const LucideIcon = content.icon;
-                  const showPreview = ["checklist", "steps", "accordion", "quiz", "question_answer", "slide", "iframe"].includes(content.id);
                   return (
-                    <TooltipProvider key={content.id} delayDuration={200}>
+                    <TooltipProvider key={content.id} delayDuration={0}>
                       <Tooltip>
-                        {true && (
-                          <TooltipTrigger asChild>
-                            <Button
-                              className="flex flex-col items-center justify-center gap-2 py-6 min-h-[96px] min-w-[120px] rounded-lg border border-border bg-muted text-foreground hover:bg-accent hover:text-primary transition-colors text-base font-medium shadow-sm"
-                              variant="outline"
-                              style={{ background: 'var(--color-card, var(--color-background))' }}
-                              onClick={() => {
-                                if (activeLessonId && activeChapterId) {
-                                  addContentToChapter(content.id, activeLessonId, activeChapterId);
-                                  setDrawerOpen(false);
-                                }
-                              }}
-                              onMouseEnter={() => setHoveredType(showPreview ? content.id : null)}
-                              onMouseLeave={() => setHoveredType(null)}
-                            >
-                              <LucideIcon className="w-7 h-7 mb-1" />
-                              <span>{content.name}</span>
-                            </Button>
-                          </TooltipTrigger>
-                        )}
-                        {!showPreview && (
-                          <TooltipContent side="right" className="max-w-xs text-sm">
-                            {content.description}
-                          </TooltipContent>
-                        )}
+                        <TooltipTrigger asChild>
+                          <Button
+                            className="flex flex-col items-center justify-center gap-2 py-6 min-h-[96px] min-w-[120px] rounded-lg border border-border bg-muted text-foreground hover:bg-accent hover:text-primary transition-colors text-base font-medium shadow-sm"
+                            variant="outline"
+                            style={{ background: 'var(--color-card, var(--color-background))' }}
+                            onClick={() => {
+                              if (activeLessonId && activeChapterId) {
+                                addContentToChapter(content.id, activeLessonId, activeChapterId);
+                                setDrawerOpen(false);
+                              }
+                            }}
+                          >
+                            <LucideIcon className="w-7 h-7 mb-1" />
+                            <span>{content.name}</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs text-sm bg-popover text-foreground p-2 border-border border-2 border-primary">
+                          <p className="font-medium text-foreground">{content.name}</p>
+                          <p className="text-foreground opacity-80">{content.description}</p>
+                        </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   );
                 })}
               </div>
-              {/* Preview panel for supported types */}
-              {hoveredType && (() => {
-                const content = contentsList.find(c => c.id === hoveredType);
-                if (!content || !hasPreview(content)) return null;
-                const Preview = content.Preview;
-                let previewProps: any = {};
-                if (content.id === 'checklist') previewProps = { items: [{ item: 'Checklist item 1' }, { item: 'Checklist item 2' }] };
-                if (content.id === 'steps') previewProps = { steps: [{ item_name: 'Step 1', item_content: 'Do this' }, { item_name: 'Step 2', item_content: 'Do that' }] };
-                if (content.id === 'accordion') previewProps = { items: [{ header_title: 'Accordion 1', body_content: 'Accordion body 1' }, { header_title: 'Accordion 2', body_content: 'Accordion body 2' }] };
-                if (content.id === 'quiz') previewProps = { questions: [{ question: 'Sample question?', options: ['A', 'B', 'C'], answer: 'A' }] };
-                if (content.id === 'question_answer') previewProps = { question: 'Sample Q?', answer: 'Sample A' };
-                if (content.id === 'slide') previewProps = { 
-                  title: 'Sample Presentation',
-                  description: 'Interactive slideshow with multiple slides',
-                  slide_show_items: [
-                    { option_text: 'Introduction', slide_content: '<p>Welcome to our presentation</p>' },
-                    { option_text: 'Main Content', slide_content: '<p>Key points and information</p>' },
-                    { option_text: 'Conclusion', slide_content: '<p>Summary and next steps</p>' }
-                  ]
-                };
-                if (content.id === 'iframe') previewProps = { url: 'https://example.com' };
-                return (
-                  <div className="absolute left-full top-0 ml-6 w-72 bg-card border border-border rounded-lg shadow-lg p-4 z-50 flex flex-col items-start min-h-[120px]">
-                    <div className="font-semibold mb-2 text-primary text-base">{content.name} Preview</div>
-                    <Preview {...previewProps} />
-                  </div>
-                );
-              })()}
             </div>
             <DrawerClose asChild>
               <div className="flex justify-center">
@@ -873,10 +850,16 @@ function DraggableContentIcon({ content, showLabel, onHover, onUnhover }: { cont
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`flex items-center gap-2 px-2 py-2 rounded-lg border border-input bg-background text-foreground cursor-grab transition-colors ${isDragging ? 'opacity-50' : 'hover:bg-accent'}`}
+      onMouseEnter={onHover}
+      onMouseLeave={onUnhover}
+      className={`flex items-center gap-2 px-2 py-2 rounded-lg border border-input bg-background text-foreground cursor-grab transition-all duration-200 ${
+        isDragging ? 'opacity-50' : 'hover:bg-accent'
+      } ${showLabel ? 'w-auto' : 'w-12'}`}
     >
-      <LucideIcon className="w-7 h-7 mb-1" />
-      <span>{content.name}</span>
+      <LucideIcon className="w-7 h-7" />
+      <span className={`transition-all duration-200 ${showLabel ? 'opacity-100 w-auto' : 'opacity-0 w-0 overflow-hidden'}`}>
+        {content.name}
+      </span>
     </div>
   );
 }
@@ -1302,7 +1285,22 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
   };
 
   const handleCancelContent = () => {
-    // Optionally reset state or remove new content block if not saved
+    // Remove the placeholder content from the chapter's contents array
+    setModule((prev: any) => {
+      const lessons = prev.lessons.map((lesson: any) => {
+        if (!lesson.chapters) return lesson;
+        return {
+          ...lesson,
+          chapters: lesson.chapters.map((ch: any) => {
+            if (ch.id !== chapter.id) return ch;
+            // Filter out any unsaved placeholders (content without docname or content_reference)
+            const updatedContents = (ch.contents || []).filter((c: any) => c.docname || c.content_reference);
+            return { ...ch, contents: updatedContents };
+          })
+        };
+      });
+      return { ...prev, lessons };
+    });
   };
 
   // Delete content block handler

@@ -101,7 +101,7 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
           </div>
           
           <div>
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description" className='mb-3'>Description</Label>
             <RichEditor 
               content={description} 
               onChange={setDescription}
@@ -131,8 +131,7 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
               />
             </div>
           </div>
-        </CardContent>
-      </Card>
+
 
       {/* Questions */}
       <div className="space-y-4">
@@ -154,7 +153,7 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Question</Label>
+                <Label className='mb-3'>Question</Label>
                 <RichEditor
                   content={question.question}
                   onChange={(value) => updateQuestion(questionIndex, 'question', value)}
@@ -173,7 +172,7 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
               </div>
 
               <div>
-                <Label>Suggested Answer</Label>
+                <Label className='mb-3'>Suggested Answer</Label>
                 <RichEditor
                   content={question.suggested_answer}
                   onChange={(value) => updateQuestion(questionIndex, 'suggested_answer', value)}
@@ -202,6 +201,8 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
           </Button>
         )}
       </div>
+      </CardContent>
+      </Card>
     </div>
   );
 } 

@@ -25,9 +25,10 @@ interface LearnersTableProps {
   learners: User[];
   isLoading: boolean;
   onRowClick?: (learner: User) => void;
+  showActions?: boolean;
 }
 
-export function LearnersTable({ learners, isLoading, onRowClick }: LearnersTableProps) {
+export function LearnersTable({ learners, isLoading, onRowClick, showActions = true }: LearnersTableProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full w-full mt-4">
       <Table>
@@ -37,13 +38,13 @@ export function LearnersTable({ learners, isLoading, onRowClick }: LearnersTable
             <TableHead>Email</TableHead>
             <TableHead>Department</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
+            {showActions && <TableHead>Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody className="text-secondary-foreground">
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center">
+              <TableCell colSpan={showActions ? 5 : 4} className="text-center">
                 <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
                 <div className="mt-2 text-muted-foreground">Loading learners...</div>
               </TableCell>
@@ -74,25 +75,27 @@ export function LearnersTable({ learners, isLoading, onRowClick }: LearnersTable
                       {learner.enabled === 1 ? "Active" : "Inactive"}
                     </span>
                   </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+                  {showActions && (
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  )}
                 </motion.tr>
               ))}
             </AnimatePresence>

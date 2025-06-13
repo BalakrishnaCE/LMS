@@ -164,7 +164,7 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
           </div>
           
           <div>
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description" className='mb-3'>Description</Label>
             <RichEditor 
               content={description} 
               onChange={setDescription}
@@ -180,9 +180,10 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
                 value={totalScore}
                 onChange={(e) => setTotalScore(Number(e.target.value))}
                 placeholder="Total score"
+                min={1}
               />
             </div>
-            
+            {/* no negetive value should be allowed */}
             <div>
               <Label htmlFor="timeLimit">Time Limit (minutes)</Label>
               <Input
@@ -191,6 +192,7 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
                 value={timeLimitMins}
                 onChange={(e) => setTimeLimitMins(Number(e.target.value))}
                 placeholder="Time limit in minutes (0 = no limit)"
+                min={0}
               />
             </div>
           </div>
@@ -201,6 +203,7 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
                 id="randomize"
                 checked={randomizeQuestions}
                 onCheckedChange={(checked) => setRandomizeQuestions(checked === true)}
+                className='border-border border-2 border-gray-300'
               />
               <Label htmlFor="randomize">Randomize Questions</Label>
             </div>
@@ -210,12 +213,12 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
                 id="active"
                 checked={isActive}
                 onCheckedChange={(checked) => setIsActive(checked === true)}
+                className='border-border border-2 border-gray-300'
               />
               <Label htmlFor="active">Active</Label>
             </div>
           </div>
-        </CardContent>
-      </Card>
+      
 
       {/* Questions */}
       <div className="space-y-4">
@@ -224,15 +227,15 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
           
         </div>
 
-        {questions.map((question, questionIndex) => (
-          <Card key={questionIndex}>
+        {questions.map((question, qIdx) => (
+          <Card key={qIdx}>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Question {questionIndex + 1}</CardTitle>
+                <CardTitle className="text-base">Question {qIdx + 1}</CardTitle>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => deleteQuestion(questionIndex)}
+                  onClick={() => deleteQuestion(qIdx)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -240,19 +243,19 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Question Text</Label>
+                <Label className='mb-3'>Question Text</Label>
                 <RichEditor
                   content={question.question_text}
-                  onChange={(value) => updateQuestion(questionIndex, 'question_text', value)}
+                  onChange={(value) => updateQuestion(qIdx, 'question_text', value)}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Question Type</Label>
+                  <Label className='mb-3'>Question Type</Label>
                   <Select
                     value={question.question_type}
-                    onValueChange={(value) => updateQuestion(questionIndex, 'question_type', value)}
+                    onValueChange={(value) => updateQuestion(qIdx, 'question_type', value)}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -268,8 +271,9 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
                   <Input
                     type="number"
                     value={question.score}
-                    onChange={(e) => updateQuestion(questionIndex, 'score', Number(e.target.value))}
+                    onChange={(e) => updateQuestion(qIdx, 'score', Number(e.target.value))}
                     placeholder="Points for this question"
+                    min={1}
                   />
                 </div>
               </div>
@@ -281,31 +285,31 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => addOption(questionIndex)}
+                    onClick={() => addOption(qIdx)}
                   >
                     <Plus className="h-3 w-3 mr-1" />
                     Add Option
                   </Button>
                 </div>
                 
-                {question.options.map((option, optionIndex) => (
-                  <div key={optionIndex} className="flex items-center gap-2 p-2 border rounded bg-muted/30">
+                {(question.options || []).map((option, oIdx) => (
+                  <div key={oIdx} className="flex items-center gap-2 p-2 border rounded bg-muted/30">
                     <Checkbox
                       checked={option.correct}
-                      onCheckedChange={(checked) => updateOption(questionIndex, optionIndex, 'correct', checked)}
+                      onCheckedChange={(checked) => updateOption(qIdx, oIdx, 'correct', checked)}
                       className="border-border border-2"
                     />
                     <Input
                       value={option.option_text}
-                      onChange={(e) => updateOption(questionIndex, optionIndex, 'option_text', e.target.value)}
-                      placeholder={`Option ${optionIndex + 1}`}
+                      onChange={(e) => updateOption(qIdx, oIdx, 'option_text', e.target.value)}
+                      placeholder={`Option ${oIdx + 1}`}
                       className="flex-1"
                     />
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteOption(questionIndex, optionIndex)}
-                      disabled={question.options.length <= 2}
+                      onClick={() => deleteOption(qIdx, oIdx)}
+                      disabled={(question.options.length <= 2)}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -332,6 +336,8 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
           </Button>
         )}
       </div>
+      </CardContent>
+      </Card>
     </div>
   );
 } 

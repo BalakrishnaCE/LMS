@@ -39,6 +39,7 @@
     "@tabler/icons-react": "^3.31.0",
     "@tailwindcss/vite": "^4.1.3",
     "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.10",
     "@tiptap/pm": "^2.12.0",
     "@tiptap/react": "^2.12.0",
     "@tiptap/starter-kit": "^2.12.0",
