@@ -308,7 +308,6 @@ export default function MainSection({
   const [lessonNameValue, setLessonNameValue] = useState("");
   const [lessonDescValue, setLessonDescValue] = useState("");
   const [chapterNameValue, setChapterNameValue] = useState("");
-
   // Get active lesson and chapter
   const activeLesson = lessons?.find(l => l.id === activeLessonId) || null;
   const activeChapter = activeLesson?.chapters?.find((c: Chapter) => c.id === activeChapterId) || null;
@@ -316,7 +315,7 @@ export default function MainSection({
   // Preview function
   const handlePreviewModule = () => {
     const previewUrl = `/modules/learner/${moduleName}`;
-    window.open(previewUrl, '_blank', 'noopener,noreferrer');
+    window.open(previewUrl, '_blank');
   };
 
   useEffect(() => {
@@ -507,8 +506,8 @@ export default function MainSection({
         )}
 
         {/* Lesson Creation Dialog */}
-        <Dialog open={adding} onOpenChange={setAdding}>
-          <DialogContent>
+        <Dialog open={adding} onOpenChange={setAdding} >
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Lesson</DialogTitle>
             </DialogHeader>
@@ -1370,7 +1369,7 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
         <Button
           variant="ghost"
           size="sm"
-          className="absolute right-2 top-1 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+          className="absolute right-2 top-6 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
           onClick={handleDeleteContent}
           title="Delete Content"
         >

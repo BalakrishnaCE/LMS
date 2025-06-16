@@ -154,7 +154,7 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="title">Quiz Title</Label>
+            <Label htmlFor="title" className='mb-3'>Quiz Title</Label>
             <Input
               id="title"
               value={title}
@@ -173,7 +173,7 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="totalScore">Total Score</Label>
+              <Label htmlFor="totalScore" className='mb-3'>Total Score</Label>
               <Input
                 id="totalScore"
                 type="number"
@@ -185,7 +185,7 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
             </div>
             {/* no negetive value should be allowed */}
             <div>
-              <Label htmlFor="timeLimit">Time Limit (minutes)</Label>
+              <Label htmlFor="timeLimit" className='mb-3'>Time Limit (minutes)</Label>
               <Input
                 id="timeLimit"
                 type="number"
@@ -267,7 +267,7 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
                 </div>
                 
                 <div>
-                  <Label>Score</Label>
+                  <Label className='mb-3'>Score</Label>
                   <Input
                     type="number"
                     value={question.score}

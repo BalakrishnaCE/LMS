@@ -91,7 +91,7 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="title">Q&A Title</Label>
+            <Label htmlFor="title" className='mb-3'>Q&A Title</Label>
             <Input
               id="title"
               value={title}
@@ -110,24 +110,26 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="maxScore">Maximum Score</Label>
+              <Label htmlFor="maxScore" className='mb-3'>Maximum Score</Label>
               <Input
                 id="maxScore"
                 type="number"
                 value={maxScore}
                 onChange={(e) => setMaxScore(Number(e.target.value))}
                 placeholder="Maximum possible score"
+                min={0}
               />
             </div>
             
             <div>
-              <Label htmlFor="timeLimit">Time Limit (minutes)</Label>
+              <Label htmlFor="timeLimit" className='mb-3'>Time Limit (minutes)</Label>
               <Input
                 id="timeLimit"
                 type="number"
                 value={timeLimitMins}
                 onChange={(e) => setTimeLimitMins(Number(e.target.value))}
                 placeholder="Time limit in minutes (0 = no limit)"
+                min={0}
               />
             </div>
           </div>
@@ -161,14 +163,18 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
               </div>
 
               <div>
-                <Label>Score</Label>
+                <Label className='mb-3'>Score</Label>
                 <Input
                   type="number"
                   value={question.score}
                   onChange={(e) => updateQuestion(questionIndex, 'score', Number(e.target.value))}
                   placeholder="Points for this question"
                   className="w-32"
+                  min={0}
                 />
+                <p className="text-muted-foreground text-sm">
+                  Points for this question
+                </p>
               </div>
 
               <div>

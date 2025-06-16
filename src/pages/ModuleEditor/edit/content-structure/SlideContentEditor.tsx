@@ -213,8 +213,8 @@ export default function SlideContentEditor({ content, onSave, onCancel }: SlideC
           </div>
           {/* Image (centered, overlay for upload/remove) */}
           <div
-            className="relative flex flex-col items-center justify-center w-full mb-8"
-            style={{ minHeight: 180, maxWidth: 500, margin: '0 auto' }}
+            className="relative flex flex-col items-center justify-center w-full mb-4"
+            style={{ minHeight: 180, maxWidth: 500, maxHeight: 300,margin: '0 auto' }}
           >
             {slideShowItems[currentSlide]?.image ? (
               <div className="relative group w-full flex flex-col items-center">
@@ -279,7 +279,7 @@ export default function SlideContentEditor({ content, onSave, onCancel }: SlideC
                 onBlur={() => setEditingDescription(false)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) setEditingDescription(false); }}
                 onChange={e => updateSlide(currentSlide, 'description', e.target.value)}
-                className="text-xl md:text-2xl text-center w-full bg-transparent border-b-2 border-border focus:border-primary outline-none py-2 px-4 transition resize-none min-h-[60px]"
+                className="text-xl md:text-2xl text-center w-full bg-transparent border-b-2 border-border focus:border-primary outline-none  transition resize-none min-h-[60px] p-2 mt-8"
                 style={{ background: 'rgba(255,255,255,0.7)' }}
                 placeholder="Add description..."
               />

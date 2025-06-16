@@ -65,7 +65,7 @@ export default function IframeContentEditor({ content, onSave, onCancel }: Ifram
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="title">Content Title</Label>
+            <Label htmlFor="title" className='mb-3'>Content Title</Label>
             <Input
               id="title"
               value={title}
@@ -75,7 +75,7 @@ export default function IframeContentEditor({ content, onSave, onCancel }: Ifram
           </div>
           
           <div>
-            <Label htmlFor="url">URL</Label>
+            <Label htmlFor="url" className='mb-3'>URL</Label>
             <Input
               id="url"
               value={url}
