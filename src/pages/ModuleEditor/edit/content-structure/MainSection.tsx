@@ -46,7 +46,7 @@ import QuestionAnswerContentEditor from '@/pages/ModuleEditor/edit/content-struc
 import SlideContentEditor from '@/pages/ModuleEditor/edit/content-structure/SlideContentEditor';
 import IframeContentEditor from '@/pages/ModuleEditor/edit/content-structure/IframeContentEditor';
 import { SlidePreview } from '@/pages/ModuleEditor/contents/slide';
-import { LMS_API_BASE_URL } from "@/config/routes";
+import { LMS_API_BASE_URL, BASE_PATH } from "@/config/routes";
 
 const contentStyles = `
     .prose ul {
@@ -312,9 +312,10 @@ export default function MainSection({
   const activeLesson = lessons?.find(l => l.id === activeLessonId) || null;
   const activeChapter = activeLesson?.chapters?.find((c: Chapter) => c.id === activeChapterId) || null;
 
+
   // Preview function
   const handlePreviewModule = () => {
-    const previewUrl = `/modules/learner/${moduleName}`;
+    const previewUrl = `${BASE_PATH}/modules/learner/${moduleName}`;
     window.open(previewUrl, '_blank');
   };
 

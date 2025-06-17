@@ -11,6 +11,7 @@ import {
 import { navigate } from "wouter/use-browser-location"
 import { useUser } from "@/hooks/use-user"
 import { getRelativePath, getFullPath } from "@/config/routes"
+import { BASE_PATH } from "@/config/routes"
 
 export function NavMain({
   items,
@@ -45,7 +46,7 @@ export function NavMain({
               size="icon"
               className="size-8 group-data-[collapsible=icon]:opacity-0 hover:text-white"
               variant="outline"
-              onClick={() => navigate('/edit')}
+              onClick={() => navigate(BASE_PATH + '/edit')}
             >
               <IconPlus className="size-4" />
               <span className="sr-only">Inbox</span>
