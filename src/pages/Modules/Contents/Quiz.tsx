@@ -342,15 +342,23 @@ export default function Quiz({ quizReference }: QuizProps) {
         </div>
         {questions.map((question, idx) => (
           <div key={question.name} className="mb-6 p-4 bg-muted/50 rounded-lg border">
-            <div className="font-semibold mb-2">Q{idx + 1}. {question.question_text}</div>
+            <div className="font-semibold mb-2">Q{idx + 1}. {question.question_text?.replace(/<[^>]+>/g, '')}</div>
             <div className="space-y-2 ml-4">
               {question.options.map((opt, oidx) => (
                 <div key={oidx} className="flex items-center gap-2">
                   <span className="inline-block w-4 h-4 rounded-full border border-muted-foreground bg-background" />
                   <Label className="text-base text-muted-foreground cursor-default">{opt.option_text}</Label>
-                  {opt.correct && (
+
+                  {/* {opt.correct && (
                     <span className="ml-2 text-green-600 text-xs font-semibold">(Correct)</span>
+                  )} */}
+
+                  {opt.correct ? (
+                    <span className="ml-2 text-green-600 text-xs font-semibold">(Correct)</span>
+                  ) : (
+                    <span className="ml-2 text-red-600 text-xs font-semibold"></span>
                   )}
+
                 </div>
               ))}
             </div>
@@ -416,9 +424,9 @@ export default function Quiz({ quizReference }: QuizProps) {
                         >
                           <div className="bg-background max-w-md w-full mx-auto rounded-2xl shadow-2xl flex flex-col items-center justify-center p-8 gap-8 relative">
                             {/* Close Button */}
-                            <Dialog.Close asChild>
+                            {/* <Dialog.Close asChild>
                               <Button variant="ghost" size="sm" className="absolute top-4 right-4 z-10">✕</Button>
-                            </Dialog.Close>
+                            </Dialog.Close> */}
                             {/* Quiz Completed Label */}
                             <motion.div
                               initial={{ opacity: 0, y: -20 }}
@@ -494,7 +502,7 @@ export default function Quiz({ quizReference }: QuizProps) {
                                   const isCorrect = userAnswer === correctOption?.option_text;
                                   return (
                                     <li key={question.name} className="rounded-lg p-3 bg-muted/40">
-                                      <div className="font-semibold mb-1">Q{idx + 1}: {question.question_text}</div>
+                                      <div className="font-semibold mb-1">Q{idx + 1}: {question.question_text?.replace(/<[^>]+>/g, '')}</div>
                                       <div className="flex flex-col gap-1 ml-2">
                                         <span className="text-green-600">Correct: {correctOption?.option_text}</span>
                                         <span className={
@@ -524,7 +532,7 @@ export default function Quiz({ quizReference }: QuizProps) {
                     {questions.map((question, index) => (
                       <div key={question.name} className="space-y-4">
                         <h3 className="text-lg font-semibold">
-                          Question {index + 1}: {question.question_text}
+                          Question {index + 1}: {question.question_text?.replace(/<[^>]+>/g, '')}
                         </h3>
                         <RadioGroup
                           value={selectedAnswers[question.name] || ''}

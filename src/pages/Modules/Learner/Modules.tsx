@@ -418,6 +418,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                             <div className="text-xs text-gray-400 mt-1 text-center">{lockReason}</div>
                                         )}
                                         <div className="flex gap-2 w-full">
+                    
                                             <Link
                                                 href={isLocked ? '#' : ROUTES.LEARNER_MODULE_DETAIL(module.name)}
                                                 className="flex-1"

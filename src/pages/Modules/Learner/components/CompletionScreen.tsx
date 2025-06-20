@@ -47,18 +47,19 @@ export function CompletionScreen({ onReview, quizQAScores }: CompletionScreenPro
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="flex flex-col items-center justify-center text-center bg-card rounded-xl shadow-2xl p-12 w-full max-w-lg relative"
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}    
+          // className="flex flex-col items-center justify-center text-center bg-card rounded-xl shadow-2xl p-12 w-full max-w-lg relative"
+          className="flex flex-col items-center justify-center text-center bg-card  shadow-2xl p-12 w-full max-w-lg relative overflow-y-auto max-h-[99vh]"
         >
           {/* Confetti or animated checkmark */}
           <motion.div
             initial={{ scale: 0, rotate: -30 }}
             animate={{ scale: 1.2, rotate: 0 }}
             transition={{ type: "spring", stiffness: 200, damping: 10, delay: 0.1 }}
-            className="mb-4"
+            className="m-12"
             aria-hidden="true"
           >
-            <span className="text-6xl">🎉</span>
+            <span className="text-6xl pt-22 block">🎉</span>
           </motion.div>
           <motion.h2
             initial={{ y: 20, opacity: 0 }}
@@ -92,7 +93,8 @@ export function CompletionScreen({ onReview, quizQAScores }: CompletionScreenPro
                     return (
                       <div key={item.title + idx} className="w-full flex items-center justify-between bg-muted/60 rounded-lg px-4 py-3 shadow-sm border border-border">
                         <div className="flex flex-col">
-                          <span className="font-medium text-base text-foreground">{item.type}: {item.title}</span>
+                          {/* <span className="font-medium text-base text-foreground">{item.type}: {item.title}</span> */}
+                          <span className="font-medium text-base text-foreground">{item.type}</span>
                         </div>
                         <span className="inline-flex items-center gap-2 text-sm font-semibold text-orange-600 bg-orange-100 rounded-full px-4 py-1 ml-4 min-w-[120px] text-center">
                           <Loader2 className="animate-spin h-4 w-4" /> Review Pending
@@ -105,7 +107,8 @@ export function CompletionScreen({ onReview, quizQAScores }: CompletionScreenPro
                   return (
                     <div key={item.title + idx} className="w-full flex items-center justify-between bg-muted/60 rounded-lg px-4 py-3 shadow-sm border border-border">
                       <div className="flex flex-col">
-                        <span className="font-medium text-base text-foreground">{item.type}: {item.title}</span>
+                        <span className="font-medium text-base text-foreground">{item.type}</span>
+                        {/* <span className="font-medium text-base text-foreground">{item.type}: {item.title}</span> */}
                       </div>
                       <span className="inline-block text-lg font-bold text-primary bg-primary/10 rounded-full px-4 py-1 ml-4 min-w-[60px] text-center">
                         {percent}%

@@ -462,7 +462,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
                     <div className="space-y-6">
                       {data.questions?.map((q: any, idx: number) => (
                         <div key={q.id} className="border rounded-lg p-4 bg-muted/50">
-                          <div className="font-semibold mb-2">Q{idx + 1}: {q.question}</div>
+                          <div className="font-semibold mb-2">Q{idx + 1}: {q.question?.replace(/<[^>]+>/g, '')}</div>
                           <div className="mb-2 text-xs text-muted-foreground">Score: {q.score}</div>
                           <div className="prose prose-sm bg-background p-2 rounded mb-2" dangerouslySetInnerHTML={{ __html: q.suggested_answer }} />
                           <div className="mb-2">

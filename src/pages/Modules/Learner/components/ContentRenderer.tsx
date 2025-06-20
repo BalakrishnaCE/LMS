@@ -159,7 +159,6 @@ export function ContentRenderer({ contentType, contentReference }: ContentRender
 
   return (
     <div>
-
     <style>{contentStyles}</style>
     <motion.div
       initial={{ opacity: 0 }}

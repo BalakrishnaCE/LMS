@@ -44,7 +44,33 @@ export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, op
     setSaving(true);
     try {
       // Update full name
-      await updateDoc("User", learner.name, { full_name: fullName });
+      console.log("full name is=",fullName);
+      console.log("name is =",learner.name);
+
+      const parts = fullName.trim().split(" ");
+      let firstName = "";
+      let middleName = "";
+      let lastName = "";
+
+      if (parts.length === 1) {
+        firstName = parts[0];
+      } else if (parts.length === 2) {
+        [firstName, lastName] = parts;
+      } else if (parts.length >= 3) {
+        firstName = parts[0];
+        lastName = parts[parts.length - 1];
+        middleName = parts.slice(1, parts.length - 1).join(" ");
+      }
+      
+      console.log("first_name=",firstName);
+      console.log("middleName=",middleName);
+      console.log("lastName=",lastName);
+
+      await updateDoc("User", learner.name, { first_name: firstName });
+      await updateDoc("User", learner.name, { middle_name: middleName });
+      await updateDoc("User", learner.name, { last_name: lastName });
+
+
       // Update password if provided
       if (password.trim()) {
         await updateDoc("User", learner.name, { new_password: password });
@@ -189,7 +215,7 @@ export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, op
                       <div key={mod.name} className="flex items-center gap-3">
                         <div className="flex-1">
                           <div className="font-medium">{mod.name1}</div>
-                          <div className="text-xs text-muted-foreground">{mod.description}</div>
+                          <div className="text-xs text-muted-foreground">{mod.description?.replace(/<[^>]+>/g, '')}</div>
                         </div>
                         <Progress value={mod.progress?.progress || 0} className="w-32 h-2" />
                         <span className="text-xs font-semibold text-primary">{mod.progress?.progress || 0}%</span>

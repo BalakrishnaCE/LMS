@@ -60,34 +60,34 @@ function getLockState(module: any, allModules: any[]) {
   return { isLocked, lockReason };
 }
 
-const StatusBadge = ({ status, isMissed, isLocked, tooltip }: { status: string, isMissed?: boolean, isLocked?: boolean, tooltip?: string }) => {
-  let icon = null, color = "";
-  if (isLocked) {
-    icon = <Lock className="h-4 w-4" />;
-    color = "bg-gray-300 text-gray-700";
-  } else if (isMissed) {
-    icon = <Clock className="h-4 w-4" />;
-    color = "bg-red-100 text-red-600";
-  } else if (status === "In Progress") {
-    icon = <FastForward className="h-4 w-4" />;
-    color = "bg-blue-100 text-blue-600";
-  } else if (status === "Completed") {
-    icon = <CheckCircle className="h-4 w-4" />;
-    color = "bg-green-100 text-green-600";
-  } else {
-    icon = <PlayCircle className="h-4 w-4" />;
-    color = "bg-gray-100 text-gray-700";
-  }
-  return (
-    <div className={`absolute top-3 right-3 rounded-full p-1 shadow ${color} cursor-default`} title={tooltip || status} aria-label={tooltip || status}>
-      {icon}
-    </div>
-  );
-};
+// const StatusBadge = ({ status, isMissed, isLocked, tooltip }: { status: string, isMissed?: boolean, isLocked?: boolean, tooltip?: string }) => {
+//   let icon = null, color = "";
+//   if (isLocked) {
+//     icon = <Lock className="h-4 w-4" />;
+//     color = "bg-gray-300 text-gray-700";
+//   } else if (isMissed) {
+//     icon = <Clock className="h-4 w-4" />;
+//     color = "bg-red-100 text-red-600";
+//   } else if (status === "In Progress") {
+//     icon = <FastForward className="h-4 w-4" />;
+//     color = "bg-blue-100 text-blue-600";
+//   } else if (status === "Completed") {
+//     icon = <CheckCircle className="h-4 w-4" />;
+//     color = "bg-green-100 text-green-600";
+//   } else {
+//     icon = <PlayCircle className="h-4 w-4" />;
+//     color = "bg-gray-100 text-gray-700";
+//   }
+//   return (
+//     <div className={`absolute top-3 right-3 rounded-full p-1 shadow ${color} cursor-default`} title={tooltip || status} aria-label={tooltip || status}>
+//       {icon}
+//     </div>
+//   );
+// };
 
 export default function LearnerDashboard() {
   const { user, isLoading: userLoading } = useUser();
-  const [activeTab, setActiveTab] = useState("current")
+  // const [activeTab, setActiveTab] = useState("current")
 
   // Fetch modules and stats from LearnerModuleData API
   const { data, error, isLoading } = useFrappeGetCall<any>("LearnerModuleData", {
@@ -101,7 +101,6 @@ export default function LearnerDashboard() {
   });
 
   console.log('DeadlineData', DeadlineData);
-
   // Fetch user achievements from API
   const { data: userAchievements, isLoading: achievementsLoading } = useFrappeGetDocList(
     "User Achievement",
@@ -258,7 +257,7 @@ export default function LearnerDashboard() {
                       <div className="space-y-4">
                         {sortedModules.filter((m: any) => m.progress?.status === 'In Progress').map((module: any, idx: number) => {
                           const { isLocked, lockReason } = getLockState(module, sortedModules);
-                          const progress = module.progress?.progress || 0;
+                          const progress = module.progress?.overall_progress ?? 0;
                           const startDate = module.progress?.started_on ? new Date(module.progress.started_on) : null;
                           const duration = module.progress?.module_duration || module.duration;
                           let dueDate = null;
@@ -283,19 +282,23 @@ export default function LearnerDashboard() {
                                   )}
                                   {/* Main Content */}
                                   <div className="flex-1 flex flex-col justify-between p-4 gap-2">
-                                    <div className="flex flex-col gap-1">
-                                      <h3 className="text-lg font-semibold truncate" title={module.name1}>{module.name1}</h3>
-                                      {module.description && <p className="text-sm text-muted-foreground truncate" title={module.description}>{module.description}</p>}
-                                    </div>
                                     {/* Progress and Meta */}
                                     <div className="flex flex-col gap-1 mt-2">
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className="text-muted-foreground">Progress</span>
-                                        <span className="font-semibold text-base">{progress}%</span>
-                                      </div>
+                                        <div className="flex flex-col space-y-1 text-xs">
+                                          <h3 className="text-lg font-semibold truncate">{module.name1}</h3>
+                                          <p className="text-sm text-muted-foreground truncate">{module.description?.replace(/<[^>]+>/g, '')}</p>
+                                          <span className="text-muted-foreground">Progress</span>
+                                          <span className="font-semibold text-base">{progress}%</span>
+                                        </div>
                                       <Progress value={progress} className="h-2" aria-label={`Progress: ${progress}%`} />
-                                      {startDate && <span className="text-xs text-muted-foreground mt-1">Started: {startDate.toLocaleDateString()}</span>}
-                                      {duration && <span className="text-xs text-muted-foreground mt-1">Duration: {duration} days</span>}
+                                      {/* {startDate && <span className="text-xs text-muted-foreground mt-1">Started: {startDate.toLocaleDateString()}</span>} */}
+                                      {/* {duration && <span className="text-xs text-muted-foreground mt-1">Duration: {duration} days</span>} */}
+                                      <span className="text-xs text-muted-foreground mt-1">
+                                        Started: {startDate ? startDate.toLocaleDateString() : 'N/A'}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground mt-1">
+                                        Duration: {duration ?? 0} days
+                                      </span>
                                       {dueDate && (
                                         <span className={`text-xs mt-1 ${isMissed ? 'text-red-600 font-semibold' : 'text-red-500'}`}>Due: {dueDate.toLocaleDateString()} {isMissed && <span className="ml-2 bg-red-100 text-red-700 px-2 py-0.5 rounded">Missed Deadline</span>}</span>
                                       )}
@@ -412,12 +415,12 @@ export default function LearnerDashboard() {
                                     )}
                                     {/* Main Content */}
                                     <div className="flex-1 flex flex-col justify-between p-4 gap-2">
-                                      <div className="flex flex-col gap-1">
-                                        <h3 className="text-lg font-semibold truncate" title={moduleName}>{moduleName}</h3>
-                                        {module.description && <p className="text-sm text-muted-foreground truncate" title={module.description}>{module.description}</p>}
-                                      </div>
                                       {/* Meta */}
                                       <div className="flex flex-col gap-1 mt-2">
+                                        <div className="flex flex-col space-y-1 text-xs">
+                                          <h3 className="text-lg font-semibold truncate">{module.name1}</h3>
+                                          <p className="text-sm text-muted-foreground truncate">{module.description?.replace(/<[^>]+>/g, '')}</p>
+                                        </div>
                                         {duration !== 0 && <span className="text-xs text-muted-foreground mt-1">Duration: {duration} days</span>}
                                         <div className="flex items-center gap-2 mt-2">
                                           {isLocked ? (
@@ -501,7 +504,11 @@ export default function LearnerDashboard() {
                         <div className="space-y-4">
                           {sortedModules.filter((m: any) => m.progress?.status === 'Completed').map((module: any, idx: number) => {
                             const { isLocked, lockReason } = getLockState(module, sortedModules);
-                            const progress = module.progress?.progress || 0;
+                            const progress = module.progress?.overall_progress ?? 0;
+
+                            // console.log("Fields in module =", Object.keys(module));
+                            // console.log("Progress=", module.progress.overall_progress)
+
                             const isMissed = false; // Completed modules are not missed
                             return (
                               <motion.div key={module.name} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }} className="transition-all duration-200">
@@ -519,13 +526,15 @@ export default function LearnerDashboard() {
                                     )}
                                     {/* Main Content */}
                                     <div className="flex-1 flex flex-col justify-between p-4 gap-2">
-                                      <div className="flex flex-col gap-1">
-                                        <h3 className="text-lg font-semibold truncate" title={module.name1}>{module.name1}</h3>
-                                        {module.description && <p className="text-sm text-muted-foreground truncate" title={module.description}>{module.description}</p>}
-                                      </div>
                                       {/* Progress and Meta */}
                                       <div className="flex flex-col gap-1 mt-2">
                                         <div className="flex items-center justify-between text-xs">
+                                          <div className="flex flex-col space-y-1 text-xs">
+                                            <h3 className="text-lg font-semibold truncate">{module.name1}</h3>
+                                            <p className="text-sm text-muted-foreground truncate">{module.description?.replace(/<[^>]+>/g, '')}</p>
+                                            <span className="text-muted-foreground">Progress</span>
+                                            <span className="font-semibold text-base">{progress}%</span>
+                                          </div>
                                           <span className="text-muted-foreground">Progress</span>
                                           <span className="font-semibold text-base">{progress}%</span>
                                         </div>

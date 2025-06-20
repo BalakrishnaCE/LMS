@@ -178,11 +178,11 @@ async function checkQuizQACompletion(module: Module, user: any) {
     return { allCompleted, scores };
 }
 
-function getAllQuizQAItems(module: Module) {
+function getAllQuizQAItems(module: Module) { 
     const items: Array<{title: string, type: string}> = [];
     if (!module || !Array.isArray(module.lessons)) return items;
     module.lessons.forEach((lesson) => {
-        if (!lesson || !Array.isArray(lesson.chapters)) return;
+        if (!lesson || !Array.isArray(lesson.chapters)) return
         lesson.chapters.forEach((chapter) => {
             if (!chapter || !Array.isArray(chapter.contents)) return;
             chapter.contents.forEach((content) => {
