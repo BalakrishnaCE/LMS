@@ -387,7 +387,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
               <Dialog.Title className="text-xl font-semibold">{data?.title || "Q&A"}</Dialog.Title>
-              {data?.time_limit_mins && !allSubmitted && (
+              {data?.time_limit_mins > 0 && !allSubmitted && (
                 <span className={
                   "ml-4 text-base font-mono " + (timeLeft <= 10 ? "text-red-500 font-bold" : "text-muted-foreground")
                 }>
@@ -464,13 +464,20 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
                         <div key={q.id} className="border rounded-lg p-4 bg-muted/50">
                           <div className="font-semibold mb-2">Q{idx + 1}: {q.question?.replace(/<[^>]+>/g, '')}</div>
                           <div className="mb-2 text-xs text-muted-foreground">Score: {q.score}</div>
-                          <div className="prose prose-sm bg-background p-2 rounded mb-2" dangerouslySetInnerHTML={{ __html: q.suggested_answer }} />
+                          {q.suggested_answer && isLMSAdmin && (
+                            <>
+                              <div className="mb-2 text-xs text-muted-foreground">Suggested Answer:</div>
+                              <div className="prose prose-sm bg-background p-2 rounded mb-2" dangerouslySetInnerHTML={{ __html: q.suggested_answer }} />
+                            </>
+                          )}
                           <div className="mb-2">
+                            {!isLMSAdmin && 
                             <RichEditor
                               content={answers[q.id] || ""}
                               onChange={val => setAnswers(a => ({ ...a, [q.id]: val }))}
                               disabled={submitted[q.id] || !timerActive || allSubmitted}
                             />
+                          }
                           </div>
                           {submitted[q.id] && <span className="text-green-600 flex items-center gap-1"><CheckCircle className="h-4 w-4" />Answer submitted!</span>}
                         </div>

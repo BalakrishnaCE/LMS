@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Trash2, Plus, MessageSquare } from 'lucide-react';
 import RichEditor from '@/components/RichEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Question {
   question: string;
@@ -156,9 +157,11 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
             <CardContent className="space-y-4">
               <div>
                 <Label className='mb-3'>Question</Label>
-                <RichEditor
-                  content={question.question}
-                  onChange={(value) => updateQuestion(questionIndex, 'question', value)}
+                <Textarea
+                  value={question.question}
+                  onChange={(e) => updateQuestion(questionIndex, 'question', e.target.value)}
+                  placeholder="Enter question"
+                  className="w-full"
                 />
               </div>
 
@@ -179,9 +182,11 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
 
               <div>
                 <Label className='mb-3'>Suggested Answer</Label>
-                <RichEditor
-                  content={question.suggested_answer}
-                  onChange={(value) => updateQuestion(questionIndex, 'suggested_answer', value)}
+                <Textarea
+                  value={question.suggested_answer}
+                  onChange={(e) => updateQuestion(questionIndex, 'suggested_answer', e.target.value)}
+                  placeholder="Enter suggested answer (optional)"
+                  className="w-full"
                 />
               </div>
             </CardContent>
