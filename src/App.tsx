@@ -19,7 +19,7 @@ import LearnerModuleDetail from "@/pages/Modules/Learner/ModuleDetail";
 import ModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
 import ModuleCreationForm from "@/pages/ModuleEditor/edit/ModuleCreationForm";
 import AnalyticsDashboard from "@/pages/Analytics/AnalyticsDashboard";
-import AnalyticsDashboardNew from "@/pages/Analytics/AnalyticsDashboardNew";
+// import AnalyticsDashboardNew from "@/pages/Analytics/AnalyticsDashboard";
 // import H5PReactDemo from '@/pages/Test/H5PReactDemo';
 // import TESTH5P from '@/pages/Test/TESTH5P';
 
@@ -88,11 +88,11 @@ function App() {
                   <AnalyticsDashboard />
                 </Layout>
               )} allowedRoles={["LMS Admin"]} />
-              <ProtectedRoute path="/analytics-new" component={() => (
+              {/* <ProtectedRoute path="/analytics-new" component={() => (
                 <Layout>
                   <AnalyticsDashboardNew />
                 </Layout>
-              )} allowedRoles={["LMS Admin"]} />
+              )} allowedRoles={["LMS Admin"]} /> */}
               {/* Test H5P React Demo route */}
               {/* <Route path="/test/h5p-react-demo" component={H5PReactDemo} /> */}
               {/* Show 404 for all unrecognized routes */}

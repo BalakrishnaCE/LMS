@@ -1,747 +1,684 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useMemo, useState } from "react";
+import { useFrappeGetCall, useFrappeUpdateDoc } from "frappe-react-sdk";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  SheetClose,
-  SheetFooter
-} from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Users,
-  BookOpen,
   CheckCircle,
+  Layers,
+  AlertCircle,
+  RefreshCw,
   TrendingUp,
+  TrendingDown,
   Target,
-  Activity,
   Award,
-  PieChart as IconPieChart,
-  BarChart2,
-  LineChart as IconLineChart,
-  Filter,
-  FileDown,
-  HelpCircle, // For Q&A
-  ListChecks,
-  Eye,
-  MoreHorizontal,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Share2,
-  Timer,
-  Flame,
-  ArrowUpRight,
-  ArrowDownRight,
-  AlertTriangle,
-  Grid,
-  RepeatIcon
+  BookOpen,
+  Download,
+  Calendar,
+  Clock,
+  GraduationCap,
 } from "lucide-react";
 import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  Cell,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  CartesianGrid
-} from "recharts";
-import { useFrappeGetCall } from 'frappe-react-sdk';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { QuizDetailsDrawer } from "./QuizDetailsDrawer";
+import { QADetailsDrawer } from "./QADetailsDrawer";
+import { ModuleDetailsDrawer } from "./ModuleDetailsDrawer";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
-// Custom hook for pagination
-const usePagination = (data: any[], itemsPerPage: number = 5) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const maxPage = Math.ceil(data.length / itemsPerPage);
-  const currentData = useMemo(() => {
-    if(!data) return [];
-    const start = (currentPage - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return data.slice(start, end);
-  }, [data, currentPage, itemsPerPage]);
+// Interfaces from backend
+interface QuizProgress {
+  user: string;
+  quiz_id: string;
+  module: { id: string | null; name: string | null; name1: string | null; };
+  score: number;
+  max_score: number;
+  ended_on?: string;
+  started_on?: string;
+  time_spent?: number;
+  data: { question: string; marked_ans: string | null; correct_ans: string | null; }[];
+  time_limit_mins?: number;
+}
 
-  const next = () => setCurrentPage((current) => Math.min(current + 1, maxPage));
-  const prev = () => setCurrentPage((current) => Math.max(current - 1, 1));
-  const jump = (page: number) => {
-      const pageNumber = Math.max(1, Math.min(page, maxPage));
-      setCurrentPage(pageNumber);
+interface QuestionAnswerProgress {
+  user: string;
+  qa_id: string;
+  module: { id: string | null; name: string | null; name1: string | null; };
+  score?: number;
+  max_score?: number;
+  end_time?: string;
+  start_time?: string;
+  duration?: number;
+  status?: 'Pending' | 'Scored';
+  responses: { question: string; answer: string; suggested_answer: string; }[];
+  time_limit_mins?: number;
+  name: string;
+}
+
+interface AnalyticsResponse {
+  quiz_progress: QuizProgress[];
+  qa_progress: QuestionAnswerProgress[];
+}
+
+// New interfaces for Module Analytics
+interface ModuleAnalytics {
+  module_id: string;
+  module_name: string;
+  department: string;
+  assignment_type: string;
+  assigned: number;
+  attended: number;
+  completed: number;
+  completion_rate: number;
+  attendance_rate: number;
+  duration: number;
+  has_scoring: boolean;
+  total_score: number;
+}
+
+interface ModuleAnalyticsResponse {
+  modules: ModuleAnalytics[];
+  summary: {
+    total_modules: number;
+    total_assigned: number;
+    total_attended: number;
+    total_completed: number;
+    average_completion_rate: number;
+    average_attendance_rate: number;
   };
-  const reset = () => setCurrentPage(1);
-
-
-  return { currentData, currentPage, maxPage, next, prev, jump, reset };
-};
-
-// Generic DataTable component for reuse
-interface DataTableProps {
-    data: any[];
-    columns: string[]; // Column keys from data objects
-    onRowClick?: (row: any) => void;
-    itemsPerPage?: number; // Optional for internal pagination if needed, but main pagination is external
+  pagination: {
+    total_count: number;
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  };
 }
-const DataTable: React.FC<DataTableProps> = ({ data, columns, onRowClick }) => {
-    if (!data || data.length === 0) {
-        return <p className="text-muted-foreground text-center py-8">No data available for the current selection.</p>;
-    }
-    // Ensure columns are derived if not explicitly provided, or use provided ones
-    const tableHeaders = columns && columns.length > 0 ? columns : Object.keys(data[0] || {});
 
-    const formatHeader = (header: string) => {
-        return header
-            .replace(/_/g, ' ') // Replace underscores with spaces
-            .replace(/([A-Z])/g, ' $1') // Add space before capital letters for camelCase/PascalCase
-            .replace(/\b\w/g, char => char.toUpperCase()); // Capitalize first letter of each word
-    };
+interface ModuleLearner {
+  user_id: string;
+  full_name: string;
+  email: string;
+  department: string;
+  status: string;
+  progress: number;
+  score?: number;
+  started_on?: string;
+  completed_on?: string;
+  attended: boolean;
+}
 
-    return (
-        <div className="overflow-x-auto">
-            <Table className="min-w-full">
-                <TableHeader>
-                    <TableRow>
-                        {tableHeaders.map(header => (
-                            <TableHead key={header} className="whitespace-nowrap">{formatHeader(header)}</TableHead>
-                        ))}
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {data.map((row, rowIndex) => (
-                        <TableRow 
-                            key={rowIndex} 
-                            onClick={() => onRowClick && onRowClick(row)} 
-                            className={onRowClick ? "cursor-pointer hover:bg-muted/50" : ""}
-                        >
-                            {tableHeaders.map(header => (
-                                <TableCell key={`${header}-${rowIndex}`} className="whitespace-nowrap text-sm">
-                                    {typeof row[header] === 'boolean' ? (row[header] ? 'Yes' : 'No') : (row[header]?.toString() ?? 'N/A')}
-                                </TableCell>
-                            ))}
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
+interface ModuleDetails {
+  name: string;
+  title: string;
+  description: string;
+  duration: number;
+  assignment_based: string;
+  department: {
+    name: string;
+    tl: string;
+  };
+  total_score: number;
+  has_scoring: boolean;
+}
+
+interface ModuleDetailsResponse {
+  module_details: ModuleDetails;
+  statistics: {
+    assigned_learners: number;
+    attended_learners: number;
+    completed_learners: number;
+    completion_rate: number;
+    attendance_rate: number;
+  };
+  learners: ModuleLearner[];
+}
+
+const StatCardSkeleton = () => (
+  <Card className="shadow-sm">
+    <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <Skeleton className="h-6 w-32" />
+    </CardHeader>
+    <CardContent>
+      <Skeleton className="h-8 w-16 mb-2" />
+      <Skeleton className="h-4 w-24" />
+    </CardContent>
+  </Card>
+);
+
+const ErrorAlert = ({ error, onRetry }: { error: any; onRetry: () => void }) => (
+  <Alert variant="destructive" className="mb-4">
+    <AlertCircle className="h-4 w-4" />
+    <AlertTitle>Error</AlertTitle>
+    <AlertDescription className="flex items-center justify-between">
+      <span>{error?.message || "Failed to load analytics data"}</span>
+      <Button variant="outline" size="sm" onClick={onRetry}>
+        <RefreshCw className="h-4 w-4 mr-2" />
+        Retry
+      </Button>
+    </AlertDescription>
+  </Alert>
+);
+
+const PaginatedTable = ({ 
+  columns, 
+    data, 
+    onRowClick,
+    emptyMessage = "No data available." 
+}: { 
+    columns: { key: string; header: string; render?: (item: any) => React.ReactNode }[];
+  data: any[]; 
+    onRowClick: (item: any) => void;
+  emptyMessage?: string;
+}) => {
+  const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+    const totalPages = Math.ceil(data.length / itemsPerPage);
+    const currentData = data.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
     );
+
+  return (
+        <>
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+                            {columns.map(col => <TableHead key={col.key}>{col.header}</TableHead>)}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+                        {currentData.length > 0 ? (
+                            currentData.map((item, index) => (
+                                <TableRow key={item.user + item.quiz_id || index} onClick={() => onRowClick(item)} className="cursor-pointer">
+                                    {columns.map(col => (
+                                        <TableCell key={col.key}>
+                                            {col.render ? col.render(item) : item[col.key]}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center">
+                                    {emptyMessage}
+                                </TableCell>
+                            </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      {totalPages > 1 && (
+        <Pagination className="mt-4">
+          <PaginationContent>
+            <PaginationItem>
+                            <PaginationPrevious onClick={() => setCurrentPage(p => Math.max(1, p - 1))} />
+            </PaginationItem>
+                        <PaginationItem>
+                            <PaginationLink>{currentPage}</PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+                            <PaginationNext onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+        </>
+  );
 };
-
-function getCssVarValue(varName: string) {
-  if (typeof window === "undefined") return "";
-  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-}
-
-// Helper: format JS Date to Frappe's required string format 'YYYY-MM-DD HH:mm:ss'
-function toFrappeDateString(date: Date) {
-  return date.toISOString().slice(0, 19).replace('T', ' ');
-}
-
-// User type for user/learner info (no department field)
-type UserItem = { name: string; email: string; full_name: string; creation: string; };
-
-// --- STATIC DATA (replace API calls) ---
-const staticUsers = [
-  { name: "user1", email: "user1@email.com", full_name: "Alice Smith", creation: "2024-05-01" },
-  { name: "user2", email: "user2@email.com", full_name: "Bob Jones", creation: "2024-05-02" },
-  { name: "user3", email: "user3@email.com", full_name: "Charlie Brown", creation: "2024-05-03" },
-];
-const staticModules = [
-  { name: "mod1", creation: "2024-05-01" },
-  { name: "mod2", creation: "2024-05-02" },
-  { name: "mod3", creation: "2024-05-03" },
-];
-const staticProgress = [
-  { name: "prog1", lms_module: "mod1", learner: "user1", status: "Completed", score: 90, module_duration: 120, completed_on: "2024-05-10", modified: "2024-05-10" },
-  { name: "prog2", lms_module: "mod2", learner: "user2", status: "Started", score: 60, module_duration: 80, completed_on: "", modified: "2024-05-12" },
-  { name: "prog3", lms_module: "mod3", learner: "user3", status: "Started", score: 40, module_duration: 60, completed_on: "", modified: "2024-05-13" },
-];
-const staticQuizProgress = [
-  { name: "quizprog1", user: "user1", quiz: "quiz1", score: 85, started_on: "2024-05-10", ended_on: "2024-05-10", time_spent: 30 },
-  { name: "quizprog2", user: "user2", quiz: "quiz2", score: 70, started_on: "2024-05-12", ended_on: "2024-05-12", time_spent: 25 },
-];
-const staticQaProgress = [
-  { name: "qaprog1", question_answer: "qa1", user: "user1", score: 80 },
-  { name: "qaprog2", question_answer: "qa2", user: "user2", score: 60 },
-];
-const staticDepartments = [
-  { name: "dept1", department: "Engineering" },
-  { name: "dept2", department: "Sales" },
-];
-const staticQuizzes = [
-  { name: "quiz1", title: "Quiz 1" },
-  { name: "quiz2", title: "Quiz 2" },
-];
-// --- END STATIC DATA ---
-// TODO: Restore API integration after UI improvements
-
-// 1. Heatmap color grading utility
-function getHeatmapColor(value: number) {
-  // 0% = #f3f4f6 (gray-100), 100% = #16a34a (green-600)
-  if (value === 0) return '#f3f4f6';
-  // Interpolate between gray and green
-  const green = [22, 163, 74]; // #16a34a
-  const gray = [243, 244, 246]; // #f3f4f6
-  const r = Math.round(gray[0] + (green[0] - gray[0]) * (value / 100));
-  const g = Math.round(gray[1] + (green[1] - gray[1]) * (value / 100));
-  const b = Math.round(gray[2] + (green[2] - gray[2]) * (value / 100));
-  return `rgb(${r},${g},${b})`;
-}
 
 export default function AnalyticsDashboard() {
-  // --- STATE HOOKS (unchanged) ---
-  const [dateRange, setDateRange] = useState("last_30_days");
-  const [department, setDepartment] = useState("All");
-  const [module, setModule] = useState("All");
-  const [quiz, setQuiz] = useState("All");
-  const [learner, setLearner] = useState("All");
-  const [activeTab, setActiveTab] = useState("overview");
-  const [showAllLearners, setShowAllLearners] = useState(false);
-  const [showAllAttention, setShowAllAttention] = useState(false);
-  const [attentionFilter, setAttentionFilter] = useState<string | null>(null);
+  const [selectedQuiz, setSelectedQuiz] = useState<QuizProgress | null>(null);
+  const [selectedQA, setSelectedQA] = useState<QuestionAnswerProgress | null>(null);
+  const [selectedModule, setSelectedModule] = useState<ModuleAnalytics | null>(null);
+  const [activeTab, setActiveTab] = useState<'quiz' | 'qa' | 'modules'>('quiz');
+  const [activeQATab, setActiveQATab] = useState<'scored' | 'pending'>('scored');
+  const { data, error, isLoading, mutate: mutateAnalytics } = useFrappeGetCall('QA&QuizAnalytics', {}, 'QA&QuizAnalytics');
+  
+  // Module Analytics data
+  const { 
+    data: moduleData, 
+    error: moduleError, 
+    isLoading: moduleLoading, 
+    mutate: mutateModuleAnalytics 
+  } = useFrappeGetCall('getModuleAnalytics', { limit: 20, offset: 0 }, 'getModuleAnalytics');
 
-  // --- API CALL WITH FRAPPE-REACT-SDK ---
-  const apiParams: Record<string, string> = {
-    date_range: dateRange,
+  const [selectedQuizItem, setSelectedQuizItem] = useState<QuizProgress | null>(null);
+  const [selectedQAItem, setSelectedQAItem] = useState<QuestionAnswerProgress | null>(null);
+  const [selectedModuleItem, setSelectedModuleItem] = useState<ModuleAnalytics | null>(null);
+  const [isQuizDrawerOpen, setIsQuizDrawerOpen] = useState(false);
+  const [isQADrawerOpen, setIsQADrawerOpen] = useState(false);
+  const [isModuleDrawerOpen, setIsModuleDrawerOpen] = useState(false);
+  const [scoreInput, setScoreInput] = useState<Record<string, number | string>>({});
+
+  const { updateDoc, loading: isUpdating } = useFrappeUpdateDoc();
+
+  const handleScoreInputChange = (name: string, value: number | string) => {
+    setScoreInput(prev => ({ ...prev, [name]: value }));
   };
-  if (department !== 'All') apiParams.department = department;
-  if (module !== 'All') apiParams.module = module;
-  if (quiz !== 'All') apiParams.quiz = quiz;
-  if (learner !== 'All') apiParams.learner = learner;
-  // TODO: Add TL filter in the future
 
-  const {
-    data: apiData,
-    isLoading: apiLoading,
-    error: apiError,
-    mutate: mutateAnalytics
-  } = useFrappeGetCall<{ message: any }>(
-    'getLMSAnalytics',
-    apiParams
-  );
+  const handleAddScore = (item: QuestionAnswerProgress) => {
+    const score = scoreInput[item.name];
+    if (typeof score !== 'number' || isNaN(score) || !item.max_score) {
+      toast.error("Invalid score input. Please enter a valid number.");
+      return;
+    };
 
-  useEffect(() => {
-    mutateAnalytics();
-  }, [dateRange, department, module, quiz, learner]);
+    if (score > item.max_score) {
+      toast.error(`Score cannot be greater than max score (${item.max_score})`);
+      return;
+    }
+    
+    updateDoc('Question Answer Progress', item.name, { score })
+      .then(() => {
+        toast.success('Score added successfully');
+        mutateAnalytics();
+        setScoreInput(prev => {
+          const newState = { ...prev };
+          delete newState[item.name];
+          return newState;
+        });
+      })
+      .catch(err => {
+        console.error(err);
+        toast.error('Failed to add score');
+      });
+  }
 
-  // --- EXTRACT DATA FROM API RESPONSE (always run hooks, use defaults if loading/error) ---
-  const message = apiData?.message || {};
-  const statCards = message.stat_cards || [];
+  const message = data?.message || {};
   const modules = message.modules || [];
-  const learners = message.learners || [];
-  const departments = message.departments || [];
-  const quizzes = message.quizzes || [];
-  const progress = message.progress || [];
   const quizProgress = message.quiz_progress || [];
-  const qaProgress = message.qa_progress || [];
+  const progress = message.progress || [];
+  const qas = message.qa_progress || [];
 
-  // --- ALL MEMOS AND DERIVED DATA HOOKS (ALWAYS RUN) ---
-  const departmentOptions = useMemo(() => ['All', ...(departments).map((d: any) => d.department)], [departments]);
-  const learnerOptions = useMemo(() => ['All', ...(learners).map((u: any) => u.full_name)], [learners]);
-  const moduleOptions = useMemo(() => ['All', ...(modules).map((m: any) => m.name)], [modules]);
-  const quizOptions = useMemo(() => ['All', ...(quizzes).map((q: any) => q.title)], [quizzes]);
-  const moduleMap = useMemo(() => Object.fromEntries((modules).map((m: any) => [m.name, m])), [modules]);
-  const userMap = useMemo(() => Object.fromEntries((learners).map((u: any) => [u.name, u])), [learners]);
-  const quizMap = useMemo(() => Object.fromEntries((quizzes).map((q: any) => [q.name, q])), [quizzes]);
+  // Module Analytics data
+  const moduleAnalytics = moduleData?.message || {};
+  const moduleList = moduleAnalytics.modules || [];
+  const moduleSummary = moduleAnalytics.summary || {};
 
-  // --- LOADING/ERROR STATES (after all hooks) ---
-  if (apiLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading analytics...</div>;
-  }
-  if (apiError || !apiData) {
-    return <div className="p-8 text-center text-destructive">Error loading analytics data.<br/>Check API and permissions.</div>;
-  }
+  const publishedModules = useMemo(() => modules.filter((m: any) => m.published), [modules]);
 
-  // --- STATS COMPUTATION ---
-  // Helper: last 30 days in Frappe format
-  const now = new Date();
-  const last30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const last30Frappe = toFrappeDateString(last30);
+  const activeLearners = useMemo(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return new Set(
+      progress
+        .filter((p: any) => p.modified && new Date(p.modified) > thirtyDaysAgo)
+        .map((p: any) => p.learner)
+    ).size;
+  }, [progress]);
 
-  // Total Learners
-  const totalLearners = learners.length;
-  // Active Learners: unique learners with progress.modified_on in last 30 days
-  const activeLearnerSet = new Set(progress.filter((p: any) => p.modified && new Date(p.modified) > last30).map((p: any) => p.learner));
-  const activeLearners = activeLearnerSet.size;
-  // Overall Completion %
-  const completedCount = progress.filter((p: any) => p.status === 'Completed').length;
-  const overallCompletionRate = progress.length > 0 ? Math.round((completedCount / progress.length) * 100) : 0;
-  // New Modules This Month
-  const newModulesThisMonth = modules.filter((m: any) => m.creation && new Date(m.creation) > last30).length;
-  // Questions Answered
-  const questionsAnswered = qaProgress.length;
-  // Quizzes Attempted
-  const quizzesAttempted = quizProgress.filter((q: any) => q.ended_on).length;
-  // Avg Time Spent/Module
-  const avgTimeSpent = progress.length > 0 ? Math.round((progress.reduce((sum: any, p: any) => sum + (p.module_duration || 0), 0) / progress.length)) : 0;
-  // Avg Quiz Score
-  const avgQuizScore = quizProgress.length > 0 ? Math.round((quizProgress.reduce((sum: any, q: any) => sum + (q.score || 0), 0) / quizProgress.length)) : 0;
-  // Avg Q&A Score
-  const avgQAScore = qaProgress.length > 0 ? Math.round((qaProgress.reduce((sum: any, q: any) => sum + (q.score || 0), 0) / qaProgress.length)) : 0;
+  const completionRate = useMemo(() => {
+    if (progress.length === 0) return 0;
+    const completed = progress.filter((p: any) => p.status === 'Completed').length;
+    return Math.round((completed / progress.length) * 100);
+  }, [progress]);
 
-  // --- CHARTS & TABLES (LIVE DATA) ---
-  // Quiz Attempts vs Assigned (per module)
-  const quizAttemptsVsAssigned = (modules).map((mod: any) => {
-    const assigned = (quizProgress).filter((q: any) => q.quiz && q.quiz.startsWith(mod.name)).length;
-    const attempted = (quizProgress).filter((q: any) => q.quiz && q.quiz.startsWith(mod.name) && q.ended_on).length;
-    return { module: mod.name, assigned, attempted };
-  });
-  // Modules Started vs Assigned (per module)
-  const modulesStartedVsAssigned = (modules).map((mod: any) => {
-    const assigned = (progress).filter((p: any) => p.lms_module === mod.name).length;
-    const started = (progress).filter((p: any) => p.lms_module === mod.name && p.status === 'Started').length;
-    return { module: mod.name, assigned, started };
-  });
-  // Progress Heatmap (learners x modules)
-  const progressHeatmap = (learners).map((learner: any) => {
-    const row: any = { learner: learner.name };
-    (modules).forEach((mod: any) => {
-      const p = (progress).find((pr: any) => pr.learner === learner.name && pr.lms_module === mod.name);
-      row[mod.name] = p ? (p.status === 'Completed' ? 100 : (p.score || 0)) : 0;
-    });
-    return row;
-  });
+  const avgQuizScore = useMemo(() => {
+    if (quizProgress.length === 0) return 0;
+    const scores = quizProgress.filter((q: any) => q.score !== undefined && q.score !== null);
+    if (scores.length === 0) return 0;
+    return Math.round(scores.reduce((sum: number, q: any) => sum + q.score, 0) / scores.length);
+  }, [quizProgress]);
 
-  // --- UI ---
-  // Learners Needing Attention: separate reasons, clickable, filterable
-  // Compute specific reason for each learner
-  const learnersNeedingAttention = learners
-    .map((learner: any) => {
-      const learnerProgress = progress.filter((p: any) => p.learner === learner.name);
-      const overdue = learnerProgress.some((p: any) => p.status !== 'Completed' && p.modified && new Date(p.modified) < last30);
-      const lowProgress = learnerProgress.some((p: any) => (p.score || 0) < 50);
-      if (overdue) return { learner: learner.name, reason: 'Overdue' };
-      if (lowProgress) return { learner: learner.name, reason: 'Low Progress' };
-      return null;
-    })
-    .filter((x: any): x is { learner: string; reason: string } => x !== null);
+  const avgQAScore = useMemo(() => {
+    if (qas.length === 0) return 0;
+    const scores = qas.filter((qa: any) => qa.score !== undefined && qa.score !== null);
+    if (scores.length === 0) return 0;
+    return Math.round(scores.reduce((sum: number, qa: any) => sum + qa.score, 0) / scores.length);
+  }, [qas]);
 
-  const filteredUsers = attentionFilter
-    ? learners.filter((u: any) => u.name === attentionFilter)
-    : learners;
-  const filteredProgress = attentionFilter
-    ? progress.filter((p: any) => p.learner === attentionFilter)
-    : progress;
-  const filteredQaProgress = attentionFilter
-    ? qaProgress.filter((q: any) => q.user === attentionFilter)
-    : qaProgress;
-  const filteredQuizProgress = attentionFilter
-    ? quizProgress.filter((q: any) => q.user === attentionFilter)
-    : quizProgress;
+  const statCards = [
+    { title: "Active Learners", value: activeLearners, icon: <Users className="h-6 w-6 text-primary" />, description: "Learners active in last 30 days" },
+    { title: "Total Modules", value: modules.length, icon: <Layers className="h-6 w-6 text-primary" />, description: "All modules in the system" },
+    { title: "Published Modules", value: publishedModules.length, icon: <CheckCircle className="h-6 w-6 text-primary" />, description: "Modules available to learners" },
+    { title: "Completion Rate", value: `${completionRate}%`, icon: <Target className="h-6 w-6 text-primary" />, description: "Overall module completion rate" },
+    { title: "Avg Quiz Score", value: `${avgQuizScore}%`, icon: <Award className="h-6 w-6 text-primary" />, description: "Average quiz performance" },
+    { title: "Avg QA Score", value: `${avgQAScore}%`, icon: <BookOpen className="h-6 w-6 text-primary" />, description: "Average Q&A performance" },
+  ];
 
-  // 3. Module Insights: single table for Fastest/Slowest Learners
-  // Compute time spent per learner per module
-  const moduleTimes: { learner: string; module: string; time: number; }[] = [];
-  progress.forEach((p: any) => {
-    moduleTimes.push({ learner: p.learner, module: p.lms_module, time: p.module_duration || 0 });
-  });
-  // Sort by time ascending (fastest first)
-  const sortedModuleTimes = [...moduleTimes].sort((a, b) => a.time - b.time);
-  const fastest = sortedModuleTimes.slice(0, 2);
-  const slowest = sortedModuleTimes.slice(-2);
+  const quizColumns = [
+    { key: 'user', header: 'User' },
+    { key: 'module', header: 'Module', render: (item: QuizProgress) => item.module?.name1 || 'N/A' },
+    { key: 'score', header: 'Score (%)', render: (item: QuizProgress) => {
+      const percentage = Math.round((item.score / item.max_score) * 100);
+      return (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{percentage}%</span>
+          <Progress value={percentage} className="w-20 h-2" />
+        </div>
+      );
+    }},
+    { key: 'date_attended', header: 'Date Attended', render: (item: QuizProgress) => {
+      return item.ended_on ? new Date(item.ended_on).toLocaleDateString() : 'N/A';
+    }},
+    { key: 'time_spent', header: 'Time Spent', render: (item: QuizProgress) => {
+      if (!item.started_on || !item.ended_on) return 'N/A';
+      const duration = new Date(item.ended_on).getTime() - new Date(item.started_on).getTime();
+      const seconds = Math.floor((duration / 1000) % 60);
+      const minutes = Math.floor((duration / (1000 * 60)) % 60);
+      const hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
 
-  function getStatus(learner: string, module: string) {
-    if (fastest.some((f: any) => f.learner === learner && f.module === module)) return 'Fastest';
-    if (slowest.some((s: any) => s.learner === learner && s.module === module)) return 'Slowest';
-    return '';
-  }
+      let timeString = '';
+      if (hours > 0) timeString += `${hours}h `;
+      if (minutes > 0) timeString += `${minutes}m `;
+      if (seconds > 0 || (hours === 0 && minutes === 0)) timeString += `${seconds}s`;
+      
+      return timeString.trim();
+    }},
+    { key: 'time_limit_mins', header: 'Time Limit', render: (item: QuizProgress) => {
+      return item.time_limit_mins ? item.time_limit_mins + ' mins' : 'N/A';
+    }},
+
+  ];
+  
+  const qaColumns = [
+    { key: 'user', header: 'User' },
+    { key: 'module', header: 'Module', render: (item: QuestionAnswerProgress) => item.module?.name1 || 'N/A' },
+    { key: 'score', header: 'Score (%)', render: (item: QuestionAnswerProgress) => {
+      if (!item.score || !item.max_score) return 'N/A';
+      const percentage = Math.round((item.score / item.max_score) * 100);
+      return `${item.score}/${item.max_score} (${percentage}%)`;
+    }},
+    { key: 'date', header: 'Date', render: (item: QuestionAnswerProgress) => {
+      return item.end_time ? new Date(item.end_time).toLocaleDateString() : 'N/A';
+    }},
+    { key: 'time_spent', header: 'Time Spent', render: (item: QuestionAnswerProgress) => {
+      if (!item.start_time || !item.end_time) return 'N/A';
+      const duration = new Date(item.end_time).getTime() - new Date(item.start_time).getTime();
+      const seconds = Math.floor((duration / 1000) % 60);
+      const minutes = Math.floor((duration / (1000 * 60)) % 60);
+      const hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+
+      let timeString = '';
+      if (hours > 0) timeString += `${hours}h `;
+      if (minutes > 0) timeString += `${minutes}m `;
+      if (seconds > 0 || (hours === 0 && minutes === 0)) timeString += `${seconds}s`;
+      
+      return timeString.trim();
+    }},
+    {key: 'time_limit_mins', header: 'Time Limit', render: (item: QuestionAnswerProgress) => {
+        return item.time_limit_mins ? item.time_limit_mins + ' mins' : 'N/A';
+      }},
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (item: QuestionAnswerProgress) => (
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={() => { setSelectedQAItem(item); setIsQADrawerOpen(true); }}>View</Button>
+          {item.status === 'Pending' && (
+            <Popover onOpenChange={(isOpen) => {
+              if(!isOpen) {
+                setScoreInput(prev => {
+                  const newState = { ...prev };
+                  delete newState[item.name];
+                  return newState;
+                });
+              }
+            }}>
+              <PopoverTrigger asChild>
+                <Button variant="secondary" size="sm">Add Score</Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2">
+                <div className="flex flex-col space-y-2">
+                  <Input 
+                    type="number" 
+                    placeholder={`Max: ${item.max_score}`} 
+                    value={scoreInput[item.name] || ''}
+                    onChange={(e) => handleScoreInputChange(item.name, e.target.valueAsNumber)}
+                    max={item.max_score}
+                    min={0}
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={() => handleAddScore(item)}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+      )
+    },
+  ];
+
+  // Separate QA data into scored and pending
+  const qaData = data?.data.qa_progress || [];
+  const scoredQAData = qaData.filter((item: QuestionAnswerProgress) => item.status === 'Scored' || (item.score && item.max_score));
+  const pendingQAData = qaData.filter((item: QuestionAnswerProgress) => item.status === 'Pending' || (!item.score || !item.max_score));
+
+  // Module Analytics columns
+  const moduleColumns = [
+    { key: 'module_name', header: 'Module Name' },
+    { key: 'department', header: 'Department' },
+    { key: 'assignment_type', header: 'Assignment Type', render: (item: ModuleAnalytics) => (
+      <Badge variant={item.assignment_type === 'Department' ? 'default' : item.assignment_type === 'Manual' ? 'secondary' : 'outline'}>
+        {item.assignment_type}
+      </Badge>
+    )},
+    { key: 'assigned', header: 'Assigned', render: (item: ModuleAnalytics) => (
+      <div className="flex items-center gap-2">
+        <Users className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium">{item.assigned}</span>
+      </div>
+    )},
+    { key: 'attended', header: 'Attended', render: (item: ModuleAnalytics) => (
+      <div className="flex items-center gap-2">
+        <GraduationCap className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium">{item.attended}</span>
+      </div>
+    )},
+    { key: 'completion_rate', header: 'Completion Rate', render: (item: ModuleAnalytics) => (
+      <div className="flex items-center gap-2">
+        <span className="font-medium">{item.completion_rate.toFixed(1)}%</span>
+        <Progress value={item.completion_rate} className="w-20 h-2" />
+      </div>
+    )},
+    { key: 'duration', header: 'Duration', render: (item: ModuleAnalytics) => (
+      <div className="flex items-center gap-1">
+        <Clock className="h-4 w-4 text-muted-foreground" />
+        <span>{item.duration} days</span>
+      </div>
+    )},
+  ];
 
   return (
     <div className="p-4 md:p-6 lg:p-8 bg-muted/30 dark:bg-background min-h-screen">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-6 items-center">
-        <div className="flex flex-col">
-          <label htmlFor="dateRange" className="text-xs text-muted-foreground mb-1">Date Range</label>
-          <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger id="dateRange" className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>{["Last 7 Days", "Last 30 Days", "Last 90 Days"].map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
-          </Select>
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
+          <p className="text-muted-foreground">Comprehensive learning analytics and insights</p>
         </div>
-        <div className="flex flex-col">
-          <label htmlFor="department" className="text-xs text-muted-foreground mb-1">Department</label>
-          <Select value={department} onValueChange={setDepartment}>
-            <SelectTrigger id="department" className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {departmentOptions.map(opt => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { mutateAnalytics(); mutateModuleAnalytics(); }}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh Data
+          </Button>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export Report
+          </Button>
         </div>
-        <div className="flex flex-col">
-          <label htmlFor="learner" className="text-xs text-muted-foreground mb-1">Learner</label>
-          <Select value={learner} onValueChange={setLearner}>
-            <SelectTrigger id="learner" className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {learnerOptions.map(opt => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button variant="outline" onClick={() => {
-          setDateRange("Last 30 Days");
-          setDepartment("All");
-          setLearner("All");
-        }}>Reset Filters</Button>
-        <Button variant="outline" className="ml-auto" onClick={() => alert('Export to Excel (not implemented)')}> <FileDown className="h-4 w-4 mr-1" /> Export to Excel</Button>
-        <Button variant="outline" onClick={() => alert('Share Analytics (not implemented)')}> <Share2 className="h-4 w-4 mr-1" /> Share Analytics</Button>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        {statCards.map((card: any) => (
-          <Card key={card.title} className="shadow-sm bg-card flex flex-col items-center justify-center p-4">
-            <div className="text-2xl font-bold">{card.value}</div>
-            <div className="text-xs text-muted-foreground mt-1 text-center">{card.title}</div>
-          </Card>
-        ))}
+      {error && <ErrorAlert error={error} onRetry={() => mutateAnalytics()} />}
+      {moduleError && <ErrorAlert error={moduleError} onRetry={() => mutateModuleAnalytics()} />}
+
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-8">
+        {isLoading ? (
+          Array(6).fill(0).map((_, i) => <StatCardSkeleton key={i} />)
+        ) : (
+          statCards.map((card) => (
+            <Card key={card.title} className="shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  {card.icon} {card.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{card.value}</div>
+                <div className="text-xs text-muted-foreground mt-1">{card.description}</div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
-      {/* Tabs for analytics sections */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-4 bg-card p-1 rounded-md">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="learner">Learner Insights</TabsTrigger>
-          <TabsTrigger value="module">Module Insights</TabsTrigger>
-          <TabsTrigger value="quiz">Q&A / Quiz</TabsTrigger>
-        </TabsList>
+      <Card>
+        <Tabs defaultValue="module_analytics" className="w-full">
+          <CardHeader>
+            <TabsList>
+              <TabsTrigger value="module_analytics">Module Analytics</TabsTrigger>
+              <TabsTrigger value="quiz_analytics">Quiz Analytics</TabsTrigger>
+              <TabsTrigger value="qa_analytics">Q&A Analytics</TabsTrigger>
+            </TabsList>
+          </CardHeader>
+          <CardContent>
+            <TabsContent value="module_analytics">
+              {moduleLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : (
+                <div className="space-y-4">
+                  {/* Module Summary Cards */}
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Layers className="h-5 w-5 text-primary" />
+                          <span className="text-sm font-medium">Total Modules</span>
+                        </div>
+                        <div className="text-2xl font-bold mt-2">{moduleSummary.total_modules || 0}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-5 w-5 text-primary" />
+                          <span className="text-sm font-medium">Total Assigned</span>
+                        </div>
+                        <div className="text-2xl font-bold mt-2">{moduleSummary.total_assigned || 0}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2">
+                          <GraduationCap className="h-5 w-5 text-primary" />
+                          <span className="text-sm font-medium">Total Attended</span>
+                        </div>
+                        <div className="text-2xl font-bold mt-2">{moduleSummary.total_attended || 0}</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Target className="h-5 w-5 text-primary" />
+                          <span className="text-sm font-medium">Avg Completion</span>
+                        </div>
+                        <div className="text-2xl font-bold mt-2">{moduleSummary.average_completion_rate?.toFixed(1) || 0}%</div>
+                      </CardContent>
+                    </Card>
+                  </div>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          {/* Compact Module Drill-down filter row */}
-          <div className="flex items-center gap-2 mb-2">
-            <label className="text-xs text-muted-foreground">Module Drill-down:</label>
-            <Select value={module} onValueChange={setModule}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>{moduleOptions.slice(1).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
-            </Select>
-            <span className="text-xs text-muted-foreground">(Coming soon)</span>
-          </div>
-          {/* Balanced grid for charts: two per row, no empty cells */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Quiz Attempts vs Assigned */}
-            <Card className="shadow-sm bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5 text-primary"/>Quiz Attempts vs Assigned</CardTitle>
-                <CardDescription>How many quizzes were attempted vs assigned per module.</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={quizAttemptsVsAssigned}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="module" fontSize={12} />
-                    <YAxis fontSize={12} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="assigned" name="Assigned" fill={getCssVarValue('--chart-1') || '#0ea5e9'} radius={[4,4,0,0]} />
-                    <Bar dataKey="attempted" name="Attempted" fill={getCssVarValue('--chart-2') || '#22c55e'} radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            {/* Modules Started vs Assigned */}
-            <Card className="shadow-sm bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5 text-primary"/>Modules Started vs Assigned</CardTitle>
-                <CardDescription>Modules started vs assigned per module.</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={modulesStartedVsAssigned}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="module" fontSize={12} />
-                    <YAxis fontSize={12} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="assigned" name="Assigned" fill={getCssVarValue('--chart-1') || '#0ea5e9'} radius={[4,4,0,0]} />
-                    <Bar dataKey="started" name="Started" fill={getCssVarValue('--chart-2') || '#22c55e'} radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            {/* Question Answers Attempted vs Assigned */}
-            <Card className="shadow-sm bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5 text-primary"/>Question Answers Attempted vs Assigned</CardTitle>
-                <CardDescription>Questions attempted vs assigned per module.</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={qaProgress}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="question_answer" fontSize={12} />
-                    <YAxis fontSize={12} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="score" name="Score" fill={getCssVarValue('--chart-1') || '#0ea5e9'} radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            {/* Time Spent vs Expected Duration */}
-            <Card className="shadow-sm bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Timer className="h-5 w-5 text-primary"/>Time Spent vs Expected Duration</CardTitle>
-                <CardDescription>Compare actual time spent to expected duration per module.</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={progress}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="lms_module" fontSize={12} />
-                    <YAxis yAxisId="left" fontSize={12} />
-                    <YAxis yAxisId="right" orientation="right" fontSize={12} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar yAxisId="left" dataKey="module_duration" name="Duration" fill={getCssVarValue('--chart-1') || '#0ea5e9'} radius={[4,4,0,0]} />
-                    <Line yAxisId="right" type="monotone" dataKey="score" name="Score" stroke={getCssVarValue('--chart-2') || '#22c55e'} strokeWidth={2} dot />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Learner Insights Tab */}
-        <TabsContent value="learner" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Progress Heatmap */}
-            <Card className="shadow-sm bg-card col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Grid className="h-5 w-5 text-primary"/>Progress Heatmap</CardTitle>
-                <CardDescription>Learner progress across modules. <span className="ml-2 text-xs">(Deeper green = higher progress)</span></CardDescription>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <table className="min-w-max border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="p-2 text-left text-xs text-muted-foreground">Learner</th>
-                      {Object.keys(progressHeatmap[0]).filter(k => k !== 'learner').map(module => (
-                        <th key={module} className="p-2 text-xs text-muted-foreground">{module}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(progressHeatmap).map((row: any) => (
-                      <tr key={row.learner}>
-                        <td className="p-2 font-medium text-sm">{row.learner}</td>
-                        {Object.keys(row).filter((k: string) => k !== 'learner').map((module: string) => {
-                          const value = row[module] ?? 0;
-                          return (
-                            <td key={module} className="p-2">
-                              <div style={{ background: getHeatmapColor(value), borderRadius: 4, padding: 4, color: value > 60 ? '#fff' : '#222', textAlign: 'center', minWidth: 32 }}>
-                                {value}%
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {/* Color legend */}
-                <div className="flex items-center gap-2 mt-2 text-xs">
-                  <span>Progress:</span>
-                  <span style={{ background: getHeatmapColor(0), width: 24, height: 12, display: 'inline-block', borderRadius: 2 }} title="0%" />
-                  <span>0%</span>
-                  <span style={{ background: getHeatmapColor(50), width: 24, height: 12, display: 'inline-block', borderRadius: 2 }} title="50%" />
-                  <span>50%</span>
-                  <span style={{ background: getHeatmapColor(100), width: 24, height: 12, display: 'inline-block', borderRadius: 2 }} title="100%" />
-                  <span>100%</span>
+                  {/* Module Table */}
+                  <PaginatedTable
+                    columns={moduleColumns}
+                    data={moduleList}
+                    onRowClick={setSelectedModuleItem}
+                    emptyMessage="No module analytics data found."
+                  />
                 </div>
-              </CardContent>
-            </Card>
-            {/* Learners Needing Attention */}
-            <Card className="shadow-sm bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-yellow-500"/>Learners Needing Attention</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {learnersNeedingAttention.length === 0 && <li className="text-muted-foreground">No learners need attention.</li>}
-                  {learnersNeedingAttention.map((l: any) => (
-                    <li key={l.learner}>
-                      <button
-                        className={`font-semibold mr-2 underline hover:text-primary focus:outline-none ${attentionFilter === l.learner ? 'text-primary' : ''}`}
-                        onClick={() => setAttentionFilter(attentionFilter === l.learner ? null : l.learner)}
-                        title="Click to filter by this learner"
-                      >
-                        {l.learner}
-                      </button>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${l.reason === 'Overdue' ? 'bg-yellow-100 text-yellow-800' : 'bg-orange-100 text-orange-800'}`}
-                        title={l.reason === 'Overdue' ? 'Learner has overdue modules' : 'Learner has low progress'}>
-                        {l.reason}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {attentionFilter && (
-                  <Button variant="ghost" size="sm" className="mt-2" onClick={() => setAttentionFilter(null)}>Clear Filter</Button>
+              )}
+            </TabsContent>
+            <TabsContent value="quiz_analytics">
+                {isLoading ? (
+                    <Skeleton className="h-64 w-full" />
+                ) : (
+            <PaginatedTable
+                        columns={quizColumns}
+                        data={data?.data.quiz_progress || []}
+                        onRowClick={setSelectedQuizItem}
+                        emptyMessage="No quiz submissions found."
+                    />
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+            </TabsContent>
+            <TabsContent value="qa_analytics">
+                {isLoading ? (
+                    <Skeleton className="h-64 w-full" />
+                ) : (
+                    <Tabs defaultValue="scored" className="w-full">
+                        <TabsList>
+                            <TabsTrigger value="scored">Scored ({scoredQAData.length})</TabsTrigger>
+                            <TabsTrigger value="pending">Pending Score ({pendingQAData.length})</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="scored">
+                            <PaginatedTable
+                                columns={qaColumns}
+                                data={scoredQAData}
+                                onRowClick={setSelectedQAItem}
+                                emptyMessage="No scored Q&A submissions found."
+                            />
+                        </TabsContent>
+                        <TabsContent value="pending">
+            <PaginatedTable
+                                columns={qaColumns}
+                                data={pendingQAData}
+                                onRowClick={setSelectedQAItem}
+                                emptyMessage="No pending Q&A submissions found."
+                            />
+                        </TabsContent>
+                    </Tabs>
+                )}
+            </TabsContent>
+          </CardContent>
+        </Tabs>
+        </Card>
 
-        {/* Module Insights Tab */}
-        <TabsContent value="module" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Completions */}
-            <Card className="shadow-sm bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><CheckCircle className="h-5 w-5 text-primary"/>Recent Completions</CardTitle>
-                <CardDescription>Completions in the last 30 days.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th className="p-2 text-left">Learner</th>
-                      <th className="p-2 text-left">Module</th>
-                      <th className="p-2 text-left">Date</th>
-                      <th className="p-2 text-left">Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(qaProgress).map((row: any) => (
-                      <tr key={row.name}>
-                        <td className="p-2">{row.user}</td>
-                        <td className="p-2">{row.question_answer}</td>
-                        <td className="p-2">{typeof row.name === 'string' ? row.name.split('_').pop() : ''}</td>
-                        <td className="p-2">{row.score}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-            {/* Learner Module Completion Times */}
-            <Card className="shadow-sm bg-card col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Timer className="h-5 w-5 text-primary"/>Learner Module Completion Times</CardTitle>
-                <CardDescription>Time spent per learner per module. <span className="ml-2 text-xs">(Fastest and slowest highlighted)</span></CardDescription>
-              </CardHeader>
-              <CardContent>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th className="p-2 text-left">Learner</th>
-                      <th className="p-2 text-left">Module</th>
-                      <th className="p-2 text-left">Time Spent</th>
-                      <th className="p-2 text-left">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedModuleTimes.map((row: any) => (
-                      <tr key={row.learner + row.module}>
-                        <td className="p-2">{row.learner}</td>
-                        <td className="p-2">{row.module}</td>
-                        <td className="p-2">{Math.floor(row.time / 60)}h {row.time % 60}m</td>
-                        <td className="p-2">
-                          {getStatus(row.learner, row.module) === 'Fastest' && <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs font-medium" title="Among the fastest"><ArrowUpRight className="h-3 w-3 mr-1"/>Fastest</span>}
-                          {getStatus(row.learner, row.module) === 'Slowest' && <span className="inline-flex items-center px-2 py-0.5 rounded bg-red-100 text-red-800 text-xs font-medium" title="Among the slowest"><ArrowDownRight className="h-3 w-3 mr-1"/>Slowest</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+      <QuizDetailsDrawer
+          item={selectedQuizItem}
+          isOpen={!!selectedQuizItem}
+          onClose={() => setSelectedQuizItem(null)}
+      />
 
-        {/* Q&A / Quiz Tab */}
-        <TabsContent value="quiz" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Quiz Attempts vs Score */}
-            <Card className="shadow-sm bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5 text-primary"/>Quiz Attempts vs Score</CardTitle>
-                <CardDescription>Quiz attempts vs average score per module.</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={(quizProgress)}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="quiz" fontSize={12} />
-                    <YAxis yAxisId="left" fontSize={12} />
-                    <YAxis yAxisId="right" orientation="right" fontSize={12} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar yAxisId="left" dataKey="score" name="Score" fill={getCssVarValue('--chart-1') || '#0ea5e9'} radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            {/* Q&A Attempted vs Score */}
-            <Card className="shadow-sm bg-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5 text-primary"/>Q&A Attempted vs Score</CardTitle>
-                <CardDescription>Q&A attempts vs average score per module.</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={(qaProgress)}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="question_answer" fontSize={12} />
-                    <YAxis yAxisId="left" fontSize={12} />
-                    <YAxis yAxisId="right" orientation="right" fontSize={12} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar yAxisId="left" dataKey="score" name="Score" fill={getCssVarValue('--chart-1') || '#0ea5e9'} radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            {/* Quiz Question Difficulty Analysis */}
-            <Card className="shadow-sm bg-card col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><IconPieChart className="h-5 w-5 text-primary"/>Quiz Question Difficulty Analysis</CardTitle>
-                <CardDescription>Correct vs incorrect answers by question difficulty.</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={(qaProgress)}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="question_answer" fontSize={12} />
-                    <YAxis fontSize={12} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="score" name="Score" fill={getCssVarValue('--chart-1') || '#0ea5e9'} radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+      <QADetailsDrawer
+          item={selectedQAItem}
+          isOpen={!!selectedQAItem}
+          onClose={() => setSelectedQAItem(null)}
+      />
+
+      <ModuleDetailsDrawer
+          key={selectedModuleItem?.module_id}
+          item={selectedModuleItem}
+          isOpen={!!selectedModuleItem}
+          onClose={() => setSelectedModuleItem(null)}
+      />
     </div>
   );
-}
+} 
