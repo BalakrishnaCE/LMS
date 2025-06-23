@@ -80,9 +80,10 @@ const contentStyles = `
 interface ContentRendererProps {
   contentType: string;
   contentReference: string;
+  moduleId?: string;
 }
 
-export function ContentRenderer({ contentType, contentReference }: ContentRendererProps) {
+export function ContentRenderer({ contentType, contentReference, moduleId }: ContentRendererProps) {
   const { data: content, error, isValidating } = useFrappeGetDoc(contentType, contentReference);
 
   if (isValidating) return <div>Loading content...</div>;
@@ -125,11 +126,11 @@ export function ContentRenderer({ contentType, contentReference }: ContentRender
           </motion.div>
         );
       case "Quiz":
-        return <Quiz quizReference={contentReference} />;
+        return <Quiz quizReference={contentReference} moduleId={moduleId} />;
       case "Slide Content":
         return <SlideContent slideContentId={contentReference} />;
       case "Question Answer":
-        return <QuestionAnswer questionAnswerId={contentReference} />;
+        return <QuestionAnswer questionAnswerId={contentReference} moduleId={moduleId} />;
       case "Steps":
         return <StepsContent content={content} />;
       case "Check List":

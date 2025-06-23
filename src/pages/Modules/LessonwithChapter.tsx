@@ -53,6 +53,7 @@ export interface LessonWithChaptersProps {
   isFirst?: boolean;
   isLast?: boolean;
   activeChapterId?: string | null;
+  moduleId?: string;
 }
 
 export function useLessonDoc(lessonName: string) {
@@ -103,7 +104,11 @@ export function useChapterDoc(chapterName: string) {
   return { data, loading, error };
 }
 
-function ContentRenderer({ contentType, contentReference }: { contentType: string, contentReference: string }) {
+function ContentRenderer({ contentType, contentReference, moduleId }: { 
+  contentType: string; 
+  contentReference: string; 
+  moduleId?: string;
+}) {
   const { data: content, error, isValidating } = useFrappeGetDoc(contentType, contentReference);
 
   if (isValidating) return <div>Loading content...</div>;
@@ -146,11 +151,11 @@ function ContentRenderer({ contentType, contentReference }: { contentType: strin
           </motion.div>
         );
       case "Quiz":
-        return <Quiz quizReference={contentReference} />;
+        return <Quiz quizReference={contentReference} moduleId={moduleId} />;
       case "Slide Content":
         return <SlideContent slideContentId={contentReference} />;
       case "Question Answer":
-        return <QuestionAnswer questionAnswerId={contentReference} />;
+        return <QuestionAnswer questionAnswerId={contentReference} moduleId={moduleId} />;
       case "Steps":
         return <StepsContent content={content} />;
       case "Check List":
@@ -190,7 +195,7 @@ function ContentRenderer({ contentType, contentReference }: { contentType: strin
   );
 }
 
-export function LessonWithChapters({ lessonName, onNext, onPrevious, isFirst, isLast, activeChapterId }: LessonWithChaptersProps) {
+export function LessonWithChapters({ lessonName, onNext, onPrevious, isFirst, isLast, activeChapterId, moduleId }: LessonWithChaptersProps) {
   const { data: lesson, loading, error } = useLessonDoc(lessonName);
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
 
@@ -261,6 +266,7 @@ export function LessonWithChapters({ lessonName, onNext, onPrevious, isFirst, is
           >
             <ChapterWithContents 
               chapterName={currentChapter.chapter} 
+              moduleId={moduleId}
             />
           </motion.div>
         )}
@@ -298,7 +304,7 @@ export function LessonWithChapters({ lessonName, onNext, onPrevious, isFirst, is
   );
 }
 
-function ChapterWithContents({ chapterName }: { chapterName: string }) {
+function ChapterWithContents({ chapterName, moduleId }: { chapterName: string; moduleId?: string }) {
   const { data: chapter, loading, error } = useChapterDoc(chapterName);
 
   if (loading) return <div>Loading chapter...</div>;
@@ -330,6 +336,7 @@ function ChapterWithContents({ chapterName }: { chapterName: string }) {
               <ContentRenderer
                 contentType={content.content_type}
                 contentReference={content.content_reference}
+                moduleId={moduleId}
               />
             </motion.div>
           ))}

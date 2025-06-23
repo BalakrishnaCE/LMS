@@ -368,6 +368,7 @@ export default function ModuleDetail() {
                                 isFirst={isFirstLesson}
                                 isLast={isLastLesson}
                                 activeChapterId={activeChapterId}
+                                moduleId={module.name}
                             />
                         </motion.div>
                     )}

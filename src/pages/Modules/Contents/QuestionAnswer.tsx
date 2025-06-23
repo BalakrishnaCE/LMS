@@ -15,9 +15,10 @@ import { LMS_API_BASE_URL } from "@/config/routes";
 
 interface QuestionAnswerProps {
   questionAnswerId: string;
+  moduleId?: string;
 }
 
-const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => {
+const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, moduleId }) => {
   const { user, isLoading: userLoading, isLMSAdmin } = useUser();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<any>(null);
@@ -36,6 +37,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
   const [qaProgress, setQaProgress] = useState<any>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [allSubmitted, setAllSubmitted] = useState(false);
+  const [progressCreated, setProgressCreated] = useState(false);
 
   // API calls for progress
   const { call: addQAProgress, loading: adding, error: addError } = useFrappePostCall("addQAProgress");
@@ -53,11 +55,102 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
       limit: 1
     },
     {
-      enabled: !!user && !!questionAnswerId && open
+      enabled: !!user && !!questionAnswerId
     }
   );
 
   const { data: progressDoc, isValidating: progressDocLoading, error: progressDocError } = useFrappeGetDoc('Question Answer Progress', qaProgressId || '', { enabled: !!qaProgressId });
+
+  const handleStartQA = () => {
+    // 1. Handle case where we already know about existing progress from the initial fetch.
+    if (existingProgress && existingProgress.length > 0) {
+      const progress = existingProgress[0];
+      if (progress.score_added === 1) {
+        setShowProgressOnly(true);
+        setShowReviewOnly(false);
+      } else {
+        setShowProgressOnly(false);
+        setShowReviewOnly(true);
+      }
+      setOpen(true);
+      return;
+    }
+
+    // 2. Handle admin view
+    if (isLMSAdmin) {
+      setOpen(true);
+      return;
+    }
+
+    // 3. If no progress was found initially, try to create it.
+    // This also handles the race condition where the initial fetch was slow.
+    if (user && data) {
+      addQAProgress({
+        qa_id: data.name,
+        module: moduleId,
+      })
+        .then((res: any) => {
+          if (res && res.message === "Already started" && res.progress_id) {
+            // The API confirms progress exists. Fetch it to show the correct dialog.
+            fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress/${res.progress_id}`, { credentials: 'include' })
+              .then(res => res.json())
+              .then(progressRes => {
+                const progressData = progressRes.data;
+                setQaProgress(progressData);
+                if (progressData.score_added === 1) {
+                  setShowProgressOnly(true);
+                  setShowReviewOnly(false);
+                } else {
+                  setShowProgressOnly(false);
+                  setShowReviewOnly(true);
+                }
+                setOpen(true);
+              })
+              .catch(fetchErr => setApiError(`Failed to load existing progress: ${fetchErr.message}`));
+          } else {
+            // This is a new attempt, open the main Q&A dialog.
+            setQaProgress(res);
+            setProgressCreated(true);
+            setOpen(true);
+          }
+        })
+        .catch((err) => {
+          setApiError("Could not start Q&A: " + err.message);
+        });
+    }
+  };
+
+  const handleSubmitAll = () => {
+    if (isLMSAdmin) return; // No submission for admin
+    
+    // Prepare answers for API
+    const answersArray = data?.questions?.map((q: any) => ({
+      question: q.question,
+      answer: answers[q.id] || ""
+    })) || [];
+
+    if (user && data) {
+      updateQAProgress({
+        qa_id: data.name,
+        module: moduleId,
+        answers: answersArray,
+      })
+        .then((res: any) => {
+          if (res && (res.message === 'Question Answer Progress saved' || res.message === 'Responses submitted')) {
+            setQaProgress(res);
+            setAllSubmitted(true);
+            setTimerActive(false);
+            // Mark all questions as submitted
+            const allSubmittedState = data.questions.reduce((acc: any, q: any) => {
+              acc[q.id] = true;
+              return acc;
+            }, {});
+            setSubmitted(allSubmittedState);
+          }
+        })
+        .catch((err) => setApiError("Could not update Q&A progress: " + err.message));
+    }
+  };
 
   // Timer effect
   useEffect(() => {
@@ -76,7 +169,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [timerActive, timeLeft, data, submitted]);
+  }, [timerActive, timeLeft, data, submitted, handleSubmitAll]);
 
   // Start timer when modal opens
   useEffect(() => {
@@ -93,6 +186,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
       if (existingProgress && existingProgress.length > 0) {
         const progress = existingProgress[0];
         setQaProgressId(progress.name);
+        setProgressCreated(true);
         
         if (progress.score_added === 1) {
           // Completed - show percentage
@@ -116,11 +210,22 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
       setShowProgressOnly(false);
       setShowReviewOnly(false);
       setAllSubmitted(false);
+      setProgressCreated(false);
     }
   }, [open, user, data, isLMSAdmin, existingProgress, checkingProgress]);
 
+  // Reset states when the dialog is closed
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setQaProgressId(null);
+      setShowProgressOnly(false);
+      setShowReviewOnly(false);
+      setAllSubmitted(false);
+      setProgressCreated(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
     setLoading(true);
     setError(null);
     fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer/${questionAnswerId}`, {
@@ -135,50 +240,12 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
         setError("Failed to load Q&A");
         setLoading(false);
       });
-  }, [open, questionAnswerId]);
+  }, [questionAnswerId]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleSubmitAll = () => {
-    if (isLMSAdmin) return; // No submission for admin
-    
-    // Prepare answers for API
-    const answersArray = data?.questions?.map((q: any) => ({
-      question: q.question,
-      answer: answers[q.id] || ""
-    })) || [];
-
-    if (user && data) {
-      // First try to add progress if it doesn't exist
-      addQAProgress({
-        qa_id: data.name,
-      })
-        .then((res: any) => {
-          // Whether it's new or existing, now update with answers
-          return updateQAProgress({
-            qa_id: data.name,
-            answers: answersArray,
-          });
-        })
-        .then((res: any) => {
-          if (res && (res.message === 'Question Answer Progress saved' || res.message === 'Responses submitted')) {
-            setQaProgress(res);
-            setAllSubmitted(true);
-            setTimerActive(false);
-            // Mark all questions as submitted
-            const allSubmittedState = data.questions.reduce((acc: any, q: any) => {
-              acc[q.id] = true;
-              return acc;
-            }, {});
-            setSubmitted(allSubmittedState);
-          }
-        })
-        .catch((err) => setApiError("Could not update Q&A progress: " + err.message));
-    }
   };
 
   const hasUnsubmittedAnswers = data?.questions?.some((q: any) => 
@@ -217,8 +284,8 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
   );
   
   // Show completed Q&A progress (score_added = 1)
-  if (showProgressOnly && (progressDoc || (existingProgress && existingProgress.length > 0))) {
-    const progressData = progressDoc || (existingProgress && existingProgress[0]);
+  if (showProgressOnly && (qaProgress || progressDoc || (existingProgress && existingProgress.length > 0))) {
+    const progressData = qaProgress || progressDoc || (existingProgress && existingProgress[0]);
     const score = progressData?.score || 0;
     const maxScore = progressData?.max_score || data?.max_score || 0;
     const percent = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
@@ -375,7 +442,9 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <Button variant="outline">Start Q&amp;A</Button>
+        <Button variant="outline" onClick={handleStartQA} disabled={checkingProgress}>
+          {checkingProgress ? "Checking..." : "Start Q&A"}
+        </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
@@ -493,16 +562,18 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId }) => 
                 <div className="text-sm text-muted-foreground">
                   {data?.questions?.filter((q: any) => submitted[q.id]).length || 0} of {data?.questions?.length || 0} questions submitted
                 </div>
+                {!isLMSAdmin && !allSubmitted && (
                 <div className="space-x-2">
-                  <Button 
+                  <Button
                     onClick={handleSubmitAll}
-                    disabled={updating}
+                    disabled={updating || !progressCreated}
                     variant="default"
                   >
                     {updating ? "Submitting..." : "Submit All Answers"}
                   </Button>
-                  <Button onClick={() => setOpen(false)}>Close</Button>
-                </div>
+                    <Button onClick={() => setOpen(false)}>Close</Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

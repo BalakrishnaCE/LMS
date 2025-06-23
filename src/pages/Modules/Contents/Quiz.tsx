@@ -17,6 +17,7 @@ import loadingAnimation from '@/assets/Loading.json';
 
 interface QuizProps {
   quizReference: string;
+  moduleId?: string;
 }
 
 interface QuizQuestion {
@@ -44,7 +45,7 @@ interface Quiz {
   }[];
 }
 
-export default function Quiz({ quizReference }: QuizProps) {
+export default function Quiz({ quizReference, moduleId }: QuizProps) {
   const { user, isLoading: userLoading, isLMSAdmin } = useUser();
   const [selectedAnswers, setSelectedAnswers] = useState<{ [key: string]: string }>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -94,6 +95,7 @@ export default function Quiz({ quizReference }: QuizProps) {
       addQuizProgress({
         user: user.name,
         quiz_id: quiz.name,
+        module: moduleId,
       })
         .then((res: any) => {
           setProgressLoading(false);
@@ -115,7 +117,7 @@ export default function Quiz({ quizReference }: QuizProps) {
       setQuizProgressId(null);
       setShowProgressOnly(false);
     }
-  }, [isOpen, user, quiz]);
+  }, [isOpen, user, quiz, moduleId]);
 
   const handleSubmit = () => {
     let totalScore = 0;
@@ -137,6 +139,7 @@ export default function Quiz({ quizReference }: QuizProps) {
     if (user && quiz) {
       updateQuizProgress({
         quiz_id: quiz.name,
+        module: moduleId,
         answers: answersObj,
       }).then((res: any) => {
         if (res && res.message === 'Quiz progress updated') {

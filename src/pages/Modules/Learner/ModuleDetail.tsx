@@ -692,6 +692,7 @@ export default function LearnerModuleDetail() {
                                                 key={content.name}
                                                 contentType={content.content_type}
                                                 contentReference={content.name}
+                                                moduleId={module.name}
                                             />
                                         ))}
                                     </div>
@@ -877,6 +878,7 @@ export default function LearnerModuleDetail() {
                                             key={content.name}
                                                     contentType={content.content_type}
                                                     contentReference={content.name}
+                                                    moduleId={module.name}
                                         />
                                     ))}
                                         </div>
