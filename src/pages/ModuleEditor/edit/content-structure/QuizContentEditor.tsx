@@ -309,7 +309,7 @@ export default function QuizContentEditor({ content, onSave, onCancel }: QuizCon
                       variant="ghost"
                       size="sm"
                       onClick={() => deleteOption(qIdx, oIdx)}
-                      disabled={(question.options.length <= 2)}
+                      // disabled={(question.options.length <= 2)}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>

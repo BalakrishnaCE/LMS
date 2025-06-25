@@ -58,9 +58,11 @@ function Admindashboard() {
     const { user, isLoading: userLoading, error } = useUser();
     const [activeTab, setActiveTab] = useState("module")
 
-    // Fetch learners data
-    const { data: studentsData, error: studentsError, isValidating: studentsLoading } = useFrappeGetCall<FrappeResponse>("getStudentRoleCount");
-    const users = studentsData?.data?.users || [];
+    // Fetch learners data using the same API as Learners.tsx
+    const { data: analyticsData, error: studentsError, isValidating: studentsLoading } = useFrappeGetCall<any>("getLearnerAnalytics");
+    const message = analyticsData?.message || {};
+    const users = message.users || [];
+    const stats = message.stats;
 
     React.useEffect(() => {
         if (user) {

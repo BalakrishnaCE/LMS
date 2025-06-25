@@ -265,6 +265,7 @@ export default function Learners() {
   const stats = message.stats;
 
   // Debugging logs
+  console.log("message111=",message);
   console.log('Learner stats:', stats);
   console.log('Learner users:', users);
 
@@ -296,6 +297,9 @@ export default function Learners() {
     const departmentMatch = departmentFilter === 'All' || user.department === departmentFilter;
     return nameMatch && emailMatch && statusMatch && departmentMatch;
   });
+
+  console.log("users22222=",users);
+  console.log("filteredUsers22222=",filteredUsers)
 
   const handleExport = () => {
     try {

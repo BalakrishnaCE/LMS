@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { CheckCircle, Clock, XCircle, BookOpen, Eye, FileText } from 'lucide-react';
 import Lottie from 'lottie-react';
 import emptyAnimation from '@/assets/Empty.json';
+import timeoutAnimation from '@/assets/timeout.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
 import { LMS_API_BASE_URL } from "@/config/routes";
@@ -272,8 +273,8 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
   );
   if (updateError) return (
     <div className="flex flex-col items-center justify-center p-8">
-      <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
-      <div className="mt-4 text-red-500">Error: {updateError.message}</div>
+      <Lottie animationData={timeoutAnimation} loop style={{ width: 120, height: 120 }} />
+      {/* <div className="mt-4 text-red-500">Error: {updateError.message}</div> */}
     </div>
   );
   if (progressLoading || progressDocLoading || checkingProgress) return (

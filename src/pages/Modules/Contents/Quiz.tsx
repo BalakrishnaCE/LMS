@@ -13,6 +13,7 @@ import { CheckCircle, Clock, XCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
+import timeoutAnimation from '@/assets/timeout.json';
 import loadingAnimation from '@/assets/Loading.json';
 
 interface QuizProps {
@@ -64,6 +65,7 @@ export default function Quiz({ quizReference, moduleId }: QuizProps) {
   // Add these hooks for API calls
   const { call: addQuizProgress, loading: adding, error: addError } = useFrappePostCall("addQuizProgress");
   const { call: updateQuizProgress, loading: updating, error: updateError } = useFrappePutCall("updateQuizProgress");
+
 
   // Fetch the main quiz document
   const { data: quiz, error: quizError, isValidating: quizLoading } = useFrappeGetDoc<Quiz>(
@@ -217,8 +219,8 @@ export default function Quiz({ quizReference, moduleId }: QuizProps) {
   );
   if (updateError) return (
     <div className="flex flex-col items-center justify-center p-8">
-      <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
-      <div className="mt-4 text-red-500">Error: {updateError.message}</div>
+      <Lottie animationData={timeoutAnimation} loop style={{ width: 120, height: 120 }} />
+      {/* <div className="mt-4 text-red-500">Error: {updateError.message}</div> */}
     </div>
   );
   if (!quiz) return null;

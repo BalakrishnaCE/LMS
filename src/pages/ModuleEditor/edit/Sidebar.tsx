@@ -793,7 +793,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     try {
       // Prepare the update data
       const updateData: any = {
-        name: editState.name,
+        name1: editState.name,
         description: editState.description,
         duration: editState.duration,
         status: editState.status,

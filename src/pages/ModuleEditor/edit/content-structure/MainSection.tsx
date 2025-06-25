@@ -1264,7 +1264,8 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
                 docname, 
                 content_type: doctype,
                 content_reference: docname,
-                ...fields 
+                ...fields,
+                questions: data.questions, // Ensure options are present in local state for Quiz and Question Answer
               };
               if (idx > -1) {
                 updatedContents[idx] = newContent;
