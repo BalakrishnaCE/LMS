@@ -84,7 +84,7 @@ const extensions = [
         formData.append('file', files);
 
         try {
-          const response = await fetch(`${LMS_API_BASE_URL}api/method/upload_file`, {
+          const response = await fetch(`${LMS_API_BASE_URL}/api/method/upload_file`, {
             method: 'POST',
             headers: {
               'Accept': 'application/json',
