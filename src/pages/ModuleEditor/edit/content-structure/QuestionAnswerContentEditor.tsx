@@ -157,11 +157,11 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
             <CardContent className="space-y-4">
               <div>
                 <Label className='mb-3'>Question</Label>
-                <Textarea
-                  value={question.question}
-                  onChange={(e) => updateQuestion(questionIndex, 'question', e.target.value)}
-                  placeholder="Enter question"
-                  className="w-full"
+                <RichEditor
+                  content={question.question}
+                  onChange={(e) => updateQuestion(questionIndex, 'question', e)}
+                  // placeholder="Enter question"
+                  // className="w-full"
                 />
               </div>
 

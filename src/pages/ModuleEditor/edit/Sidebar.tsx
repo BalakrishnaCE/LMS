@@ -378,7 +378,7 @@ function SettingsDialog({
                   {editState?.assignment_based === "Manual" && (
                     <div className=" flex flex-col gap-2">
                       <div>
-                        <Label>Learners</Label>
+                        <Label className="mb-2">Learners</Label>
                         {/* Searchable user table with Add button */}
                         <Input
                           placeholder="Search learners..."
@@ -817,7 +817,6 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         // @ts-ignore
         updateData.learners = (editState as any).learners || [];
       }
-
       // Update module info
       await updateDoc("LMS Module", moduleInfo.id, updateData);
 

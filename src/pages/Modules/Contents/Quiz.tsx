@@ -347,7 +347,10 @@ export default function Quiz({ quizReference, moduleId }: QuizProps) {
         </div>
         {questions.map((question, idx) => (
           <div key={question.name} className="mb-6 p-4 bg-muted/50 rounded-lg border">
-            <div className="font-semibold mb-2">Q{idx + 1}. {question.question_text?.replace(/<[^>]+>/g, '')}</div>
+            <span>Q{idx + 1}</span>
+              <div className="font-semibold mb-2"
+              dangerouslySetInnerHTML={{ __html: question.question_text }}
+              />
             <div className="space-y-2 ml-4">
               {question.options.map((opt, oidx) => (
                 <div key={oidx} className="flex items-center gap-2">
