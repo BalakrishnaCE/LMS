@@ -125,6 +125,21 @@ export function ContentRenderer({ contentType, contentReference, moduleId }: Con
             />
           </motion.div>
         );
+      case "Audio Content":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative"
+          >
+            <div className="font-semibold text-lg mb-2 text-center">{content.title}</div>
+            <audio
+              src={LMS_API_BASE_URL+content.attach}
+              controls
+              className="w-full rounded-lg shadow-lg"
+            />
+          </motion.div>
+        );
       case "Quiz":
         return <Quiz quizReference={contentReference} moduleId={moduleId} />;
       case "Slide Content":

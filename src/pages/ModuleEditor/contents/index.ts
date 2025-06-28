@@ -3,18 +3,20 @@
 import { textContentInfo, TextPreview } from './text';
 import { imageContentInfo, ImagePreview } from './image';
 import { videoContentInfo, VideoPreview } from './video';
+import { audioContentInfo, AudioPreview } from './audio';
 import { checklistContentInfo, CheckListPreview } from './checklist';
 import { stepsContentInfo, StepsPreview } from './steps';
 import { quizContentInfo, QuizPreview } from './quiz';
 import { questionAnswerContentInfo, QuestionAnswerPreview } from './question_answer';
 import { slideContentInfo, SlidePreview } from './slide';
 import { iframeContentInfo, IframePreview } from './iframe';
-import { FileText, Image as ImageIcon, Video as VideoIcon, CheckSquare, ListOrdered, File, HelpCircle, FolderKanban, Globe, MessageSquare, Presentation } from 'lucide-react';
+import { FileText, Image as ImageIcon, Video as VideoIcon, Volume2, CheckSquare, ListOrdered, File, HelpCircle, FolderKanban, Globe, MessageSquare, Presentation } from 'lucide-react';
 
 export const contentsList = [
   { ...textContentInfo, icon: FileText, Preview: TextPreview },
   { ...imageContentInfo, icon: ImageIcon, Preview: ImagePreview },
   { ...videoContentInfo, icon: VideoIcon, Preview: VideoPreview },
+  { ...audioContentInfo, icon: Volume2, Preview: AudioPreview },
   { ...checklistContentInfo, icon: CheckSquare, Preview: CheckListPreview },
   { ...stepsContentInfo, icon: ListOrdered, Preview: StepsPreview },
   { ...quizContentInfo, icon: HelpCircle, Preview: QuizPreview },

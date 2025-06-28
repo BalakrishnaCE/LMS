@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {  FileText, Image as ImageIcon, Video, File, GripVertical, Pencil, ExternalLink, Trash2 } from "lucide-react";
+import {  FileText, Image as ImageIcon, Video, Volume2, File, GripVertical, Pencil, ExternalLink, Trash2 } from "lucide-react";
 import RichEditor from "@/components/RichEditor";
 import {
   Drawer,
@@ -35,6 +35,7 @@ import loadingAnimation from '@/assets/Loading.json';
 import TextContentEditor from '@/pages/ModuleEditor/edit/content-structure/TextContentEditor';
 import ImageContentEditor from '@/pages/ModuleEditor/edit/content-structure/ImageContentEditor';
 import VideoContentEditor from '@/pages/ModuleEditor/edit/content-structure/VideoContentEditor';
+import AudioContentEditor from '@/pages/ModuleEditor/edit/content-structure/AudioContentEditor';
 import FileAttachContentEditor from '@/pages/ModuleEditor/edit/content-structure/FileAttachContentEditor';
 import CheckListContentEditor from '@/pages/ModuleEditor/edit/content-structure/ChecklistContent';
 import StepsTableContentEditor from '@/pages/ModuleEditor/edit/content-structure/StepsContent';
@@ -118,6 +119,7 @@ const alwaysVisibleContentTypes = [
   { id: 'image', name: 'Image', icon: ImageIcon },
   { id: 'video', name: 'Video', icon: Video },
   { id: 'file', name: 'File', icon: File },
+  { id: 'audio', name: 'Audio', icon: Volume2 },
 ];
 
 // Utility for file type accept
@@ -791,7 +793,7 @@ export default function MainSection({
         </Dialog>
         {/*  Drawer for Content Types using shadcn/ui Drawer */}
         <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} direction="right">
-          <DrawerContent>
+          <DrawerContent className="overflow-scroll">
             <DrawerHeader>
               <DrawerTitle>Select Content Type</DrawerTitle>
             </DrawerHeader>
@@ -908,6 +910,9 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
       case 'video':
       case 'Video Content':
         return <VideoContentEditor content={localContent} onSave={handleSave} onCancel={handleCancel} />;
+      case 'audio':
+      case 'Audio Content':
+        return <AudioContentEditor content={localContent} onSave={handleSave} onCancel={handleCancel} />;
       case 'file':
       case 'File Attach':
         return <FileAttachContentEditor content={localContent} onSave={handleSave} onCancel={handleCancel} />;
@@ -951,6 +956,14 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           {content.video && <video src={LMS_API_BASE_URL + content.video} controls className="max-h-48 mx-auto rounded" />}
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
+        </div>
+      );
+    case 'Audio Content':
+      return (
+        <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
+          <div className="font-bold mb-2">{content.title}</div>
+          {content.attach && <audio src={LMS_API_BASE_URL + content.attach} controls className="w-full mt-2 rounded" />}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
@@ -1080,6 +1093,11 @@ function SortableContentBlock({ id, index, content, chapter, reorderContentBlock
         case 'Video Content':
           doctype = 'Video Content';
           fields = { title: data.title, video: data.video };
+          break;
+        case 'audio':
+        case 'Audio Content':
+          doctype = 'Audio Content';
+          fields = { title: data.title, attach: data.attach };
           break;
         case 'file':
         case 'File Attach':

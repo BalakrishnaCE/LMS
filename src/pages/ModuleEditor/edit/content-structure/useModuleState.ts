@@ -36,6 +36,7 @@ export function useModuleState(initialModule?: any) {
       text: "Text Content",
       image: "Image Content",
       video: "Video Content",
+      audio: "Audio Content",
       file: "File Attach",
       pdf: "PDF",
       checklist: "Check List",
@@ -65,6 +66,7 @@ export function useModuleState(initialModule?: any) {
         }
         case "image":
         case "video":
+        case "audio":
         case "file":
         case "pdf":
         case "checklist":
