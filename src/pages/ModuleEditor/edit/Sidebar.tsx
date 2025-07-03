@@ -175,18 +175,22 @@ function SettingsDialog({
   departments,
   handleFieldChange,
   uploadingImage,
-  setUploadingImage
+  setUploadingImage,
+  learners,
+  setLearners
 }: { 
   open: boolean;
   onOpenChange: (open: boolean) => void;
   moduleInfo: ModuleInfo;
   editState: ModuleInfo | null;
   setEditState: (state: ModuleInfo | null) => void;
-  onSave: () => Promise<void>;
+  onSave: (learners: LearnerRow[]) => Promise<void>;
   departments: any[];
   handleFieldChange: (field: keyof ModuleInfo, value: any) => void;
   uploadingImage: boolean;
   setUploadingImage: React.Dispatch<React.SetStateAction<boolean>>;
+  learners: LearnerRow[];
+  setLearners: React.Dispatch<React.SetStateAction<LearnerRow[]>>;
 }) {
   // Fetch all users with LMS Student role
   const { data: lmsStudents, isLoading: loadingStudents } = useFrappeGetDocList("User", {
@@ -196,18 +200,6 @@ function SettingsDialog({
   });
   // Use all users from the data (no roles filter needed)
   const studentUsers = lmsStudents || [];
-
-  // Local learners state for manual assignment
-  const [learners, setLearners] = useState<LearnerRow[]>(() => {
-    // Try to get from editState if present
-    // @ts-ignore
-    return (editState && (editState as any).learners) || [];
-  });
-  useEffect(() => {
-    // Sync local learners state if module changes
-    // @ts-ignore
-    setLearners((editState && (editState as any).learners) || []);
-  }, [editState]);
 
   const handleAddLearnerRow = () => {
     setLearners([...learners, { user: "" }]);
@@ -219,17 +211,11 @@ function SettingsDialog({
     setLearners(learners.map((l, i) => (i === idx ? { ...l, user } : l)));
   };
 
-  // On save, sync learners to editState
   const handleSaveWithLearners = async () => {
-    if (!hasChanges) return;
-    if (!editState) return;
-    // @ts-ignore
-    setEditState({ ...editState, learners });
-    await onSave();
+    await onSave(learners);
   };
 
   const [search, setSearch] = useState("");
-
   // Assume originalModule and originalLearners are set when the sidebar opens
   const [originalModule, setOriginalModule] = useState(editState);
   const [originalLearners, setOriginalLearners] = useState(learners);
@@ -247,6 +233,7 @@ function SettingsDialog({
     <Sheet open={open} onOpenChange={(open) => {
       if (!open) {
         setEditState(moduleInfo);
+        setLearners(moduleInfo.learners || []);
       }
       onOpenChange(open);
     }}>
@@ -736,6 +723,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   const [, setLocation] = useLocation();
   const { updateDoc, loading: saving } = useFrappeUpdateDoc();
   const [editState, setEditState] = useState<ModuleInfo | null>(null);
+  const [learners, setLearners] = useState<LearnerRow[]>([]); // Add learners state
   const [hasChanges, setHasChanges] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [addingLesson, setAddingLesson] = useState(false);
@@ -765,10 +753,11 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     { swrConfig: { revalidateOnFocus: false } }
   );
 
-  // Initialize edit state when moduleInfo changes
+  // Initialize edit state and learners when moduleInfo changes
   useEffect(() => {
     if (moduleInfo) {
       setEditState({ ...moduleInfo });
+      setLearners(moduleInfo.learners || []);
       setHasChanges(false);
     }
   }, [moduleInfo]);
@@ -778,17 +767,20 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     if (!moduleInfo || !editState) return setHasChanges(false);
     
     // Check module info changes
-    const moduleFields = ["name", "description", "duration", "status", "assignment_based", "department"];
+    const moduleFields = ["name", "description", "duration", "status", "assignment_based", "department", "image"];
     const moduleChanged = moduleFields.some(f => (editState as any)[f] !== (moduleInfo as any)[f]);
+    
+    // Check learners changes
+    const learnersChanged = !isEqual(learners, moduleInfo.learners || []);
     
     // Check content structure changes (lessons, chapters, contents)
     const contentChanged = JSON.stringify(module?.lessons) !== JSON.stringify(moduleInfo.lessons);
     
-    setHasChanges(moduleChanged || contentChanged);
-  }, [editState, moduleInfo, module]);
+    setHasChanges(moduleChanged || learnersChanged || contentChanged);
+  }, [editState, learners, moduleInfo, module]);
 
-  const handleSave = async () => {
-    if (!editState || !moduleInfo) return;
+  const handleSave = async (learnersToSave: LearnerRow[] = learners) => {
+    if (!moduleInfo || !editState) return;
     
     try {
       // Prepare the update data
@@ -800,33 +792,32 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         assignment_based: editState.assignment_based,
         department: editState.department,
         image: editState.image,
+        // Always update learners based on current assignment method
+        learners: editState.assignment_based === "Manual" ? learnersToSave : []
       };
 
       // Only include lessons if they exist in the current module state
       if (module?.lessons) {
-        const formattedLessons = module.lessons.map((lesson, index) => ({
-          lesson: lesson.id,
+        const formattedLessons = module.lessons.map((l, index) => ({
+          lesson: l.id,
           order: index + 1
         }));
         updateData.lessons = formattedLessons;
       }
 
-      // --- ADD: include learners if assignment_based is Manual ---
-      if (editState.assignment_based === "Manual") {
-        // learners should be an array of { user: userId }
-        // @ts-ignore
-        updateData.learners = (editState as any).learners || [];
-      }
       // Update module info
-      await updateDoc("LMS Module", moduleInfo.id, updateData);
-
+      await updateDoc("LMS Module", moduleInfo.id, updateData);     
       toast.success("Module saved successfully");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000)
       setHasChanges(false);
       setShowSettings(false);
       // Refetch the latest module info from backend
       await refetchModuleInfo();
       if (freshModuleInfo) {
         setEditState({ ...freshModuleInfo });
+        setLearners(freshModuleInfo.learners || []);
       }
       onFinishSetup?.(editState);
     } catch (err) {
@@ -1119,6 +1110,8 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         handleFieldChange={handleFieldChange}
         uploadingImage={uploadingImage}
         setUploadingImage={setUploadingImage}
+        learners={learners}
+        setLearners={setLearners}
       />
 
       {/* Delete Lesson Dialog */}
@@ -1136,4 +1129,4 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       />
     </AnimatePresence>
   );
-} 
+}

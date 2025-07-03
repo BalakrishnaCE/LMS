@@ -34,6 +34,7 @@ export interface ModuleInfo {
   creation?: string;
   lessons?: Lesson[];
   image?: string;
+  learners?: { user: string }[];
 }
 
 export default function ModuleEdit() {
