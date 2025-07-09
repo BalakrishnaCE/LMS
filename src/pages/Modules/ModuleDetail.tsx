@@ -179,12 +179,16 @@ export default function ModuleDetail() {
     const handleNext = () => {
         if (!isLastLesson) {
             setCurrentLessonIndex(prev => prev + 1);
+            // Scroll to top when navigating to next lesson
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
     const handlePrevious = () => {
         if (!isFirstLesson) {
             setCurrentLessonIndex(prev => prev - 1);
+            // Scroll to top when navigating to previous lesson
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 

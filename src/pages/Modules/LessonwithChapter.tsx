@@ -239,16 +239,24 @@ export function LessonWithChapters({ lessonName, onNext, onPrevious, isFirst, is
   const handleNextChapter = () => {
     if (!isLastChapter) {
       setCurrentChapterIndex(prev => prev + 1);
+      // Scroll to top when navigating to next chapter
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (onNext) {
       onNext();
+      // Scroll to top when navigating to next lesson
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handlePreviousChapter = () => {
     if (!isFirstChapter) {
       setCurrentChapterIndex(prev => prev - 1);
+      // Scroll to top when navigating to previous chapter
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (onPrevious) {
       onPrevious();
+      // Scroll to top when navigating to previous lesson
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 

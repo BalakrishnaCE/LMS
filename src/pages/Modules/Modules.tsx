@@ -75,9 +75,14 @@ function Modules({ itemsPerPage }: ModulesProps) {
 
     // Get departments for filter
     const { data: departments } = useFrappeGetDocList("Department", {
-        fields: ["name"],
+        fields: ["name", "department"],
         limit: 100,
     })
+    
+    // Sort departments alphabetically by department name
+    const sortedDepartments = departments?.sort((a, b) => 
+        (a.department || a.name).localeCompare(b.department || b.name)
+    ) || [];
     const filters: Filter[] = []
     if (selectedDepartment && selectedDepartment !== "all") {
         filters.push(["department", "=", selectedDepartment])
@@ -197,9 +202,9 @@ function Modules({ itemsPerPage }: ModulesProps) {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Departments</SelectItem>
-                            {departments?.map((dept) => (
+                            {sortedDepartments.map((dept) => (
                                 <SelectItem key={dept.name} value={dept.name}>
-                                    {dept.name}
+                                    {dept.department || dept.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>

@@ -771,10 +771,12 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     if (moduleInfo) {
       setEditState({
         ...moduleInfo,
-        // Flatten child table for Select
-        department: Array.isArray((moduleInfo as any).department)
-          ? ((moduleInfo as any).department[0]?.department || "")
-          : (moduleInfo.department || ""),
+        // Handle department as simple string
+        department: typeof moduleInfo.department === "string" 
+          ? moduleInfo.department 
+          : (Array.isArray(moduleInfo.department) && (moduleInfo.department as any[]).length > 0 && typeof (moduleInfo.department as any[])[0] === "object")
+            ? ((moduleInfo.department as any[])[0] as any).department || ""
+            : (moduleInfo.department || ""),
         order: moduleInfo.order ?? 1,
       });
       setLearners(moduleInfo.learners || []);
@@ -811,8 +813,8 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         order: editState.order ?? 1,
         status: editState.status,
         assignment_based: editState.assignment_based,
-        // Transform departments for child table
-        department: editState.department ? [{ department: editState.department }] : [],
+        // Send department as simple string
+        department: editState.department || "",
         image: editState.image,
         // Always update learners based on current assignment method
         learners: editState.assignment_based === "Manual" ? learnersToSave : []

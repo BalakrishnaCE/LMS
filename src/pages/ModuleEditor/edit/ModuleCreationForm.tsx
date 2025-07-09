@@ -60,9 +60,7 @@ export default function ModuleCreationForm() {
         order: order,
         status: "Draft",
         assignment_based: assignmentBased,
-        department: assignmentBased === "Department" && departmentSelected
-          ? [{ department: departmentSelected }]
-          : [],
+        department: assignmentBased === "Department" ? departmentSelected : "",
         created_by: user?.email,
         image: imageUrl,
       });
