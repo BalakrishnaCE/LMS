@@ -1,21 +1,28 @@
 import * as React from "react";
 import { useFrappeGetCall, useFrappeGetDocList, useFrappePostCall } from "frappe-react-sdk";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction, CardFooter } from "@/components/ui/card";
-import { motion } from "framer-motion";
+import { Card, CardHeader, CardTitle, CardDescription, CardAction, CardFooter } from "@/components/ui/card";
 import { LearnersTable } from "@/pages/Learners/LearnersTable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Download, Users, CheckCircle, PauseCircle, TrendingUp } from "lucide-react";
+import { Search, Download, CheckCircle, PauseCircle, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { UserDetailsDrawer } from "./components/LearnerDetailsDrawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface User {
   name: string;
   full_name: string;
   email: string;
   enabled: number;
+  department?: string;
+  departments?: string[];
+  mobile_no?: string;
+  creation?: string;
+  last_login?: string;
+  user_image?: string;
+  roles?: string[];
 }
 
 interface ApiData {
@@ -26,10 +33,6 @@ interface ApiData {
     percentage_change: number;
   };
   users: User[];
-}
-
-interface FrappeResponse {
-  data: ApiData;
 }
 
 // Helper function to convert data to CSV
@@ -169,12 +172,12 @@ function Filters({
   searchName: string;
   searchEmail: string;
   searchStatus: string;
-  departmentFilter: string;
-  departmentOptions: string[];
+  departmentFilter: string[];
+  departmentOptions: { value: string; label: string }[];
   onSearchNameChange: (value: string) => void;
   onSearchEmailChange: (value: string) => void;
   onSearchStatusChange: (value: string) => void;
-  onDepartmentChange: (value: string) => void;
+  onDepartmentChange: (value: string[]) => void;
   onExport: () => void;
 }) {
   return (
@@ -215,17 +218,21 @@ function Filters({
       </div>
       {/* Department Filter */}
       <div className="w-full md:w-48">
-        <Select value={departmentFilter} onValueChange={onDepartmentChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Department" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All</SelectItem>
-            {departmentOptions.map(dep => (
-              <SelectItem key={dep} value={dep}>{dep}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MultiSelect
+          options={departmentOptions}
+          selected={departmentFilter}
+          onSelect={selected => {
+            // If "All" is selected, clear all other selections
+            if (selected.includes("__all__")) {
+              onDepartmentChange([]);
+            } else {
+              // Remove "All" if present and set the rest
+              onDepartmentChange(selected.filter(v => v !== "__all__"));
+            }
+          }}
+          placeholder="Filter by departments"
+          className="w-full md:w-48"
+        />
       </div>
       <Button 
         variant="outline" 
@@ -244,7 +251,7 @@ export default function Learners() {
   const [searchEmail, setSearchEmail] = React.useState("");
   const [searchStatus, setSearchStatus] = React.useState("all");
   const [selectedLearner, setSelectedLearner] = React.useState<User | null>(null);
-  const [departmentFilter, setDepartmentFilter] = React.useState<string>('All');
+  const [departmentFilter, setDepartmentFilter] = React.useState<string[]>([]);
   const [addOpen, setAddOpen] = React.useState(false);
   const [addLoading, setAddLoading] = React.useState(false);
   const [addError, setAddError] = React.useState<string | null>(null);
@@ -252,23 +259,31 @@ export default function Learners() {
     first_name: '',
     last_name: '',
     email: '',
-    department: '',
+    departments: [] as string[],
     mobile_no: '',
     password: '',
     send_welcome_email: true
   });
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editLoading, setEditLoading] = React.useState(false);
+  const [editError, setEditError] = React.useState<string | null>(null);
+  const [editForm, setEditForm] = React.useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    mobile_no: '',
+    password: '',
+    enabled: 1,
+    departments: [] as string[] // Multi-department selection
+  });
+  const [learnerToEdit, setLearnerToEdit] = React.useState<User | null>(null);
 
   const { call: addLearnerPost } = useFrappePostCall("addLMSUser");
-  const { data: analyticsData, error, isValidating, mutate } = useFrappeGetCall<any>("getLearnerAnalytics");
-  const message = analyticsData?.message || {};
-  const users = message.users || [];
-  const stats = message.stats;
-
-  // Debugging logs
-  console.log("message111=",message);
-  console.log('Learner stats:', stats);
-  console.log('Learner users:', users);
-
+  const { call: updateLearnerPost } = useFrappePostCall("updateLearner");
+  const { data: analyticsData, error, isValidating, mutate } = useFrappeGetCall<{ message: ApiData }>("getLearnerAnalytics");
+  const message = analyticsData?.message;
+  const users = message?.users || [];
+  const stats = message?.stats;
   // Log on every update for more accurate debugging
   React.useEffect(() => {
     console.log('Learner stats (effect):', stats);
@@ -278,23 +293,26 @@ export default function Learners() {
     }
   }, [stats, users]);
 
-  // Collect unique departments from users
-  const departmentOptions = React.useMemo(() => {
-    const set = new Set<string>();
-    users.forEach((u: any) => {
-      if (u.department) set.add(u.department);
-    });
-    return Array.from(set).sort();
-  }, [users]);
+  // Fetch all departments for filter and selection (limit 150)
+  const { data: allDepartmentsData } = useFrappeGetDocList("Department", { fields: ["name", "department"], limit: 150 });
+  const allDepartmentOptions = allDepartmentsData || [];
+  const departmentIdToName = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map(dep => [dep.name, dep.department])), [allDepartmentOptions]);
+
+  const departmentOptionsWithAll = [
+    { value: "__all__", label: "All" },
+    ...allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }))
+  ];
 
   // Filter users based on search criteria
-  const filteredUsers = users.filter((user: any) => {
+  const filteredUsers = users.filter((user: User) => {
     const nameMatch = user.full_name?.toLowerCase().includes(searchName.toLowerCase());
     const emailMatch = user.email?.toLowerCase().includes(searchEmail.toLowerCase());
     const statusMatch = searchStatus === "all" || 
       (searchStatus === "active" && user.enabled === 1) || 
       (searchStatus === "inactive" && user.enabled === 0);
-    const departmentMatch = departmentFilter === 'All' || user.department === departmentFilter;
+    // Multi-department filter
+    const userDepartments = (user.departments && user.departments.length > 0) ? user.departments : (user.department ? [user.department] : []);
+    const departmentMatch = departmentFilter.length === 0 || departmentFilter.some(dep => userDepartments.includes(dep));
     return nameMatch && emailMatch && statusMatch && departmentMatch;
   });
 
@@ -313,16 +331,12 @@ export default function Learners() {
     }
   };
 
-  // Fetch departments for dropdown
-  const { data: departmentsData } = useFrappeGetDocList("Department", { fields: ["name", "department"] });
-  const departmentOptionsFull = departmentsData || [];
-
   // Add Learner handler (placeholder)
   async function handleAddLearner(e: React.FormEvent) {
     e.preventDefault();
     setAddError(null);
-    if (!addForm.first_name || !addForm.last_name || !addForm.email || !addForm.department) {
-      setAddError("Please fill all required fields.");
+    if (!addForm.first_name || !addForm.last_name || !addForm.email || !addForm.departments || addForm.departments.length === 0) {
+      setAddError("Please fill all required fields and select at least one department.");
       return;
     }
     setAddLoading(true);
@@ -333,7 +347,7 @@ export default function Learners() {
         first_name: addForm.first_name,
         last_name: addForm.last_name,
         mobile_no: addForm.mobile_no,
-        department: addForm.department,
+        departments: addForm.departments,
         password: addForm.password || undefined,
         send_welcome_email: addForm.send_welcome_email ? 1 : 0,
         role: "LMS Student"
@@ -358,7 +372,7 @@ export default function Learners() {
         first_name: '',
         last_name: '',
         email: '',
-        department: '',
+        departments: [],
         mobile_no: '',
         password: '',
         send_welcome_email: true
@@ -385,6 +399,115 @@ export default function Learners() {
       setAddLoading(false);
     }
   }
+
+  // Edit Learner handler
+  async function handleEditLearner(e: React.FormEvent) {
+    e.preventDefault();
+    setEditError(null);
+    if (!editForm.first_name || !editForm.last_name || !editForm.email || !editForm.departments || editForm.departments.length === 0 || !learnerToEdit?.name) {
+      setEditError("Please select at least one department.");
+      return;
+    }
+    setEditLoading(true);
+    try {
+      // Update user information using the updateLearner API
+      const updateData: any = {
+        user_id: learnerToEdit.name,
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        email: editForm.email,
+        mobile_no: editForm.mobile_no,
+        enabled: editForm.enabled,
+        departments: editForm.departments
+      };
+
+      // Add password if provided
+      if (editForm.password) {
+        updateData.password = editForm.password;
+      }
+
+      const response = await updateLearnerPost(updateData);
+      
+      // Check for backend error structure in response
+      const msg = response?.message;
+      if (msg && msg.success === false) {
+        if (msg.error_type === "duplicate_email") {
+          setEditError("A user with this email already exists.");
+        } else if (msg.error_type === "duplicate_mobile") {
+          setEditError("A user with this mobile number already exists.");
+        } else if (msg.error_type === "user_not_found") {
+          setEditError("User not found.");
+        } else if (msg.error_type === "invalid_department") {
+          setEditError("Invalid department selected.");
+        } else if (msg.error) {
+          setEditError(msg.error);
+        } else {
+          setEditError("Failed to update learner.");
+        }
+        setEditLoading(false);
+        return;
+      }
+
+      setEditOpen(false);
+      setEditForm({
+        first_name: '',
+        last_name: '',
+        email: '',
+        mobile_no: '',
+        password: '',
+        enabled: 1,
+        departments: []
+      });
+      setLearnerToEdit(null);
+      toast.success("Learner updated successfully");
+      await mutate(); // Refresh the learners list
+    } catch (err: any) {
+      console.error("Edit learner error:", err);
+      // Handle different error response formats
+      if (err?.message && typeof err.message === 'object') {
+        // If message is an object (API response), extract the error message
+        const apiResponse = err.message;
+        if (apiResponse.error) {
+          setEditError(apiResponse.error);
+        } else if (apiResponse.error_type) {
+          setEditError(`Error: ${apiResponse.error_type}`);
+        } else {
+          setEditError("Failed to update learner.");
+        }
+      } else if (typeof err?.message === 'string') {
+        setEditError(err.message);
+      } else {
+        setEditError("Failed to update learner.");
+      }
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  // Handle view details action
+  const handleViewDetails = (learner: User) => {
+    setSelectedLearner(learner);
+  };
+
+  // Handle edit action
+  const handleEdit = (learner: User) => {
+    setLearnerToEdit(learner);
+    // Parse full name into first and last name
+    const nameParts = learner.full_name?.split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
+    setEditForm({
+      first_name: firstName,
+      last_name: lastName,
+      email: learner.email || '',
+      mobile_no: (learner as User).mobile_no || '',
+      password: '',
+      enabled: learner.enabled,
+      departments: (learner as User).departments || [(learner as User).department || ''].filter(Boolean) // Convert single department to array
+    });
+    setEditOpen(true);
+  };
 
   if (error) {
     return (
@@ -422,14 +545,25 @@ export default function Learners() {
               <Input type="email" value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} required disabled={addLoading} />
             </div>
             <div>
-              <label className="block mb-1 font-medium">Department<span className="text-red-500">*</span></label>
-              <select className="w-full border rounded px-3 py-2" value={addForm.department} onChange={e => setAddForm(f => ({ ...f, department: e.target.value }))} required disabled={addLoading}>
-                <option value="">Select department</option>
-                {departmentOptionsFull.map((dep: any) => (
-                  <option key={dep.name} value={dep.name}>{dep.department || dep.name}</option>
-                ))}
-              </select>
+              <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
+                             <MultiSelect
+                 options={allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }))}
+                 selected={addForm.departments}
+                 onSelect={(selected) => setAddForm(f => ({ ...f, departments: selected }))}
+                 placeholder="Select departments"
+                 disabled={addLoading}
+               />
+              {addForm.departments && addForm.departments.length === 0 && (
+                <div className="mt-2 text-xs text-destructive">
+                  Please select at least one department.
+                </div>
+              )}
             </div>
+            {addForm.departments && addForm.departments.length > 0 && (
+              <div className="mt-2 text-xs text-muted-foreground">
+                Selected: {addForm.departments.map(depId => departmentIdToName[depId] || depId).join(', ')}
+              </div>
+            )}
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
               <Input value={addForm.mobile_no} onChange={e => setAddForm(f => ({ ...f, mobile_no: e.target.value }))} disabled={addLoading} />
@@ -457,6 +591,69 @@ export default function Learners() {
           </form>
         </DialogContent>
       </Dialog>
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Learner</DialogTitle>
+            <DialogDescription>Edit the details of the selected learner.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditLearner} className="space-y-4">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block mb-1 font-medium">First Name<span className="text-red-500">*</span></label>
+                <Input value={editForm.first_name} onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} required disabled={editLoading} />
+              </div>
+              <div className="flex-1">
+                <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
+                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} required disabled={editLoading} />
+              </div>
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Email<span className="text-red-500">*</span></label>
+              <Input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} required disabled={editLoading} />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
+                             <MultiSelect
+                 options={allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }))}
+                 selected={editForm.departments}
+                 onSelect={(selected) => setEditForm(f => ({ ...f, departments: selected }))}
+                 placeholder="Select departments"
+                 disabled={editLoading}
+               />
+              {editForm.departments && editForm.departments.length > 0 && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Selected: {editForm.departments.map(depId => departmentIdToName[depId] || depId).join(', ')}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Mobile Number</label>
+              <Input value={editForm.mobile_no} onChange={e => setEditForm(f => ({ ...f, mobile_no: e.target.value }))} disabled={editLoading} />
+            </div>
+            <div>
+              <label className="block mb-1 font-medium">Password</label>
+              <Input type="password" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} disabled={editLoading} placeholder="Leave blank to keep existing" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="enabled" checked={editForm.enabled === 1} onChange={e => setEditForm(f => ({ ...f, enabled: e.target.checked ? 1 : 0 }))} disabled={editLoading} />
+              <label htmlFor="enabled" className="font-medium">Enabled</label>
+            </div>
+            {editError && (
+              <div className="flex items-center gap-2 p-3 mt-2 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /></svg>
+                <span>{editError}</span>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="submit" disabled={editLoading}>{editLoading ? "Saving..." : "Save Changes"}</Button>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={editLoading}>Cancel</Button>
+              </DialogClose>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       {/* Show a visible warning if stats.total !== users.length */}
       {stats && users && typeof stats.total === 'number' && stats.total !== users.length && (
         <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 border border-yellow-300">
@@ -470,7 +667,7 @@ export default function Learners() {
         searchEmail={searchEmail}
         searchStatus={searchStatus}
         departmentFilter={departmentFilter}
-        departmentOptions={departmentOptions}
+        departmentOptions={departmentOptionsWithAll}
         onSearchNameChange={setSearchName}
         onSearchEmailChange={setSearchEmail}
         onSearchStatusChange={setSearchStatus}
@@ -481,7 +678,8 @@ export default function Learners() {
       <LearnersTable
         learners={filteredUsers}
         isLoading={isValidating}
-        onRowClick={setSelectedLearner}
+        onEdit={handleEdit}
+        onViewDetails={handleViewDetails}
       />
 
       <UserDetailsDrawer

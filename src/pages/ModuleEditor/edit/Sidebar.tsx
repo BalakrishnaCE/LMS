@@ -5,9 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ModuleInfo } from "./ModuleEdit";
-import { format } from "date-fns";
 import { useLocation } from "wouter";
-import { ArrowLeftIcon, Settings, X, Pencil } from "lucide-react";
+import { ArrowLeftIcon, X, Pencil } from "lucide-react";
 import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc, useFrappeGetDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
 import {
@@ -47,6 +46,7 @@ import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
 import { LMS_API_BASE_URL } from "@/config/routes";
 // @ts-ignore
 import isEqual from 'lodash/isEqual';
+// Removed MultiSelect import
 
 interface Lesson {
   id: string;
@@ -229,6 +229,11 @@ function SettingsDialog({
 
   const hasChanges = !isEqual(editState, originalModule) || !isEqual(learners, originalLearners);
 
+  const departmentOptions = (departments || []).map((dept) => ({
+    value: dept.name,
+    label: dept.department,
+  }));
+
   return (
     <Sheet open={open} onOpenChange={(open) => {
       if (!open) {
@@ -327,6 +332,15 @@ function SettingsDialog({
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label>Order</Label>
+                    <Input
+                      type="number"
+                      value={editState?.order ?? 1}
+                      min={1}
+                      onChange={e => handleFieldChange("order", Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label>Assignment</Label>
                     <Select
                       value={editState?.assignment_based || "Everyone"}
@@ -347,16 +361,14 @@ function SettingsDialog({
                       <Label>Department</Label>
                       <Select
                         value={editState?.department || ""}
-                        onValueChange={(value) => handleFieldChange("department", value)}
+                        onValueChange={val => handleFieldChange("department" as keyof ModuleInfo, val)}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
-                          {departments?.map((dept, deptIndex) => (
-                            <SelectItem key={dept.name || `dept-${deptIndex}`} value={dept.name}>
-                              {dept.department}
-                            </SelectItem>
+                          {departmentOptions.map(opt => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -743,6 +755,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   // Fetch departments for the department selector
   const { data: departments } = useFrappeGetDocList("Department", {
     fields: ["name", "department"],
+    limit: 150,
   });
 
   // In Sidebar component, add a refetch function for moduleInfo
@@ -756,7 +769,14 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   // Initialize edit state and learners when moduleInfo changes
   useEffect(() => {
     if (moduleInfo) {
-      setEditState({ ...moduleInfo });
+      setEditState({
+        ...moduleInfo,
+        // Flatten child table for Select
+        department: Array.isArray((moduleInfo as any).department)
+          ? ((moduleInfo as any).department[0]?.department || "")
+          : (moduleInfo.department || ""),
+        order: moduleInfo.order ?? 1,
+      });
       setLearners(moduleInfo.learners || []);
       setHasChanges(false);
     }
@@ -767,7 +787,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     if (!moduleInfo || !editState) return setHasChanges(false);
     
     // Check module info changes
-    const moduleFields = ["name", "description", "duration", "status", "assignment_based", "department", "image"];
+    const moduleFields: (keyof ModuleInfo)[] = ["name", "description", "duration", "status", "assignment_based", "department", "image", "order"];
     const moduleChanged = moduleFields.some(f => (editState as any)[f] !== (moduleInfo as any)[f]);
     
     // Check learners changes
@@ -788,9 +808,11 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         name1: editState.name,
         description: editState.description,
         duration: editState.duration,
+        order: editState.order ?? 1,
         status: editState.status,
         assignment_based: editState.assignment_based,
-        department: editState.department,
+        // Transform departments for child table
+        department: editState.department ? [{ department: editState.department }] : [],
         image: editState.image,
         // Always update learners based on current assignment method
         learners: editState.assignment_based === "Manual" ? learnersToSave : []
@@ -967,7 +989,11 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
 
   const handleFieldChange = (field: keyof ModuleInfo, value: any) => {
     if (!editState) return;
-    setEditState({ ...editState, [field]: value });
+    if (field === "department") {
+      setEditState({ ...editState, department: value });
+    } else {
+      setEditState({ ...editState, [field]: value });
+    }
   };
 
   return (
@@ -1030,6 +1056,25 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                     <div className="space-y-2">
                       <Label>Description</Label>
                       <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: moduleInfo.description || "" }} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Department</Label>
+                      <div className="flex flex-wrap gap-1">
+                        {(() => {
+                          let depId = "";
+                          if (typeof moduleInfo?.department === "string") {
+                            depId = moduleInfo.department;
+                          } else if (Array.isArray(moduleInfo?.department) && (moduleInfo.department as any[]).length > 0 && typeof (moduleInfo.department as any[])[0] === "object" && (moduleInfo.department as any[])[0] !== null) {
+                            depId = ((moduleInfo.department as any[])[0] as { department?: string }).department || "";
+                          }
+                          const depName = (departments || []).find(d => d.name === depId)?.department || depId;
+                          return depId ? (
+                            <span className="inline-block px-2 py-1 rounded bg-accent text-xs font-medium">
+                              {depName}
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
                     </div>
 
                     {/* Lessons/Chapters Hierarchy */}                    {module?.lessons && (

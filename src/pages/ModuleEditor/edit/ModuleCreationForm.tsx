@@ -16,6 +16,7 @@ import {
 import { useUser } from "@/hooks/use-user";
 import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
 import { LMS_API_BASE_URL } from "@/config/routes";
+// Removed MultiSelect import
 
 export default function ModuleCreationForm() {
   const [, setLocation] = useLocation();
@@ -25,19 +26,29 @@ export default function ModuleCreationForm() {
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState("");
   const [assignmentBased, setAssignmentBased] = useState("Everyone");
-  const [department, setDepartment] = useState("");
+  const [departmentSelected, setDepartmentSelected] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [order, setOrder] = useState(1);
 
   const { data: departments } = useFrappeGetDocList("Department", {
     fields: ["name", "department"],
     limit: 100,
   });
 
+  const departmentOptions = (departments || []).map((dept) => ({
+    value: dept.name,
+    label: dept.department,
+  }));
+
   const handleCreateModule = async () => {
     if (!moduleName.trim()) {
       toast.error("Module name is required");
+      return;
+    }
+    if (assignmentBased === "Department" && !departmentSelected) {
+      toast.error("Please select a department");
       return;
     }
 
@@ -46,9 +57,12 @@ export default function ModuleCreationForm() {
         name1: moduleName,
         description: description,
         duration: duration,
+        order: order,
         status: "Draft",
         assignment_based: assignmentBased,
-        department: assignmentBased === "Department" ? department : "",
+        department: assignmentBased === "Department" && departmentSelected
+          ? [{ department: departmentSelected }]
+          : [],
         created_by: user?.email,
         image: imageUrl,
       });
@@ -118,6 +132,18 @@ export default function ModuleCreationForm() {
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="order">Order</Label>
+          <Input
+            id="order"
+            type="number"
+            value={order}
+            onChange={(e) => setOrder(Number(e.target.value))}
+            placeholder="Enter module order"
+            min={1}
+          />
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="assignmentBased">Assignment Based</Label>
           <Select value={assignmentBased} onValueChange={setAssignmentBased}>
             <SelectTrigger>
@@ -134,15 +160,16 @@ export default function ModuleCreationForm() {
         {assignmentBased === "Department" && (
           <div className="space-y-2">
             <Label htmlFor="department">Department</Label>
-            <Select value={department} onValueChange={setDepartment}>
+            <Select
+              value={departmentSelected}
+              onValueChange={setDepartmentSelected}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                {departments?.map((dept) => (
-                  <SelectItem key={dept.name} value={dept.name}>
-                    {dept.department}
-                  </SelectItem>
+                {departmentOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

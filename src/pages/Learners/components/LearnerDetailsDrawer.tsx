@@ -5,9 +5,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X, Mail, Users, TrendingUp, BookOpen, Award } from "lucide-react";
-import { useFrappeGetCall, useFrappeUpdateDoc } from "frappe-react-sdk";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { useFrappeGetCall } from "frappe-react-sdk";
+import { useFrappeGetDocList } from "frappe-react-sdk";
 
 export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, open: boolean, onClose: () => void }) {
   // Fetch module progress/activity for this learner
@@ -15,76 +14,17 @@ export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, op
     user: learner?.email
   }, { enabled: !!learner });
   const modules = progressData?.data?.modules || [];
+  // Fetch departments for mapping
+  const { data: departments } = useFrappeGetDocList("Department", { fields: ["name", "department"], limit: 150 });
+  const departmentIdToName = React.useMemo(() => Object.fromEntries((departments || []).map(d => [d.name, d.department])), [departments]);
   // Calculate completion rate
   const totalModules = modules.length;
   const completedModules = modules.filter((m: any) => m.progress?.status === "Completed").length;
   const completionRate = totalModules ? Math.round((completedModules / totalModules) * 100) : 0;
   // Recent activity: last 5 modules
   const recent = modules.slice(0, 5);
-
-  const { updateDoc } = useFrappeUpdateDoc();
-  const [editMode, setEditMode] = React.useState(false);
-  const [fullName, setFullName] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
-
-  React.useEffect(() => {
-    if (learner) {
-      setFullName(learner.full_name || "");
-      setPassword("");
-      setEditMode(false);
-    }
-  }, [learner]);
-
-  const handleSave = async () => {
-    if (!fullName.trim()) {
-      toast.error("Full name is required");
-      return;
-    }
-    setSaving(true);
-    try {
-      // Update full name
-      console.log("full name is=",fullName);
-      console.log("name is =",learner.name);
-
-      const parts = fullName.trim().split(" ");
-      let firstName = "";
-      let middleName = "";
-      let lastName = "";
-
-      if (parts.length === 1) {
-        firstName = parts[0];
-      } else if (parts.length === 2) {
-        [firstName, lastName] = parts;
-      } else if (parts.length >= 3) {
-        firstName = parts[0];
-        lastName = parts[parts.length - 1];
-        middleName = parts.slice(1, parts.length - 1).join(" ");
-      }
-      
-      console.log("first_name=",firstName);
-      console.log("middleName=",middleName);
-      console.log("lastName=",lastName);
-
-      await updateDoc("User", learner.name, { first_name: firstName });
-      await updateDoc("User", learner.name, { middle_name: middleName });
-      await updateDoc("User", learner.name, { last_name: lastName });
-
-
-      // Update password if provided
-      if (password.trim()) {
-        await updateDoc("User", learner.name, { new_password: password });
-      }
-      toast.success("Learner updated successfully");
-      setEditMode(false);
-      setPassword("");
-      // Optionally, trigger a refresh in parent
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update learner");
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Get learner departments as array
+  const learnerDepartments = (learner?.departments && learner.departments.length > 0) ? learner.departments : (learner?.department ? [learner.department] : []);
 
   return (
     <AnimatePresence>
@@ -117,60 +57,28 @@ export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, op
               <div className="flex items-center gap-3">
                 <Users className="w-8 h-8 text-primary" />
                 <div>
-                  {editMode ? (
-                    <Input
-                      className="text-xl font-bold mb-1"
-                      value={fullName}
-                      onChange={e => setFullName(e.target.value)}
-                      disabled={saving}
-                      placeholder="Full Name"
-                    />
-                  ) : (
-                    <div className="text-xl font-bold">{learner.full_name}</div>
-                  )}
+                  <div className="text-xl font-bold">{learner.full_name}</div>
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
                     <Mail className="w-4 h-4" /> {learner.email}
                     <Badge variant={learner.enabled === 1 ? "secondary" : "destructive"} className="ml-2">
                       {learner.enabled === 1 ? "Active" : "Inactive"}
                     </Badge>
                   </div>
+                  {/* Departments as badges */}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {learnerDepartments.map((depId: string) => (
+                      <Badge key={depId} variant="outline">
+                        {departmentIdToName[depId] || depId}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="flex gap-2">
-                {!editMode && (
-                  <Button variant="outline" size="sm" onClick={() => setEditMode(true)}>
-                    Edit
-                  </Button>
-                )}
                 <Button variant="ghost" onClick={onClose} aria-label="Close"><X className="w-6 h-6" /></Button>
               </div>
             </div>
             <div className="p-6 space-y-6">
-              {editMode && (
-                <Card className="mb-4">
-                  <CardHeader>
-                    <CardTitle>Edit Learner</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <label className="block mb-1 font-medium">Full Name</label>
-                      <Input value={fullName} onChange={e => setFullName(e.target.value)} disabled={saving} />
-                    </div>
-                    <div>
-                      <label className="block mb-1 font-medium">Password</label>
-                      <Input type="password" value={password} onChange={e => setPassword(e.target.value)} disabled={saving} placeholder="Leave blank to keep unchanged" />
-                    </div>
-                    <div className="flex gap-2 mt-2">
-                      <Button onClick={handleSave} disabled={saving}>
-                        {saving ? "Saving..." : "Save"}
-                      </Button>
-                      <Button variant="outline" onClick={() => setEditMode(false)} disabled={saving}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> Completion Rate</CardTitle>
