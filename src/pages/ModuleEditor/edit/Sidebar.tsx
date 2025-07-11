@@ -1061,22 +1061,6 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                     </div>
                     <div className="space-y-2">
                       <Label>Department</Label>
-                      <div className="flex flex-wrap gap-1">
-                        {(() => {
-                          let depId = "";
-                          if (typeof moduleInfo?.department === "string") {
-                            depId = moduleInfo.department;
-                          } else if (Array.isArray(moduleInfo?.department) && (moduleInfo.department as any[]).length > 0 && typeof (moduleInfo.department as any[])[0] === "object" && (moduleInfo.department as any[])[0] !== null) {
-                            depId = ((moduleInfo.department as any[])[0] as { department?: string }).department || "";
-                          }
-                          const depName = (departments || []).find(d => d.name === depId)?.department || depId;
-                          return depId ? (
-                            <span className="inline-block px-2 py-1 rounded bg-accent text-xs font-medium">
-                              {depName}
-                            </span>
-                          ) : null;
-                        })()}
-                      </div>
                     </div>
 
                     {/* Lessons/Chapters Hierarchy */}                    {module?.lessons && (

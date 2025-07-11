@@ -39,6 +39,7 @@ interface Module {
   description: string;
   is_published: number;
   image: string | null;
+  status?: string; // Add status as optional for type safety
   // add other fields as needed
 }
 
@@ -61,7 +62,7 @@ export function AdminDashboardCards() {
 
   // Dynamic module stats
   const totalModules = ModuleData?.data?.modules?.length ?? 0;
-  const publishedModules = ModuleData?.data?.modules?.filter((m: Module) => m.is_published)?.length ?? 0;
+  const publishedModules = ModuleData?.data?.modules?.filter((m: Module) => (m.status === "Published" ))?.length ?? 0;
   
   // Calculate module statistics
   const moduleStats = ModuleData?.data?.stats;

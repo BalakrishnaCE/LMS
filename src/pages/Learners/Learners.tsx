@@ -221,15 +221,7 @@ function Filters({
         <MultiSelect
           options={departmentOptions}
           selected={departmentFilter}
-          onSelect={selected => {
-            // If "All" is selected, clear all other selections
-            if (selected.includes("__all__")) {
-              onDepartmentChange([]);
-            } else {
-              // Remove "All" if present and set the rest
-              onDepartmentChange(selected.filter(v => v !== "__all__"));
-            }
-          }}
+          onSelect={onDepartmentChange}
           placeholder="Filter by departments"
           className="w-full md:w-48"
         />
@@ -298,10 +290,7 @@ export default function Learners() {
   const allDepartmentOptions = allDepartmentsData || [];
   const departmentIdToName = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map(dep => [dep.name, dep.department])), [allDepartmentOptions]);
 
-  const departmentOptionsWithAll = [
-    { value: "__all__", label: "All" },
-    ...allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }))
-  ];
+  const departmentOptions = allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }));
 
   // Filter users based on search criteria
   const filteredUsers = users.filter((user: User) => {
@@ -524,7 +513,7 @@ export default function Learners() {
         <Button onClick={() => setAddOpen(true)} variant="default">Add Learner</Button>
       </div>
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Learner</DialogTitle>
             <DialogDescription>Fill in the details to add a new learner. The user will be assigned the LMS Learner role and added to the selected department.</DialogDescription>
@@ -667,7 +656,7 @@ export default function Learners() {
         searchEmail={searchEmail}
         searchStatus={searchStatus}
         departmentFilter={departmentFilter}
-        departmentOptions={departmentOptionsWithAll}
+        departmentOptions={departmentOptions}
         onSearchNameChange={setSearchName}
         onSearchEmailChange={setSearchEmail}
         onSearchStatusChange={setSearchStatus}

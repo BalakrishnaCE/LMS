@@ -245,7 +245,7 @@ export function ModuleDetailsDrawer({ item, isOpen, onClose }: ModuleDetailsDraw
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-2">
+                  {/* <div className="space-y-2">
                     {moduleInfo?.description && (
                       <div>
                         <span className="text-sm font-medium text-muted-foreground">Description:</span>
@@ -258,7 +258,7 @@ export function ModuleDetailsDrawer({ item, isOpen, onClose }: ModuleDetailsDraw
                         <span className="font-medium">{moduleInfo.department.tl}</span>
                       </div>
                     )}
-                  </div>
+                  </div> */}
                 </div>
               </div>
 

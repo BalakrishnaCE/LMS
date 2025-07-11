@@ -78,12 +78,26 @@ export default function ModuleEdit() {
           ...lesson,
           chapters: lesson.chapters?.map((chapter: any) => ({
             ...chapter,
-            contents: chapter.contents?.map((block: any) => ({
-              id: block.id,
-              type: typeMap[String(block.type)] || block.type, // normalize type
-              docname: block.reference,
-              ...block.data,
-            })) || [],
+            contents: chapter.contents?.map((block: any) => {
+              let normalizedBlock = {
+                id: block.id,
+                type: typeMap[String(block.type)] || block.type, // normalize type
+                docname: block.reference,
+                ...block.data,
+              };
+              // Special normalization for Question Answer content
+              if (
+                (typeMap[String(block.type)] || block.type) === 'Question Answer' &&
+                Array.isArray(block.data?.questions)
+              ) {
+                normalizedBlock.questions = block.data.questions.map((q: any) => ({
+                  question: q.question,
+                  score: q.score,
+                  suggested_answer: typeof q.suggested_answer === 'string' ? q.suggested_answer : ''
+                }));
+              }
+              return normalizedBlock;
+            }) || [],
           })) || [],
         })),
       };
