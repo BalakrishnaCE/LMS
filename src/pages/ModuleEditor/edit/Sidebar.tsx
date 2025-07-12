@@ -1059,12 +1059,12 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                       <Label>Description</Label>
                       <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: moduleInfo.description || "" }} />
                     </div>
-                    <div className="space-y-2">
+                    {/* <div className="space-y-2">
                       <Label>Department</Label>
-                    </div>
+                    </div> */}
 
                     {/* Lessons/Chapters Hierarchy */}                    {module?.lessons && (
-                      <div className="mt-6">
+                      <div className="mt-2">
                         <h4 className="text-sm font-semibold mb-2">Lessons</h4>
                         {module.lessons.length > 0 && (
                           <DndContext
