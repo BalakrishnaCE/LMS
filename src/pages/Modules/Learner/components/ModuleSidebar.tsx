@@ -67,6 +67,36 @@ export function ModuleSidebar({
     }
   };
 
+  // Helper function to check if a lesson is completed
+  const isLessonCompleted = (lesson: any) => {
+    if (lesson.progress === "Completed") return true;
+    if (!lesson.chapters || lesson.chapters.length === 0) return false;
+    
+    // Check if all chapters in the lesson are completed
+    return lesson.chapters.every((chapter: any) => isChapterCompleted(chapter, lesson));
+  };
+
+  // Helper function to check if a chapter is completed
+  const isChapterCompleted = (chapter: any, lesson: any) => {
+    if (chapter.progress === "Completed") return true;
+    
+    // Check if this chapter is before the current chapter in progress
+    if (progress?.current_lesson && progress?.current_chapter) {
+      const currentLessonIdx = module?.lessons?.findIndex((l: any) => l.name === progress.current_lesson) ?? -1;
+      const lessonIdx = module?.lessons?.findIndex((l: any) => l.name === lesson.name) ?? -1;
+      
+      if (lessonIdx < currentLessonIdx) {
+        return true; // Lesson is before current lesson, so all chapters are completed
+      } else if (lessonIdx === currentLessonIdx) {
+        const currentChapterIdx = lesson.chapters?.findIndex((c: any) => c.name === progress.current_chapter) ?? -1;
+        const chapterIdx = lesson.chapters?.findIndex((c: any) => c.name === chapter.name) ?? -1;
+        return chapterIdx < currentChapterIdx; // Chapter is before current chapter
+      }
+    }
+    
+    return false;
+  };
+
   return (
     <motion.div 
       initial={{ x: -20, opacity: 0 }}
@@ -202,7 +232,7 @@ export function ModuleSidebar({
                       {/* Progress indicators only for learners */}
                       {mode !== 'admin' && (
                         <>
-                          {lesson.progress === "Completed" ? (
+                          {isLessonCompleted(lesson) ? (
                             <CheckCircle className="h-4 w-4 text-primary" />
                           ) : lesson.name === currentLessonName ? (
                             <PlayCircle className="h-4 w-4 text-primary" />
@@ -264,12 +294,12 @@ export function ModuleSidebar({
                               {/* Progress indicators only for learners */}
                               {mode !== 'admin' && (
                                 <>
-                                  {chapter.progress === "Completed" ? (
-                                    <CheckCircle className="h-3 w-3" />
+                                  {isChapterCompleted(chapter, lesson) ? (
+                                    <CheckCircle className="h-3 w-3 text-primary" />
                                   ) : chapter.name === currentChapterName ? (
-                                    <PlayCircle className="h-3 w-3" />
+                                    <PlayCircle className="h-3 w-3 text-primary" />
                                   ) : (
-                                    <Circle className="h-3 w-3" />
+                                    <Circle className="h-3 w-3 text-muted-foreground" />
                                   )}
                                 </>
                               )}

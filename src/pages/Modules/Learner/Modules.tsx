@@ -269,12 +269,16 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                     <AnimatePresence>
                 {sortedModules.map((module: any, idx: number) => {
                     const status = module.progress?.status || "Not Started";
-                    let progress = module.progress?.progress || 0;
-                    if (progress == null) progress = 0;
+                    
+                    // Use the overall_progress from the API response
+                    let progress = module.progress?.overall_progress || 0;
+                    if (status === "Completed") {
+                        progress = 100;
+                    }
+                    
                     const isCompleted = status === "Completed";
                     const isInProgress = status === "In Progress";
                     const isNotStarted = status === "Not Started";
-                    if (isCompleted) progress = 100;
                     let buttonText = "Start";
                     if (isInProgress) buttonText = "Continue";
                     if (isCompleted) buttonText = "Completed";

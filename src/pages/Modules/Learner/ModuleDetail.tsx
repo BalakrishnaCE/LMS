@@ -288,18 +288,35 @@ export default function LearnerModuleDetail() {
         }
     }, [progress, module]);
 
+    // Force progress recalculation when current indices change
+    useEffect(() => {
+        // This will trigger a re-render and recalculate overallProgress
+    }, [currentLessonIdx, currentChapterIdx, module]);
+
     // Calculate overall progress
     const getOverallProgress = () => {
         if (progress?.status === "Completed") return 100;
         if (!module?.lessons?.length) return 0;
         let totalChapters = 0;
         let completedChapters = 0;
-        module.lessons.forEach(lesson => {
-            lesson.chapters.forEach(chapter => {
+        
+        // Calculate based on current position and completed chapters
+        module.lessons.forEach((lesson, lessonIdx) => {
+            lesson.chapters.forEach((chapter, chapterIdx) => {
                 totalChapters += 1;
-                if (chapter.progress === "Completed") completedChapters += 1;
+                
+                // Mark as completed if:
+                // 1. Chapter has explicit "Completed" status
+                // 2. Chapter is before current position
+                // 3. Chapter is at current position and we've moved past it
+                if (chapter.progress === "Completed" || 
+                    (lessonIdx < currentLessonIdx) || 
+                    (lessonIdx === currentLessonIdx && chapterIdx < currentChapterIdx)) {
+                    completedChapters += 1;
+                }
             });
         });
+        
         return totalChapters === 0 ? 0 : Math.round((completedChapters / totalChapters) * 100);
     };
     const overallProgress = getOverallProgress();
@@ -331,6 +348,15 @@ export default function LearnerModuleDetail() {
                 current_chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
                 status: "In Progress"
             });
+            
+            // Update module progress to reflect current chapter
+            if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
+                const updatedModule = { ...module };
+                if (updatedModule.lessons[lessonIdx]?.chapters[chapterIdx]) {
+                    updatedModule.lessons[lessonIdx].chapters[chapterIdx].progress = "In Progress";
+                }
+                setModule(updatedModule);
+            }
         }
     };
 
@@ -367,9 +393,11 @@ export default function LearnerModuleDetail() {
         let chapterIdx = currentChapterIdx;
         const currentLesson = module.lessons[lessonIdx];
         const currentChapter = currentLesson.chapters[chapterIdx];
+        
         // If this is the last chapter of the last lesson, check Quiz/QA completion BEFORE calling updateProgress
         const isLastLesson = lessonIdx === module.lessons.length - 1;
         const isLastChapter = chapterIdx === currentLesson.chapters.length - 1;
+        
         if (isLastLesson && isLastChapter) {
             setQuizQAIncomplete(false);
             setShowQuizQAAlert(false);
@@ -392,7 +420,6 @@ export default function LearnerModuleDetail() {
                         )}
                     </div>
                 );
-                // Do NOT call updateProgress for module completion
                 return;
             }
             setQuizQAScores(scores);
@@ -411,7 +438,8 @@ export default function LearnerModuleDetail() {
             });
             return;
         }
-        // Otherwise, normal chapter/lesson progress update
+        
+        // Mark current chapter as completed
         await updateProgress({
             user: user.email,
             module: moduleName,
@@ -419,11 +447,23 @@ export default function LearnerModuleDetail() {
             chapter: currentChapter.name,
             status: "Completed"
         });
+        
+        // Update module progress to reflect completed chapter
+        if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
+            const updatedModule = { ...module };
+            if (updatedModule.lessons[lessonIdx]?.chapters[chapterIdx]) {
+                updatedModule.lessons[lessonIdx].chapters[chapterIdx].progress = "Completed";
+            }
+            setModule(updatedModule);
+        }
+        
         if (chapterIdx < currentLesson.chapters.length - 1) {
             // Move to next chapter in the same lesson
             chapterIdx += 1;
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
+            
+            // Update progress for next chapter
             await updateProgress({
                 user: user.email,
                 module: moduleName,
@@ -431,28 +471,35 @@ export default function LearnerModuleDetail() {
                 chapter: currentLesson.chapters[chapterIdx].name,
                 status: "In Progress"
             });
+            
+            // Update local progress state
             setProgress({
                 ...progress!,
                 current_lesson: currentLesson.name,
                 current_chapter: currentLesson.chapters[chapterIdx].name,
                 status: "In Progress"
             });
+            
+            // Update module progress to reflect current chapter
+            if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
+                const updatedModule = { ...module };
+                if (updatedModule.lessons[lessonIdx]?.chapters[chapterIdx]) {
+                    updatedModule.lessons[lessonIdx].chapters[chapterIdx].progress = "In Progress";
+                }
+                setModule(updatedModule);
+            }
             return;
         }
+        
         // At the end of the last chapter in the lesson, mark lesson as completed
-        await updateProgress({
-            user: user.email,
-            module: moduleName,
-            lesson: currentLesson.name,
-            chapter: currentChapter.name,
-            status: "Completed"
-        });
         if (lessonIdx < module.lessons.length - 1) {
             // Move to next lesson and its first chapter
             lessonIdx += 1;
             chapterIdx = 0;
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
+            
+            // Update progress for next lesson's first chapter
             await updateProgress({
                 user: user.email,
                 module: moduleName,
@@ -460,12 +507,23 @@ export default function LearnerModuleDetail() {
                 chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
                 status: "In Progress"
             });
+            
+            // Update local progress state
             setProgress({
                 ...progress!,
                 current_lesson: module.lessons[lessonIdx].name,
                 current_chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
                 status: "In Progress"
             });
+            
+            // Update module progress to reflect current chapter
+            if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
+                const updatedModule = { ...module };
+                if (updatedModule.lessons[lessonIdx]?.chapters[chapterIdx]) {
+                    updatedModule.lessons[lessonIdx].chapters[chapterIdx].progress = "In Progress";
+                }
+                setModule(updatedModule);
+            }
             return;
         }
     };
