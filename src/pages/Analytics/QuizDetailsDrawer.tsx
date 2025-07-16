@@ -91,13 +91,16 @@ export const QuizDetailsDrawer: React.FC<QuizDetailsDrawerProps> = ({
         0: { fontStyle: 'bold', cellWidth: 40 },
       }
     });
-    //question needs to be dangeously set inner html
-    const question = item.data.map(q => q.question);
-    const questionText = question.map(q => q.replace(/<[^>]*>?/g, ''));
-    console.log(questionText);
+    // Strip HTML tags from questions for PDF export
+    const stripHtml = (html: string) => {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      return tmp.textContent || tmp.innerText || '';
+    };
+
     // Responses Table
     const tableData = item.data.map(q => [
-        q.question, 
+        stripHtml(q.question), 
         q.marked_ans || 'Not Answered', 
         q.correct_ans || 'N/A', 
         q.marked_ans === q.correct_ans ? 'Correct' : 'Incorrect'
