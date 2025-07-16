@@ -921,7 +921,7 @@ export default function LearnerModuleDetail() {
                     {/* Main Content */}
                     <div className="flex-1 flex justify-center items-start p-8">
                         <div className="w-full  rounded-xl shadow p-8">
-                            {started && !completed && currentLesson && currentChapter && (
+                            {(started || reviewing) && currentLesson && currentChapter && (
                                 <div className="space-y-8">
                                     {/* Lesson and Chapter Header */}
                                     <div>
