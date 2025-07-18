@@ -98,6 +98,22 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
               .then(progressRes => {
                 const progressData = progressRes.data;
                 setQaProgress(progressData);
+                
+                // Load existing answers if available
+                if (progressData.responses && data) {
+                  const existingAnswers: Record<string, string> = {};
+                  const existingSubmitted: Record<string, boolean> = {};
+                  
+                  progressData.responses.forEach((response: any) => {
+                    // Use question text as the key since questions don't have unique IDs
+                    existingAnswers[response.question] = response.answer || "";
+                    existingSubmitted[response.question] = true; // Mark as submitted since it's in progress
+                  });
+                  
+                  setAnswers(existingAnswers);
+                  setSubmitted(existingSubmitted);
+                }
+                
                 if (progressData.score_added === 1) {
                   setShowProgressOnly(true);
                   setShowReviewOnly(false);
@@ -127,7 +143,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
     // Prepare answers for API
     const answersArray = data?.questions?.map((q: any) => ({
       question: q.question,
-      answer: answers[q.id] || ""
+      answer: answers[q.question] || ""
     })) || [];
 
     if (user && data) {
@@ -143,7 +159,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
             setTimerActive(false);
             // Mark all questions as submitted
             const allSubmittedState = data.questions.reduce((acc: any, q: any) => {
-              acc[q.id] = true;
+              acc[q.question] = true;
               return acc;
             }, {});
             setSubmitted(allSubmittedState);
@@ -215,6 +231,27 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
     }
   }, [open, user, data, isLMSAdmin, existingProgress, checkingProgress]);
 
+  // Load existing answers when progress data is available
+  useEffect(() => {
+    if (open && data && !isLMSAdmin) {
+      const progressData = qaProgress || progressDoc;
+      if (progressData && progressData.responses) {
+        // Load existing answers from progress data
+        const existingAnswers: Record<string, string> = {};
+        const existingSubmitted: Record<string, boolean> = {};
+        
+        progressData.responses.forEach((response: any) => {
+          // Use question text as the key since questions don't have unique IDs
+          existingAnswers[response.question] = response.answer || "";
+          existingSubmitted[response.question] = true; // Mark as submitted since it's in progress
+        });
+        
+        setAnswers(existingAnswers);
+        setSubmitted(existingSubmitted);
+      }
+    }
+  }, [open, data, qaProgress, progressDoc, isLMSAdmin]);
+
   // Reset states when the dialog is closed
   useEffect(() => {
     if (!open) {
@@ -250,7 +287,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
   };
 
   const hasUnsubmittedAnswers = data?.questions?.some((q: any) => 
-    answers[q.id] && answers[q.id].trim() && !submitted[q.id]
+    answers[q.question] && answers[q.question].trim() && !submitted[q.question]
   );
 
   if (userLoading) return (
@@ -546,13 +583,13 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
                           <div className="mb-2">
                             {!isLMSAdmin && 
                             <RichEditor
-                              content={answers[q.id] || ""}
-                              onChange={val => setAnswers(a => ({ ...a, [q.id]: val }))}
-                              disabled={submitted[q.id] || !timerActive || allSubmitted}
+                              content={answers[q.question] || ""}
+                              onChange={val => setAnswers(a => ({ ...a, [q.question]: val }))}
+                              disabled={submitted[q.question] || (data?.time_limit_mins > 0 && !timerActive) || allSubmitted}
                             />
                           }
                           </div>
-                          {submitted[q.id] && <span className="text-green-600 flex items-center gap-1"><CheckCircle className="h-4 w-4" />Answer submitted!</span>}
+                          {submitted[q.question] && <span className="text-green-600 flex items-center gap-1"><CheckCircle className="h-4 w-4" />Answer submitted!</span>}
                         </div>
                       ))}
                     </div>
