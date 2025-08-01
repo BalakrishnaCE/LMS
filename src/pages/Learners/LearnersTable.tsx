@@ -82,7 +82,11 @@ export function LearnersTable({ learners, isLoading, showActions = true, onViewD
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full mt-4">
+    <motion.div 
+      className="flex flex-col items-center justify-center h-full w-full mt-4"
+      layout
+      transition={{ duration: 0.2, ease: "easeOut" }}
+    >
       <Table>
         <TableHeader>
           <TableRow>
@@ -101,15 +105,24 @@ export function LearnersTable({ learners, isLoading, showActions = true, onViewD
                 <div className="mt-2 text-muted-foreground">Loading learners...</div>
               </TableCell>
             </TableRow>
+          ) : learners.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={showActions ? 5 : 4} className="text-center py-8">
+                <div className="text-muted-foreground">No learners found matching your criteria</div>
+              </TableCell>
+            </TableRow>
           ) : (
-            <AnimatePresence>
+            <AnimatePresence mode="wait">
               {learners.map((learner, index) => (
                 <motion.tr
-                  key={learner.name}
-                  initial={{ opacity: 0, y: 20 }}
+                  key={`${learner.name}-${learner.email}`}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.2, delay: index * 0.1 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ 
+                    duration: 0.15,
+                    ease: "easeOut"
+                  }}
                   className="group hover:bg-muted/50 transition-colors duration-200"
                 >
                   <TableCell className="group-hover:text-primary transition-colors duration-200">{learner.full_name}</TableCell>
@@ -163,6 +176,6 @@ export function LearnersTable({ learners, isLoading, showActions = true, onViewD
           )}
         </TableBody>
       </Table>
-    </div>
+    </motion.div>
   );
 } 

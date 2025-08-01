@@ -10,6 +10,14 @@ import { toast } from "sonner";
 import { UserDetailsDrawer } from "./components/LearnerDetailsDrawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem, 
+  PaginationLink, 
+  PaginationNext, 
+  PaginationPrevious 
+} from "@/components/ui/pagination";
 
 interface User {
   name: string;
@@ -244,6 +252,8 @@ export default function Learners() {
   const [searchStatus, setSearchStatus] = React.useState("all");
   const [selectedLearner, setSelectedLearner] = React.useState<User | null>(null);
   const [departmentFilter, setDepartmentFilter] = React.useState<string[]>([]);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [itemsPerPage] = React.useState(20);
   const [addOpen, setAddOpen] = React.useState(false);
   const [addLoading, setAddLoading] = React.useState(false);
   const [addError, setAddError] = React.useState<string | null>(null);
@@ -272,7 +282,10 @@ export default function Learners() {
 
   const { call: addLearnerPost } = useFrappePostCall("addLMSUser");
   const { call: updateLearnerPost } = useFrappePostCall("updateLearner");
-  const { data: analyticsData, error, isValidating, mutate } = useFrappeGetCall<{ message: ApiData }>("getLearnerAnalytics");
+  const { data: analyticsData, error, isValidating, mutate } = useFrappeGetCall<{ message: ApiData }>("getLearnerAnalytics", {
+    limit: 1000, // Increase limit to handle large datasets
+    page_length: 1000
+  });
   const message = analyticsData?.message;
   const users = message?.users || [];
   const stats = message?.stats;
@@ -280,6 +293,7 @@ export default function Learners() {
   React.useEffect(() => {
     console.log('Learner stats (effect):', stats);
     console.log('Learner users (effect):', users);
+    console.log('Total users fetched:', users.length);
     if (stats && users && typeof stats.total === 'number' && stats.total !== users.length) {
       console.warn('Mismatch: stats.total does not match users.length', stats.total, users.length);
     }
@@ -292,21 +306,53 @@ export default function Learners() {
 
   const departmentOptions = allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }));
 
-  // Filter users based on search criteria
-  const filteredUsers = users.filter((user: User) => {
-    const nameMatch = user.full_name?.toLowerCase().includes(searchName.toLowerCase());
-    const emailMatch = user.email?.toLowerCase().includes(searchEmail.toLowerCase());
-    const statusMatch = searchStatus === "all" || 
-      (searchStatus === "active" && user.enabled === 1) || 
-      (searchStatus === "inactive" && user.enabled === 0);
-    // Multi-department filter
-    const userDepartments = (user.departments && user.departments.length > 0) ? user.departments : (user.department ? [user.department] : []);
-    const departmentMatch = departmentFilter.length === 0 || departmentFilter.some(dep => userDepartments.includes(dep));
-    return nameMatch && emailMatch && statusMatch && departmentMatch;
-  });
+  // Filter users based on search criteria with improved logic
+  const filteredUsers = React.useMemo(() => {
+    if (!users || users.length === 0) return [];
+    
+    return users.filter((user: User) => {
+      // Handle null/undefined values safely
+      const fullName = user.full_name || '';
+      const email = user.email || '';
+      const userDepartments = (user.departments && user.departments.length > 0) 
+        ? user.departments 
+        : (user.department ? [user.department] : []);
+      
+      // Name filter - case insensitive
+      const nameMatch = searchName === '' || 
+        fullName.toLowerCase().includes(searchName.toLowerCase());
+      
+      // Email filter - case insensitive
+      const emailMatch = searchEmail === '' || 
+        email.toLowerCase().includes(searchEmail.toLowerCase());
+      
+      // Status filter
+      const statusMatch = searchStatus === "all" || 
+        (searchStatus === "active" && user.enabled === 1) || 
+        (searchStatus === "inactive" && user.enabled === 0);
+      
+      // Department filter - check if any selected department matches user's departments
+      const departmentMatch = departmentFilter.length === 0 || 
+        departmentFilter.some(dep => userDepartments.includes(dep));
+      
+      return nameMatch && emailMatch && statusMatch && departmentMatch;
+    });
+  }, [users, searchName, searchEmail, searchStatus, departmentFilter]);
 
-  console.log("users22222=",users);
-  console.log("filteredUsers22222=",filteredUsers)
+  // Pagination logic
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchName, searchEmail, searchStatus, departmentFilter]);
+
+  console.log("Total users:", users.length);
+  console.log("Filtered users:", filteredUsers.length);
+  console.log("Current page:", currentPage, "of", totalPages);
 
   const handleExport = () => {
     try {
@@ -646,9 +692,17 @@ export default function Learners() {
       {/* Show a visible warning if stats.total !== users.length */}
       {stats && users && typeof stats.total === 'number' && stats.total !== users.length && (
         <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 border border-yellow-300">
-          <strong>Warning:</strong> Learner stats total ({stats.total}) does not match number of users ({users.length}). This may indicate an API or backend data issue.
+          <strong>Warning:</strong> Learner stats total ({stats.total}) does not match number of users ({users.length}). This may indicate an API limit issue. Try refreshing the page.
         </div>
       )}
+      
+      {/* Show loading state */}
+      {isValidating && (
+        <div className="mb-4 p-3 rounded bg-blue-100 text-blue-800 border border-blue-300">
+          <strong>Loading:</strong> Fetching learner data... ({users.length} users loaded so far)
+        </div>
+      )}
+      
       {stats && <StatsCards stats={stats} />}
       
       <Filters
@@ -664,12 +718,53 @@ export default function Learners() {
         onExport={handleExport}
       />
 
+
+
       <LearnersTable
-        learners={filteredUsers}
+        learners={paginatedUsers}
         isLoading={isValidating}
         onEdit={handleEdit}
         onViewDetails={handleViewDetails}
       />
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex flex-col items-center gap-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} learners
+          </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              
+              {/* Page numbers */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    isActive={currentPage === page}
+                    onClick={() => setCurrentPage(page)}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       <UserDetailsDrawer
         learner={selectedLearner}
