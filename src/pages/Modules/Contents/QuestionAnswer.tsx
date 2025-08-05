@@ -5,14 +5,13 @@ import RichEditor from '@/components/RichEditor';
 import { useUser } from "@/hooks/use-user";
 import { useFrappeGetDoc, useFrappePostCall, useFrappePutCall, useFrappeGetDocList } from 'frappe-react-sdk';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Progress } from '@/components/ui/progress';
-import { CheckCircle, Clock, XCircle, BookOpen, Eye, FileText } from 'lucide-react';
+import { CheckCircle, Eye, FileText } from 'lucide-react';
 import Lottie from 'lottie-react';
-import emptyAnimation from '@/assets/Empty.json';
 import timeoutAnimation from '@/assets/timeout.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
 import { LMS_API_BASE_URL } from "@/config/routes";
+import InstructionDialog from '@/components/InstructionDialog';
 
 interface QuestionAnswerProps {
   questionAnswerId: string;
@@ -22,6 +21,7 @@ interface QuestionAnswerProps {
 const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, moduleId }) => {
   const { user, isLoading: userLoading, isLMSAdmin } = useUser();
   const [open, setOpen] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +39,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
   const [apiError, setApiError] = useState<string | null>(null);
   const [allSubmitted, setAllSubmitted] = useState(false);
   const [progressCreated, setProgressCreated] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   // API calls for progress
   const { call: addQAProgress, loading: adding, error: addError } = useFrappePostCall("addQAProgress");
@@ -60,7 +61,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
     }
   );
 
-  const { data: progressDoc, isValidating: progressDocLoading, error: progressDocError } = useFrappeGetDoc('Question Answer Progress', qaProgressId || '', { enabled: !!qaProgressId });
+  const { data: progressDoc, isValidating: progressDocLoading } = useFrappeGetDoc('Question Answer Progress', qaProgressId || '', { enabled: !!qaProgressId });
 
   const handleStartQA = () => {
     // 1. Handle case where we already know about existing progress from the initial fetch.
@@ -137,6 +138,103 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
     }
   };
 
+  const handleNextQuestion = () => {
+    if (isLMSAdmin) return; // No submission for admin
+    
+    const currentQuestion = data?.questions?.[currentQuestionIndex];
+    if (!currentQuestion) return;
+    
+    // Prepare answer for API
+    const answerData = {
+      question: currentQuestion.question,
+      answer: answers[currentQuestion.question] || ""
+    };
+
+    if (user && data) {
+      updateQAProgress({
+        qa_id: data.name,
+        module: moduleId,
+        answers: [answerData],
+      })
+        .then((res: any) => {
+          if (res && (res.message === 'Question Answer Progress saved' || res.message === 'Responses submitted')) {
+            setQaProgress(res);
+            // Mark this question as submitted
+            setSubmitted(prev => ({ ...prev, [currentQuestion.question]: true }));
+            
+            // Move to next question
+            if (currentQuestionIndex < (data?.questions?.length || 0) - 1) {
+              setCurrentQuestionIndex(prev => prev + 1);
+            }
+          } else {
+            // Handle unexpected response
+            console.warn('Unexpected API response:', res);
+            // Still mark as submitted to prevent data loss
+            setSubmitted(prev => ({ ...prev, [currentQuestion.question]: true }));
+            // Move to next question even if API response is unexpected
+            if (currentQuestionIndex < (data?.questions?.length || 0) - 1) {
+              setCurrentQuestionIndex(prev => prev + 1);
+            }
+          }
+        })
+        .catch((err) => {
+          console.error('Error saving answer:', err);
+          // Don't show error to user, just log it
+          // Still mark as submitted to prevent data loss
+          setSubmitted(prev => ({ ...prev, [currentQuestion.question]: true }));
+          // Move to next question even if API fails
+          if (currentQuestionIndex < (data?.questions?.length || 0) - 1) {
+            setCurrentQuestionIndex(prev => prev + 1);
+          }
+        });
+    }
+  };
+
+  const handlePreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      // Save current answer before going back
+      const currentQuestion = data?.questions?.[currentQuestionIndex];
+      if (currentQuestion && answers[currentQuestion.question]?.trim()) {
+        const answerData = {
+          question: currentQuestion.question,
+          answer: answers[currentQuestion.question] || ""
+        };
+
+        if (user && data) {
+          updateQAProgress({
+            qa_id: data.name,
+            module: moduleId,
+            answers: [answerData],
+          })
+            .then((res: any) => {
+              if (res && (res.message === 'Question Answer Progress saved' || res.message === 'Responses submitted')) {
+                setQaProgress(res);
+                setSubmitted(prev => ({ ...prev, [currentQuestion.question]: true }));
+                // Move to previous question after saving
+                setCurrentQuestionIndex(prev => prev - 1);
+              } else {
+                // Handle unexpected response
+                console.warn('Unexpected API response:', res);
+                // Still mark as submitted and move back
+                setSubmitted(prev => ({ ...prev, [currentQuestion.question]: true }));
+                setCurrentQuestionIndex(prev => prev - 1);
+              }
+            })
+            .catch((err) => {
+              console.error('Error saving answer:', err);
+              // Don't show error to user, just log it
+              // Still mark as submitted and move back
+              setSubmitted(prev => ({ ...prev, [currentQuestion.question]: true }));
+              setCurrentQuestionIndex(prev => prev - 1);
+            });
+        }
+      } else {
+        // If no answer to save, just go back
+        setCurrentQuestionIndex(prev => prev - 1);
+      }
+    }
+  };
+
   const handleSubmitAll = () => {
     if (isLMSAdmin) return; // No submission for admin
     
@@ -163,9 +261,31 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
               return acc;
             }, {});
             setSubmitted(allSubmittedState);
+          } else {
+            // Handle unexpected response
+            console.warn('Unexpected API response:', res);
+            // Still mark as submitted to prevent data loss
+            setAllSubmitted(true);
+            setTimerActive(false);
+            const allSubmittedState = data.questions.reduce((acc: any, q: any) => {
+              acc[q.question] = true;
+              return acc;
+            }, {});
+            setSubmitted(allSubmittedState);
           }
         })
-        .catch((err) => setApiError("Could not update Q&A progress: " + err.message));
+        .catch((err) => {
+          console.error('Error submitting all answers:', err);
+          // Don't show error to user, just log it
+          // Still mark as submitted to prevent data loss
+          setAllSubmitted(true);
+          setTimerActive(false);
+          const allSubmittedState = data.questions.reduce((acc: any, q: any) => {
+            acc[q.question] = true;
+            return acc;
+          }, {});
+          setSubmitted(allSubmittedState);
+        });
     }
   };
 
@@ -199,29 +319,33 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
   // Check for existing progress and determine state
   useEffect(() => {
     if (open && user && data && !isLMSAdmin && !checkingProgress) {
-      // If we found existing progress, check its state
-      if (existingProgress && existingProgress.length > 0) {
-        const progress = existingProgress[0];
-        setQaProgressId(progress.name);
-        setProgressCreated(true);
-        
-        if (progress.score_added === 1) {
-          // Completed - show percentage
-          setShowProgressOnly(true);
-          setShowReviewOnly(false);
-        } else {
-          // Under review - show review status
-          setShowProgressOnly(false);
-          setShowReviewOnly(true);
+      // Only set states if they haven't been set by handleStartQA
+      // This prevents overriding the states that were already set
+      if (!showProgressOnly && !showReviewOnly) {
+        // If we found existing progress, check its state
+        if (existingProgress && existingProgress.length > 0) {
+          const progress = existingProgress[0];
+          setQaProgressId(progress.name);
+          setProgressCreated(true);
+          
+          if (progress.score_added === 1) {
+            // Completed - show percentage
+            setShowProgressOnly(true);
+            setShowReviewOnly(false);
+          } else {
+            // Under review - show review status
+            setShowProgressOnly(false);
+            setShowReviewOnly(true);
+          }
+          setProgressLoading(false);
+          return;
         }
-        setProgressLoading(false);
-        return;
-      }
 
-      // No existing progress - allow new submission
-      setShowProgressOnly(false);
-      setShowReviewOnly(false);
-      setProgressLoading(false);
+        // No existing progress - allow new submission
+        setShowProgressOnly(false);
+        setShowReviewOnly(false);
+        setProgressLoading(false);
+      }
     } else if (!open) {
       setQaProgressId(null);
       setShowProgressOnly(false);
@@ -229,7 +353,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
       setAllSubmitted(false);
       setProgressCreated(false);
     }
-  }, [open, user, data, isLMSAdmin, existingProgress, checkingProgress]);
+  }, [open, user, data, isLMSAdmin, existingProgress, checkingProgress, showProgressOnly, showReviewOnly]);
 
   // Load existing answers when progress data is available
   useEffect(() => {
@@ -243,7 +367,8 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
         progressData.responses.forEach((response: any) => {
           // Use question text as the key since questions don't have unique IDs
           existingAnswers[response.question] = response.answer || "";
-          existingSubmitted[response.question] = true; // Mark as submitted since it's in progress
+          // Only mark as submitted if the answer is not empty
+          existingSubmitted[response.question] = !!(response.answer && response.answer.trim());
         });
         
         setAnswers(existingAnswers);
@@ -260,6 +385,8 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
       setShowReviewOnly(false);
       setAllSubmitted(false);
       setProgressCreated(false);
+      setShowInstructions(false);
+      setCurrentQuestionIndex(0);
     }
   }, [open]);
 
@@ -276,6 +403,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
       })
       .catch(e => {
         setError("Failed to load Q&A");
+        console.error(e);
         setLoading(false);
       });
   }, [questionAnswerId]);
@@ -285,10 +413,6 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-
-  const hasUnsubmittedAnswers = data?.questions?.some((q: any) => 
-    answers[q.question] && answers[q.question].trim() && !submitted[q.question]
-  );
 
   if (userLoading) return (
     <div className="flex flex-col items-center justify-center p-8">
@@ -478,12 +602,32 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>
-        <Button variant="outline" onClick={handleStartQA} disabled={checkingProgress}>
-          {checkingProgress ? "Checking..." : "Start Q&A"}
-        </Button>
-      </Dialog.Trigger>
+    <>
+      <Button variant="outline" onClick={() => setShowInstructions(true)} disabled={checkingProgress}>
+        {checkingProgress ? "Checking..." : "Start Q&A"}
+      </Button>
+      
+      {/* Instruction Dialog */}
+      <InstructionDialog
+        open={showInstructions}
+        onOpenChange={setShowInstructions}
+        onStart={handleStartQA}
+        type="qa"
+        title={data?.title || "Question & Answer"}
+        description={data?.description}
+        timeLimit={data?.time_limit_mins}
+        maxScore={data?.max_score}
+        questionCount={data?.questions?.length}
+        loading={progressLoading || progressDocLoading || checkingProgress}
+      />
+
+      <Dialog.Root open={open} onOpenChange={(newOpen) => {
+        // Prevent closing during API calls only
+        if (!newOpen && (updating || adding)) {
+          return;
+        }
+        setOpen(newOpen);
+      }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
         <Dialog.Content
@@ -502,7 +646,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
                 </span>
               )}
               <Dialog.Close asChild>
-                <Button variant="ghost" size="sm">✕</Button>
+                <Button variant="ghost" size="sm" disabled={updating || adding}>✕</Button>
               </Dialog.Close>
             </div>
             {/* Content */}
@@ -566,10 +710,31 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
                   <>
                     <div className="mb-2 text-sm text-muted-foreground">Max Score: {data.max_score}</div>
                     <div className="mb-4 prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: data.description }} />
-                    <div className="space-y-6">
-                      {data.questions?.map((q: any, idx: number) => (
-                        <div key={q.id} className="border rounded-lg p-4 bg-muted/50">
-                          <span>Q{idx + 1}</span>
+                    
+                    {/* Question Navigation */}
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        Question {currentQuestionIndex + 1} of {data?.questions?.length || 0}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {currentQuestionIndex > 0 && (
+                          <Button
+                            onClick={handlePreviousQuestion}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Back
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Current Question */}
+                    {data?.questions?.[currentQuestionIndex] && (() => {
+                      const q = data.questions[currentQuestionIndex];
+                      return (
+                        <div className="border rounded-lg p-4 bg-muted/50">
+                          <span>Q{currentQuestionIndex + 1}</span>
                           <div className="font-semibold mb-2"
                           dangerouslySetInnerHTML={{ __html: q.question }}
                           />
@@ -585,14 +750,39 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
                             <RichEditor
                               content={answers[q.question] || ""}
                               onChange={val => setAnswers(a => ({ ...a, [q.question]: val }))}
-                              disabled={submitted[q.question] || (data?.time_limit_mins > 0 && !timerActive) || allSubmitted}
+                              disabled={(data?.time_limit_mins > 0 && !timerActive) || allSubmitted}
                             />
                           }
                           </div>
-                          {submitted[q.question] && <span className="text-green-600 flex items-center gap-1"><CheckCircle className="h-4 w-4" />Answer submitted!</span>}
+                          <div className="flex items-center justify-between">
+                            {submitted[q.question] && !allSubmitted && <span className="text-green-600 flex items-center gap-1"><CheckCircle className="h-4 w-4" />Answer saved!</span>}
+                            {!isLMSAdmin && !allSubmitted && (
+                              <div className="flex gap-2">
+                                {currentQuestionIndex < (data?.questions?.length || 0) - 1 ? (
+                                  <Button
+                                    onClick={handleNextQuestion}
+                                    disabled={updating || !progressCreated || !answers[q.question]?.trim()}
+                                    variant="outline"
+                                    size="sm"
+                                  >
+                                    {updating ? "Saving..." : "Next"}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    onClick={handleSubmitAll}
+                                    disabled={updating || !progressCreated}
+                                    variant="default"
+                                    size="sm"
+                                  >
+                                    {updating ? "Submitting..." : "Submit All Answers"}
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })()}
                   </>
                 )
               )}
@@ -601,19 +791,10 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
             {!allSubmitted && (
               <div className="p-4 border-t flex justify-between items-center">
                 <div className="text-sm text-muted-foreground">
-                  {data?.questions?.filter((q: any) => submitted[q.id]).length || 0} of {data?.questions?.length || 0} questions submitted
+                  {data?.questions?.filter((q: any) => submitted[q.question]).length || 0} of {data?.questions?.length || 0} questions saved
                 </div>
-                {!isLMSAdmin && !allSubmitted && (
-                <div className="space-x-2">
-                  <Button
-                    onClick={handleSubmitAll}
-                    disabled={updating || !progressCreated}
-                    variant="default"
-                  >
-                    {updating ? "Submitting..." : "Submit All Answers"}
-                  </Button>
-                    <Button onClick={() => setOpen(false)}>Close</Button>
-                  </div>
+                {!isLMSAdmin && (
+                  <Button onClick={() => setOpen(false)} disabled={updating || adding}>Close</Button>
                 )}
               </div>
             )}
@@ -621,6 +802,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, modul
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+    </>
   );
 };
 
