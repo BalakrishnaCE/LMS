@@ -5,7 +5,7 @@ import Module from "@/pages/Modules/Modules"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LearnersTable } from "@/pages/Learners/LearnersTable"
 import { useUser } from "@/hooks/use-user"
-import { useFrappeGetCall } from "frappe-react-sdk"
+import { useLMSAnalytics } from "@/lib/api"
 import { motion, AnimatePresence } from "framer-motion"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
@@ -58,8 +58,8 @@ function Admindashboard() {
     const { user, isLoading: userLoading, error } = useUser();
     const [activeTab, setActiveTab] = useState("module")
 
-    // Fetch learners data using the same API as Learners.tsx
-    const { data: analyticsData, error: studentsError, isValidating: studentsLoading } = useFrappeGetCall<any>("getLearnerAnalytics");
+    // Fetch learners data using the new API
+    const { data: analyticsData, error: studentsError, isLoading: studentsLoading } = useLMSAnalytics();
     const message = analyticsData?.message || {};
     const users = message.users || [];
     const stats = message.stats;

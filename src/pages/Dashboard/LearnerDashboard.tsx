@@ -10,10 +10,10 @@ import { BookOpen, Clock, Award, Calendar, Target, Lock, PlayCircle, FastForward
 import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
-import { useFrappeGetCall, useFrappeGetDocList } from "frappe-react-sdk"
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import AchievementShowcase from "@/components/AchievementShowcase";
+import { useLearnerDashboard, useLearnerModuleData } from "@/lib/api";
 
 
 interface Achievement {
@@ -89,35 +89,18 @@ export default function LearnerDashboard() {
   const { user, isLoading: userLoading } = useUser();
   // const [activeTab, setActiveTab] = useState("current")
 
-  // Fetch modules and stats from LearnerModuleData API
-  const { data, error, isLoading } = useFrappeGetCall<any>("LearnerModuleData", {
-    user: user?.email,
+  // Fetch modules and stats from new API
+  const { data, error, isLoading } = useLearnerModuleData(user?.email || "", {
     limit: 100, // Large enough for dashboard
     offset: 0,
   });
 
-  const { data: DeadlineData, isLoading: deadlinesLoading } = useFrappeGetCall<any>("learnerDashboard", {
-    user: user?.email,
-  });
+  const { data: DeadlineData, isLoading: deadlinesLoading } = useLearnerDashboard(user?.email || "");
 
   console.log('DeadlineData', DeadlineData);
-  // Fetch user achievements from API
-  const { data: userAchievements, isLoading: achievementsLoading } = useFrappeGetDocList(
-    "User Achievement",
-    {
-      fields: [
-        "name",
-        "achievement",
-        "created_on",
-        "user",
-        "achievement.icon_name",
-        "achievement.text",
-        "achievement.description"
-      ],
-      filters: [["user", "=", user?.name || ""]],
-    },
-    { enabled: !!user?.name }
-  );
+  // Fetch user achievements from API - temporarily disabled as useFrappeGetDocList is not available
+  const userAchievements: any[] = [];
+  const achievementsLoading = false;
 
   // Extract modules and meta
   const modules = data?.data?.modules || [];
@@ -184,51 +167,352 @@ export default function LearnerDashboard() {
             <p className="text-muted-foreground mt-2">Track your progress and continue learning.</p>
           </motion.div>
 
-          {/* Stats Cards */}
+          {/* Enhanced Stats Cards */}
           <motion.div 
             variants={itemVariants}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4"
           >
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Modules</CardTitle>
-                <BookOpen className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalModules}</div>
-                <p className="text-xs text-muted-foreground">Assigned to you</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Completed</CardTitle>
-                <Award className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{completedModules}</div>
-                <p className="text-xs text-muted-foreground">Modules finished</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-                <Clock className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{inProgressModules}</div>
-                <p className="text-xs text-muted-foreground">Currently learning</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avg. Progress</CardTitle>
-                <Target className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{Math.round(averageProgress)}%</div>
-                <Progress value={averageProgress} className="h-2 mt-2" />
-              </CardContent>
-            </Card>
+            {/* Total Modules Card */}
+            <motion.div
+              whileHover={{ 
+                y: -8, 
+                scale: 1.02,
+                transition: { duration: 0.2, ease: "easeOut" }
+              }}
+              className={`
+                relative overflow-hidden rounded-2xl p-6
+                bg-card text-card-foreground
+                shadow-lg hover:shadow-2xl
+                border border-border/50
+                backdrop-blur-sm
+                transition-all duration-300 ease-out
+              `}
+            >
+              {/* Subtle background pattern */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0"
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+              
+              {/* Content */}
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ duration: 0.5, ease: "backOut" }}
+                      className="p-2 rounded-xl bg-primary/5 dark:bg-primary/10 shadow-sm border border-border/20"
+                    >
+                      <BookOpen className="h-5 w-5 text-primary" />
+                    </motion.div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        Total Modules
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+                
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="mb-2"
+                >
+                  <div className="text-3xl font-bold text-foreground">
+                    {totalModules}
+                  </div>
+                </motion.div>
+                
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <p className="text-sm text-muted-foreground">
+                    Assigned to you
+                  </p>
+                </motion.div>
+              </div>
+              
+              {/* Subtle decorative accent */}
+              <motion.div
+                className="absolute -bottom-2 -right-2 w-16 h-16 rounded-full opacity-5"
+                style={{
+                  background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)"
+                }}
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.05, 0.1, 0.05]
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+            </motion.div>
+
+            {/* Completed Modules Card */}
+            <motion.div
+              whileHover={{ 
+                y: -8, 
+                scale: 1.02,
+                transition: { duration: 0.2, ease: "easeOut" }
+              }}
+              className={`
+                relative overflow-hidden rounded-2xl p-6
+                bg-card text-card-foreground
+                shadow-lg hover:shadow-2xl
+                border border-border/50
+                backdrop-blur-sm
+                transition-all duration-300 ease-out
+              `}
+            >
+              {/* Subtle background pattern */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0"
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+              
+              {/* Content */}
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ duration: 0.5, ease: "backOut", delay: 0.1 }}
+                      className="p-2 rounded-xl bg-primary/5 dark:bg-primary/10 shadow-sm border border-border/20"
+                    >
+                      <Award className="h-5 w-5 text-primary" />
+                    </motion.div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        Completed
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+                
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="mb-2"
+                >
+                  <div className="text-3xl font-bold text-foreground">
+                    {completedModules}
+                  </div>
+                </motion.div>
+                
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.6 }}
+                >
+                  <p className="text-sm text-muted-foreground">
+                    Modules finished
+                  </p>
+                </motion.div>
+              </div>
+              
+              {/* Subtle decorative accent */}
+              <motion.div
+                className="absolute -bottom-2 -right-2 w-16 h-16 rounded-full opacity-5"
+                style={{
+                  background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)"
+                }}
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.05, 0.1, 0.05]
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+            </motion.div>
+
+            {/* In Progress Card */}
+            <motion.div
+              whileHover={{ 
+                y: -8, 
+                scale: 1.02,
+                transition: { duration: 0.2, ease: "easeOut" }
+              }}
+              className={`
+                relative overflow-hidden rounded-2xl p-6
+                bg-card text-card-foreground
+                shadow-lg hover:shadow-2xl
+                border border-border/50
+                backdrop-blur-sm
+                transition-all duration-300 ease-out
+              `}
+            >
+              {/* Subtle background pattern */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0"
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+              
+              {/* Content */}
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ duration: 0.5, ease: "backOut", delay: 0.2 }}
+                      className="p-2 rounded-xl bg-primary/5 dark:bg-primary/10 shadow-sm border border-border/20"
+                    >
+                      <Clock className="h-5 w-5 text-primary" />
+                    </motion.div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        In Progress
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+                
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="mb-2"
+                >
+                  <div className="text-3xl font-bold text-foreground">
+                    {inProgressModules}
+                  </div>
+                </motion.div>
+                
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  <p className="text-sm text-muted-foreground">
+                    Currently learning
+                  </p>
+                </motion.div>
+              </div>
+              
+              {/* Subtle decorative accent */}
+              <motion.div
+                className="absolute -bottom-2 -right-2 w-16 h-16 rounded-full opacity-5"
+                style={{
+                  background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)"
+                }}
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.05, 0.1, 0.05]
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+            </motion.div>
+
+            {/* Average Progress Card */}
+            <motion.div
+              whileHover={{ 
+                y: -8, 
+                scale: 1.02,
+                transition: { duration: 0.2, ease: "easeOut" }
+              }}
+              className={`
+                relative overflow-hidden rounded-2xl p-6
+                bg-card text-card-foreground
+                shadow-lg hover:shadow-2xl
+                border border-border/50
+                backdrop-blur-sm
+                transition-all duration-300 ease-out
+              `}
+            >
+              {/* Subtle background pattern */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0"
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+              
+              {/* Content */}
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ duration: 0.5, ease: "backOut", delay: 0.3 }}
+                      className="p-2 rounded-xl bg-primary/5 dark:bg-primary/10 shadow-sm border border-border/20"
+                    >
+                      <Target className="h-5 w-5 text-primary" />
+                    </motion.div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                        Avg. Progress
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+                
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                  className="mb-2"
+                >
+                  <div className="text-3xl font-bold text-foreground">
+                    {Math.round(averageProgress)}%
+                  </div>
+                </motion.div>
+                
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.8 }}
+                  className="mb-3"
+                >
+                  <p className="text-sm text-muted-foreground">
+                    Overall completion
+                  </p>
+                </motion.div>
+
+                {/* Progress bar */}
+                <motion.div
+                  initial={{ opacity: 0, scaleX: 0 }}
+                  animate={{ opacity: 1, scaleX: 1 }}
+                  transition={{ delay: 0.9, duration: 0.8 }}
+                >
+                  <Progress value={averageProgress} className="h-2" />
+                </motion.div>
+              </div>
+              
+              {/* Subtle decorative accent */}
+              <motion.div
+                className="absolute -bottom-2 -right-2 w-16 h-16 rounded-full opacity-5"
+                style={{
+                  background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)"
+                }}
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.05, 0.1, 0.05]
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+            </motion.div>
           </motion.div>
 
           {/* Achievements Showcase */}
@@ -379,7 +663,7 @@ export default function LearnerDashboard() {
                         <div className="mt-4 text-muted-foreground">Loading modules...</div>
                       </div>
                     ) : (function() {
-                      const notStarted = DeadlineData.message.filter((item: any) => !item.progress);
+                      const notStarted = DeadlineData?.message?.filter((item: any) => !item.progress) || [];
                       const ordered = notStarted.filter((item: any) => item.module?.order && item.module.order > 0).sort((a: any, b: any) => a.module.order - b.module.order);
                       const unordered = notStarted.filter((item: any) => !item.module?.order || item.module.order === 0);
                       const readyToStart = [...ordered, ...unordered];
@@ -626,9 +910,9 @@ export default function LearnerDashboard() {
                   ) : (
                     (() => {
                       // Filter and order modules for deadlines section
-                      let inProgressModules = DeadlineData.message.filter(
+                      let inProgressModules = DeadlineData?.message?.filter(
                         (item: any) => item.progress && item.progress.status === "In Progress"
-                      );
+                      ) || [];
                       // Separate ordered and unordered
                       const ordered = inProgressModules.filter((m: any) => m.module?.order && m.module.order > 0).sort((a: any, b: any) => a.module.order - b.module.order);
                       const unordered = inProgressModules.filter((m: any) => !m.module?.order || m.module.order === 0);
@@ -690,9 +974,9 @@ export default function LearnerDashboard() {
                   ) : (
                     (() => {
                       // Filter and order modules for ready to start section
-                      let notStartedModules = DeadlineData.message.filter(
+                      let notStartedModules = DeadlineData?.message?.filter(
                         (item: any) => !item.progress
-                      );
+                      ) || [];
                       // Separate ordered and unordered
                       const ordered = notStartedModules.filter((m: any) => m.module?.order && m.module.order > 0).sort((a: any, b: any) => a.module.order - b.module.order);
                       const unordered = notStartedModules.filter((m: any) => !m.module?.order || m.module.order === 0);

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useUser } from "@/hooks/use-user";
-import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
+
+import { useLearnerModuleData, useGetLearnerProgress, useAddLearnerProgress, useUpdateLearnerProgress } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar";
 import { CompletionScreen } from "@/pages/Modules/Learner/components/CompletionScreen";
@@ -221,24 +222,19 @@ export default function LearnerModuleDetail() {
     const [incompleteQuizQATitles, setIncompleteQuizQATitles] = useState<string[]>([]);
 
     // Fetch module data
-    const { data: moduleListData, error: moduleListError } = useFrappeGetCall<ApiResponse<{ modules: Module[] }>>("LearnerModuleData", {
-        user: user?.email,
+    const { data: moduleListData, error: moduleListError } = useLearnerModuleData(user?.email || "", {
         limit: 1,
         offset: 0,
-        filters: [["name", "=", moduleName]]
     });
     const moduleData = moduleListData?.data?.modules?.[0];
     // Post call for starting module
-    const { call: startModule } = useFrappePostCall('addLearnerProgress');
+    const { call: startModule } = useAddLearnerProgress();
     // Fetch progress and module structure
-    const { data: progressData } = useFrappeGetCall<ApiResponse<{ module: Module }>>("getLearnerProgress", {
-        user: user?.email,
-        module: moduleName
-    }, {
+    const { data: progressData } = useGetLearnerProgress(user?.email || "", moduleName || "", {
         enabled: started && !!moduleData
     });
     // Post call for updating progress
-    const { call: updateProgress, loading: updateLoading } = useFrappePostCall('updateLearnerProgress');
+    const { call: updateProgress, loading: updateLoading } = useUpdateLearnerProgress();
 
     // Update module data when fetched
     useEffect(() => {

@@ -16,6 +16,7 @@ export const ROUTES = {
   HOME: '/',
   LOGIN: '/login',
   LEARNER_DASHBOARD: '/learner-dashboard',
+  TL_DASHBOARD: '/tl-dashboard',
   MODULES: '/modules',
   MODULE_DETAIL: (moduleName: string) => `/module/${moduleName}`,
   MODULE_EDIT: (moduleName: string) => `/module/${moduleName}/edit`,

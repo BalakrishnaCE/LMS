@@ -22,7 +22,7 @@ import { useUser } from "@/hooks/use-user"
 import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Progress } from "@/components/ui/progress"
-import { useFrappeGetCall } from "frappe-react-sdk"
+import { useLearnerModuleData } from "@/lib/api"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { CheckCircle, Clock, MinusCircle, ChevronDown, ChevronUp, Calendar, AlertTriangle } from 'lucide-react';
 import Lottie from 'lottie-react';
@@ -62,9 +62,8 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
 
     const offset = (page - 1) * itemsPerPage
 
-    // Fetch modules with optimized learner API using frappe-react-sdk
-    const { data, error, isLoading } = useFrappeGetCall<any>("LearnerModuleData", {
-        user: user?.email,
+    // Fetch modules with optimized learner API using new API service
+    const { data, error, isLoading } = useLearnerModuleData(user?.email || "", {
         limit: itemsPerPage,
         offset,
     })
@@ -147,73 +146,141 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
             <AnimatePresence mode="wait">
                 <motion.div
                     key="stats"
-                    initial={{ opacity: 0, y: -20 }}
+                    initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.5 }}
-                    className="flex justify-center w-full"
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-gradient-to-r from-card to-card/80 border border-border rounded-xl p-6 shadow-lg backdrop-blur-sm"
                 >
-                    <Card className="mx-auto w-full max-w-4xl bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-2xl rounded-3xl p-6 md:p-10 flex flex-col gap-6 items-center border border-border">
-                        {/* Card Title */}
-                        <div className="w-full text-center text-2xl font-extrabold tracking-tight mb-2 text-foreground">Your Learning Stats</div>
-                        {/* Stats Row - stack vertically on mobile */}
-                        <div className="flex flex-col md:flex-row w-full justify-center items-center gap-6 md:gap-10">
-                            {barData.map((stat, idx) => (
-                                <div key={stat.name} className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center justify-center w-16 h-16 rounded-full shadow-lg" style={{ background: stat.color + '22' }}>
-                                        <span className="text-3xl font-extrabold" style={{ color: stat.color }}>{stat.value}</span>
-                                    </div>
-                                    <span className="text-sm font-semibold text-muted-foreground mt-1 flex items-center gap-1">
-                                        {stat.icon}
-                                        {stat.name}
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                        {/* Title and Description */}
+                        <div className="space-y-2">
+                            <motion.h1 
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="text-3xl font-bold text-foreground"
+                            >
+                                Available Modules
+                            </motion.h1>
+                            <motion.p 
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.5, delay: 0.1 }}
+                                className="text-muted-foreground"
+                            >
+                                Browse and enroll in modules to start your learning journey
+                            </motion.p>
+                        </div>
+                        
+                        {/* Enhanced Animated Stats */}
+                        <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+                            {/* Completed Modules */}
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.2 }}
+                                className="flex items-center gap-3 bg-green-50 dark:bg-green-950/30 px-4 py-2 rounded-lg border border-green-200 dark:border-green-800"
+                            >
+                                <motion.div 
+                                    className="w-4 h-4 rounded-full bg-green-500"
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                                        {completedCount}
                                     </span>
+                                    <span className="text-xs text-green-600 dark:text-green-500">Completed</span>
                                 </div>
-                            ))}
+                            </motion.div>
+
+                            {/* In Progress Modules */}
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.3 }}
+                                className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950/30 px-4 py-2 rounded-lg border border-blue-200 dark:border-blue-800"
+                            >
+                                <motion.div 
+                                    className="w-4 h-4 rounded-full bg-blue-500"
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                                />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+                                        {inProgressCount}
+                                    </span>
+                                    <span className="text-xs text-blue-600 dark:text-blue-500">In Progress</span>
+                                </div>
+                            </motion.div>
+
+                            {/* Available Modules */}
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.4 }}
+                                className="flex items-center gap-3 bg-gray-50 dark:bg-gray-950/30 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-800"
+                            >
+                                <motion.div 
+                                    className="w-4 h-4 rounded-full bg-gray-400"
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                                />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-400">
+                                        {notStartedCount}
+                                    </span>
+                                    <span className="text-xs text-gray-600 dark:text-gray-500">Available</span>
+                                </div>
+                            </motion.div>
+
+                            {/* Average Progress */}
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.5 }}
+                                className="flex items-center gap-3 bg-primary/10 dark:bg-primary/20 px-4 py-2 rounded-lg border border-primary/20 dark:border-primary/30"
+                            >
+                                <motion.div 
+                                    className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"
+                                    animate={{ rotate: [0, 360] }}
+                                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                >
+                                    <span className="text-xs font-bold text-primary-foreground">
+                                        {Math.round(averageProgress)}%
+                                    </span>
+                                </motion.div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-primary">
+                                        {Math.round(averageProgress)}%
+                                    </span>
+                                    <span className="text-xs text-primary/70">Avg Progress</span>
+                                </div>
+                            </motion.div>
                         </div>
-                        {/* Multi-segment Donut Chart for Module Status */}
-                        <div className="w-full flex flex-col items-center mt-2">
-                            <span className="text-xs text-muted-foreground font-medium">Module Status Breakdown</span>
-                            <div className="relative flex items-center justify-center w-full" style={{ minHeight: 180 }}>
-                                <ResponsiveContainer width={180} height={180}>
-                                    <PieChart>
-                                        <Pie
-                                            data={donutChartData}
-                                            dataKey="value"
-                                            nameKey="name"
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={80}
-                                            paddingAngle={2}
-                                            labelLine={false}
-                                        >
-                                            {donutChartData.map((entry, idx) => (
-                                                <Cell key={entry.name} fill={entry.color} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip formatter={(value, name) => [`${value} module${value === 1 ? '' : 's'}`, name]} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                {/* Center label for average progress */}
-                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <span className="text-3xl font-bold" style={{ color: '#0ea5e9' }}>{meta.average_progress?.toFixed(2) || '0.00'}%</span>
-                                    <span className="text-xs text-muted-foreground">Avg. Progress</span>
-                                </div>
-                            </div>
-                            {/* Legend below chart */}
-                            <div className="flex justify-center gap-6 mt-4 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-block w-4 h-4 rounded" style={{ background: '#22c55e' }} /> Completed
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-block w-4 h-4 rounded" style={{ background: '#0ea5e9' }} /> In Progress
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-block w-4 h-4 rounded" style={{ background: '#9ca3af' }} /> Yet to Start
-                                </div>
-                            </div>
+                    </div>
+
+                    {/* Progress Bar for Overall Completion */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.6 }}
+                        className="mt-4"
+                    >
+                        <div className="flex justify-between items-center text-xs text-muted-foreground mb-2">
+                            <span>Overall Progress</span>
+                            <span>{meta.total_count > 0 ? Math.round((meta.completed_modules / meta.total_count) * 100) : 0}% Complete</span>
                         </div>
-                    </Card>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                            <motion.div 
+                                className="h-full bg-gradient-to-r from-green-500 to-blue-500 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${meta.total_count > 0 ? (meta.completed_modules / meta.total_count) * 100 : 0}%` }}
+                                transition={{ duration: 1, delay: 0.8, ease: "easeOut" }}
+                            />
+                        </div>
+                    </motion.div>
                 </motion.div>
 
                 <motion.div

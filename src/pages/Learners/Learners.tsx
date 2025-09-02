@@ -1,5 +1,4 @@
 import * as React from "react";
-import { useFrappeGetCall, useFrappeGetDocList, useFrappePostCall } from "frappe-react-sdk";
 import { Card, CardHeader, CardTitle, CardDescription, CardAction, CardFooter } from "@/components/ui/card";
 import { LearnersTable } from "@/pages/Learners/LearnersTable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,6 +17,7 @@ import {
   PaginationNext, 
   PaginationPrevious 
 } from "@/components/ui/pagination";
+import { useAPI } from "@/lib/api";
 
 interface User {
   name: string;
@@ -280,12 +280,34 @@ export default function Learners() {
   });
   const [learnerToEdit, setLearnerToEdit] = React.useState<User | null>(null);
 
-  const { call: addLearnerPost } = useFrappePostCall("addLMSUser");
-  const { call: updateLearnerPost } = useFrappePostCall("updateLearner");
-  const { data: analyticsData, error, isValidating, mutate } = useFrappeGetCall<{ message: ApiData }>("getLearnerAnalytics", {
-    limit: 1000, // Increase limit to handle large datasets
-    page_length: 1000
-  });
+  const api = useAPI();
+  const [analyticsData, setAnalyticsData] = React.useState<{ message: ApiData } | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isValidating, setIsValidating] = React.useState(false);
+
+  // Fetch learner analytics data
+  const fetchLearnerAnalytics = React.useCallback(async () => {
+    setIsValidating(true);
+    setError(null);
+    try {
+      const response = await api.getLMSAnalytics({
+        limit: 1000,
+        page_length: 1000
+      });
+      setAnalyticsData(response);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch learner analytics");
+      console.error("Error fetching learner analytics:", err);
+    } finally {
+      setIsValidating(false);
+    }
+  }, [api]);
+
+  React.useEffect(() => {
+    fetchLearnerAnalytics();
+  }, [fetchLearnerAnalytics]);
+
+  const mutate = fetchLearnerAnalytics;
   const message = analyticsData?.message;
   const users = message?.users || [];
   const stats = message?.stats;
@@ -300,7 +322,33 @@ export default function Learners() {
   }, [stats, users]);
 
   // Fetch all departments for filter and selection (limit 150)
-  const { data: allDepartmentsData } = useFrappeGetDocList("Department", { fields: ["name", "department"], limit: 150 });
+  const [allDepartmentsData, setAllDepartmentsData] = React.useState<any[]>([]);
+  
+  React.useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const response = await fetch(`${process.env.NODE_ENV === 'production' ? "https://lms.noveloffice.in" : "http://10.80.4.85:8000"}/api/resource/User?fields=["name","department"]&limit=150`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          // Extract unique departments from users
+          const departments = new Map();
+          data.data?.forEach((user: any) => {
+            if (user.department) {
+              departments.set(user.department, { name: user.department, department: user.department });
+            }
+          });
+          setAllDepartmentsData(Array.from(departments.values()));
+        }
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+    
+    fetchDepartments();
+  }, []);
+  
   const allDepartmentOptions = allDepartmentsData || [];
   const departmentIdToName = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map(dep => [dep.name, dep.department])), [allDepartmentOptions]);
 
@@ -366,7 +414,7 @@ export default function Learners() {
     }
   };
 
-  // Add Learner handler (placeholder)
+  // Add Learner handler
   async function handleAddLearner(e: React.FormEvent) {
     e.preventDefault();
     setAddError(null);
@@ -376,7 +424,7 @@ export default function Learners() {
     }
     setAddLoading(true);
     try {
-      const response = await addLearnerPost({
+      const response = await api.addLearner({
         email: addForm.email,
         full_name: `${addForm.first_name} ${addForm.last_name}`.trim(),
         first_name: addForm.first_name,
@@ -461,7 +509,7 @@ export default function Learners() {
         updateData.password = editForm.password;
       }
 
-      const response = await updateLearnerPost(updateData);
+      const response = await api.updateLearner(updateData);
       
       // Check for backend error structure in response
       const msg = response?.message;

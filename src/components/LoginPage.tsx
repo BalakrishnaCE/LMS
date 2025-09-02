@@ -18,6 +18,7 @@ import { motion, HTMLMotionProps } from "framer-motion"
 import { ROUTES, getFullPath, LMS_API_BASE_URL } from "@/config/routes"
 import Lottie from 'lottie-react';
 import errorAnimation from '@/assets/Error.json';
+import { useLMSUserPermissions } from "@/hooks/use-lms-user-permissions";
 
 interface UserRole {
   role: string;
@@ -32,14 +33,18 @@ export function LoginForm({
   const [showPassword, setShowPassword] = React.useState(false)
   const [isLoggingIn, setIsLoggingIn] = React.useState(false)
   const { login, error: loginError, isLoading: isLoginLoading, currentUser } = useFrappeAuth()
-  const [user, setUser] = React.useState<any>(null)
-  const [userLoading, setUserLoading] = React.useState(false)
-  const [userLoadingError, setUserLoadingError] = React.useState<string | null>(null)
-  const [userError, setUserError] = React.useState<string | null>(null)
-  const [isLMSAdmin, setIsLMSAdmin] = React.useState(false)
-  const [isLMSStudent, setIsLMSStudent] = React.useState(false)
-  const [isLMSContentEditor, setIsLMSContentEditor] = React.useState(false)
   const [loginTriggered, setLoginTriggered] = React.useState(false)
+  
+  // Use the new LMS Users permissions hook
+  const { 
+    isLoading: permissionsLoading, 
+    isLMSAdmin, 
+    isLMSStudent, 
+    isLMSContentEditor, 
+    isLMSTL,
+    userType,
+    error: permissionsError 
+  } = useLMSUserPermissions()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,63 +65,51 @@ export function LoginForm({
     }
   }
 
-  // Fetch user doc after login
+  // Simplified redirect logic - single useEffect to handle all cases
   React.useEffect(() => {
     if (!loginTriggered || !currentUser) return;
-    setUserLoading(true);
-    setUserError(null);
-    // Fetch user doc using useFrappeGetDoc
-    const fetchUser = async () => {
-      try {
-        // Use direct fetch for user doc
-        // add with credentials true 
-        const res = await fetch(`${LMS_API_BASE_URL}/api/resource/User/${currentUser}`, {
-          credentials: "include"
-        });
-        const userDoc = await res.json();
-        const userData = userDoc.data || userDoc;
-        setUser(userData);
-        // Set role flags
-        const roles = (userData.roles || []) as Array<{ role: string }>;
-        setIsLMSAdmin(roles.some((role: { role: string }) => role.role === "LMS Admin"));
-        setIsLMSStudent(roles.some((role: { role: string }) => role.role === "LMS Student"));
-        setIsLMSContentEditor(roles.some((role: { role: string }) => role.role === "LMS Content Editor"));
-        setUserLoading(false);
-      } catch (err: any) {
-        setUserError(err?.message || "Failed to fetch user data");
-        setUserLoading(false);
-      }
-    };
-    fetchUser();
-  }, [loginTriggered, currentUser]);
-
-  // Redirect as soon as user data is available after login
-  React.useEffect(() => {
-    if (!loginTriggered) return;
-    if (user) {
-      setIsLoggingIn(false);
-      setLoginTriggered(false);
+    
+    // Wait for permissions to load
+    if (permissionsLoading) return;
+    
+    // Debug logging
+    console.log("Login redirect logic:", {
+      loginTriggered,
+      currentUser,
+      permissionsLoading,
+      userType,
+      isLMSAdmin,
+      isLMSContentEditor,
+      isLMSTL,
+      isLMSStudent
+    });
+    
+    // Reset login state
+    setIsLoggingIn(false);
+    setLoginTriggered(false);
+    
+    // Check if user has any valid LMS role
+    if (userType) {
+      // User has a valid role, redirect accordingly
       if (isLMSAdmin) {
+        console.log("Redirecting to admin dashboard");
         navigate(getFullPath(ROUTES.HOME));
       } else if (isLMSContentEditor) {
+        console.log("Redirecting to content editor modules");
         navigate(getFullPath(ROUTES.MODULES));
+      } else if (isLMSTL) {
+        console.log("Redirecting to TL dashboard");
+        navigate(getFullPath(ROUTES.TL_DASHBOARD));
       } else if (isLMSStudent) {
+        console.log("Redirecting to learner dashboard");
         navigate(getFullPath(ROUTES.LEARNER_DASHBOARD));
-      } else {
-        navigate(getFullPath(ROUTES.LOGIN));
-        toast.error("You don't have the required permissions to access this system");
       }
+    } else {
+      // User is logged in but has no LMS role - redirect to login
+      console.log("No valid user type found, redirecting to login");
+      navigate(getFullPath(ROUTES.LOGIN));
     }
-    // If user data doesn't load in 5 seconds, show error
-    const timeout = setTimeout(() => {
-      if (!user) {
-        setIsLoggingIn(false);
-        setLoginTriggered(false);
-        toast.error("Failed to load user data. Please try again.");
-      }
-    }, 5000);
-    return () => clearTimeout(timeout);
-  }, [user, isLMSAdmin, isLMSStudent, isLMSContentEditor, loginTriggered]);
+  }, [userType, isLMSAdmin, isLMSStudent, isLMSContentEditor, isLMSTL, permissionsLoading, loginTriggered, currentUser]);
 
   const motionProps: HTMLMotionProps<"div"> = {
     initial: { opacity: 0, y: 20 },
@@ -202,12 +195,12 @@ export function LoginForm({
               <Button 
                 type="submit" 
                 className="w-full h-11 font-medium" 
-                disabled={isLoggingIn}
+                disabled={isLoggingIn || permissionsLoading}
               >
-                {isLoggingIn ? (
+                {isLoggingIn || permissionsLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Logging in...
+                    {isLoggingIn ? "Logging in..." : "Loading permissions..."}
                   </>
                 ) : (
                   "Sign In"

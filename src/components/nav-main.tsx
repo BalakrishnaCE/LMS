@@ -9,7 +9,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { navigate } from "wouter/use-browser-location"
-import { useUser } from "@/hooks/use-user"
+import { useLMSUserPermissions } from "@/hooks/use-lms-user-permissions"
 import { getRelativePath, getFullPath } from "@/config/routes"
 import { BASE_PATH } from "@/config/routes"
 
@@ -24,7 +24,7 @@ export function NavMain({
   }[]
 }) {
   const [location] = useLocation();
-  const { isLMSAdmin } = useUser();
+  const { isLMSAdmin } = useLMSUserPermissions();
 
   // Get the current path without the base path
   const currentPath = getRelativePath(location);

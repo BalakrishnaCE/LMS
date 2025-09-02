@@ -1,5 +1,4 @@
 import { useParams, Link } from "wouter"
-import { useFrappeGetDoc } from "frappe-react-sdk"
 import { Progress } from "@/components/ui/progress"
 import { LessonWithChapters } from "@/pages/Modules/LessonwithChapter"
 import { useEffect, useState, useMemo } from "react";
@@ -8,7 +7,8 @@ import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { useUser } from "@/hooks/use-user"
-import { LMS_API_BASE_URL, BASE_PATH } from "@/config/routes"
+import { BASE_PATH } from "@/config/routes"
+import { useAPI } from "@/lib/api"
 
 
 // Add custom styles for the content
@@ -78,9 +78,28 @@ export default function ModuleDetail() {
         setEnableEditing(isLMSAdmin || isLMSContentEditor);
     }, [isLMSAdmin, isLMSContentEditor]);
 
-    const { data: module, error, isValidating } = useFrappeGetDoc("LMS Module", moduleName, {
-        fields: ["name", "name1", "description", "is_published", "image", "lessons", "total_score", "has_scoring", "has_progress"]
-    });
+    const api = useAPI();
+    const [module, setModule] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [isValidating, setIsValidating] = useState(false);
+
+    // Fetch module data
+    useEffect(() => {
+        if (!moduleName) return;
+        
+        setIsValidating(true);
+        setError(null);
+        
+        api.getModuleWithDetails({ module_id: moduleName })
+            .then((response: any) => {
+                setModule(response.message || response);
+                setIsValidating(false);
+            })
+            .catch((err: any) => {
+                setError(err.message || "Failed to load module");
+                setIsValidating(false);
+            });
+    }, [moduleName, api]);
 
     const sortedLessons = useMemo(() => {
         return (module?.lessons || []).sort((a: ModuleLesson, b: ModuleLesson) => a.order - b.order);
@@ -104,11 +123,9 @@ export default function ModuleDetail() {
             const details: Record<string, any> = {};
             for (const lesson of sortedLessons) {
                 try {
-                    const response = await fetch(`${LMS_API_BASE_URL}/api/resource/Lesson/${lesson.lesson}`, {
-                        credentials: 'include'
-                    });
-                    const data = await response.json();
-                    details[lesson.lesson] = data.data;
+                    const response = await api.getModuleDetails();
+                    const data = response.message || response;
+                    details[lesson.lesson] = data;
                 } catch (error) {
                     console.error(`Error fetching lesson ${lesson.lesson}:`, error);
                 }
@@ -119,7 +136,7 @@ export default function ModuleDetail() {
         if (sortedLessons.length > 0) {
             fetchLessonDetails();
         }
-    }, [sortedLessons]);
+    }, [sortedLessons, api]);
 
     // Fetch chapter details for the selected lesson
     useEffect(() => {
@@ -139,12 +156,10 @@ export default function ModuleDetail() {
             const details: Record<string, any> = {};
             for (const chapter of chapters) {
                 try {
-                    const response = await fetch(`${LMS_API_BASE_URL}/api/resource/Chapter/${chapter.chapter}`, {
-                        credentials: 'include'
-                    });
-                    const data = await response.json();
+                    const response = await api.getModuleDetails();
+                    const data = response.message || response;
                     if (!isCurrent) return;
-                    details[chapter.chapter] = data.data;
+                    details[chapter.chapter] = data;
                 } catch (error) {}
             }
             if (isCurrent) setChapterDetailsSidebar(details);
@@ -228,25 +243,23 @@ export default function ModuleDetail() {
                                 onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                             >
                                 Description
-                                <AnimatePresence mode="wait">
-                                    {isDescriptionExpanded ? (
-                                        <motion.div
-                                            initial={{ rotate: 0 }}
-                                            animate={{ rotate: 180 }}
-                                            exit={{ rotate: 0 }}
-                                        >
-                                            <ChevronUp className="h-4 w-4" />
-                                        </motion.div>
-                                    ) : (
-                                        <motion.div
-                                            initial={{ rotate: 180 }}
-                                            animate={{ rotate: 0 }}
-                                            exit={{ rotate: 180 }}
-                                        >
-                                            <ChevronDown className="h-4 w-4" />
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                {isDescriptionExpanded ? (
+                                    <motion.div
+                                        initial={{ rotate: 0 }}
+                                        animate={{ rotate: 180 }}
+                                        transition={{ duration: 0.2 }}
+                                    >
+                                        <ChevronUp className="h-4 w-4" />
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        initial={{ rotate: 180 }}
+                                        animate={{ rotate: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                    >
+                                        <ChevronDown className="h-4 w-4" />
+                                    </motion.div>
+                                )}
                             </Button>
                             <AnimatePresence>
                                 {isDescriptionExpanded && (

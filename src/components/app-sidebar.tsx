@@ -18,9 +18,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { useUser } from "@/hooks/use-user"
+import { useLMSUserPermissions } from "@/hooks/use-lms-user-permissions"
 import { ROUTES } from "@/config/routes"
 import { Link } from 'wouter'
+import { useFrappeAuth } from "frappe-react-sdk"
 
 interface NavItem {
   title: string;
@@ -80,11 +81,33 @@ const learnerNavItems: NavItem[] = [
   },
 ];
 
+const tlNavItems: NavItem[] = [
+  {
+    title: "Team Dashboard",
+    url: ROUTES.TL_DASHBOARD,
+    icon: IconDashboard,
+    tooltip: "Team Dashboard",
+  },
+  {
+    title: "Team Modules",
+    url: ROUTES.LEARNER_MODULES,
+    icon: IconListDetails,
+    tooltip: "Team Modules",
+  },
+  {
+    title: "Analytics",
+    url: ROUTES.ANALYTICS,
+    icon: IconChartBar,
+    tooltip: "Analytics",
+  },
+];
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user, isLMSAdmin } = useUser();
+  const { isLMSAdmin, isLMSContentEditor, isLMSTL } = useLMSUserPermissions();
+  const { currentUser } = useFrappeAuth();
   const [navData, setNavData] = React.useState<NavData>({
     user: {
-      name: "User",
+      name: currentUser || "User",
       email: "",
       avatar: "/avatars/shadcn.jpg",
     },
@@ -92,18 +115,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   });
 
   React.useEffect(() => {
-    if (user) {
-      setNavData(prev => ({
-        ...prev,
-        user: {
-          name: user.full_name,
-          email: user.email,
-          avatar: user.image || "/avatars/shadcn.jpg",
-        },
-        navMain: isLMSAdmin ? adminNavItems : learnerNavItems
-      }));
+    // Determine navigation based on user type
+    let navItems = learnerNavItems; // Default to learner nav
+    
+    if (isLMSAdmin) {
+      navItems = adminNavItems;
+    } else if (isLMSContentEditor) {
+      navItems = adminNavItems; // Content editors get admin nav
+    } else if (isLMSTL) {
+      navItems = tlNavItems; // TL gets TL-specific nav
     }
-  }, [user, isLMSAdmin]);
+    
+    setNavData(prev => ({
+      ...prev,
+      user: {
+        name: currentUser || "User",
+        email: "",
+        avatar: "/avatars/shadcn.jpg",
+      },
+      navMain: navItems
+    }));
+  }, [isLMSAdmin, isLMSContentEditor, isLMSTL, currentUser]);
 
   return (
     <div>
@@ -115,7 +147,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 asChild
                 className="data-[slot=sidebar-menu-button]:!p-1.5"
               >
-                <Link href={isLMSAdmin ? ROUTES.HOME : ROUTES.LEARNER_DASHBOARD} className="hover:text-white">
+                <Link href={
+                  isLMSAdmin || isLMSContentEditor 
+                    ? ROUTES.HOME 
+                    : isLMSTL 
+                      ? ROUTES.TL_DASHBOARD 
+                      : ROUTES.LEARNER_DASHBOARD
+                } className="hover:text-white">
                   <IconBook className="!size-5" />
                   <span className="text-base font-semibold">Novel LMS</span>
                 </Link>            

@@ -1,4 +1,4 @@
-import { useUser } from "@/hooks/use-user";
+import { useLMSUserPermissions } from "@/hooks/use-lms-user-permissions";
 import { Redirect, Route } from "wouter";
 import { useFrappeAuth } from "frappe-react-sdk";
 import Lottie from 'lottie-react';
@@ -15,11 +15,18 @@ export function ProtectedRoute({
   component: Component,
   allowedRoles = [],
 }: ProtectedRouteProps) {
-  const { user, isLoading, isLMSAdmin, isLMSStudent, isLMSContentEditor } = useUser();
+  const { 
+    isLoading: permissionsLoading, 
+    isLMSAdmin, 
+    isLMSStudent, 
+    isLMSContentEditor, 
+    isLMSTL,
+    userType 
+  } = useLMSUserPermissions();
   const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
 
-  // Show loading state while either auth or user data is loading
-  if (isLoading || isAuthLoading) {
+  // Show loading state while either auth or permissions data is loading
+  if (permissionsLoading || isAuthLoading) {
     return (
       <Route path={path}>
         <div className="flex items-center justify-center min-h-screen bg-bg-soft">
@@ -29,8 +36,8 @@ export function ProtectedRoute({
     );
   }
 
-  // Only redirect to login if we're sure there's no authenticated user
-  if (!currentUser || !user) {
+  // If not authenticated, redirect to login
+  if (!currentUser) {
     return (
       <Route path={path}>
         <Redirect to="/login" />
@@ -38,7 +45,16 @@ export function ProtectedRoute({
     );
   }
 
-  // Check role-based access
+  // If no user type found, redirect to login
+  if (!userType) {
+    return (
+      <Route path={path}>
+        <Redirect to="/login" />
+      </Route>
+    );
+  }
+
+  // Check role-based access using LMS Users permissions
   if (allowedRoles.length > 0) {
     const hasAccess = allowedRoles.some(role => {
       switch (role) {
@@ -48,20 +64,26 @@ export function ProtectedRoute({
           return isLMSStudent;
         case "LMS Content Editor":
           return isLMSContentEditor;
+        case "LMS TL":
+          return isLMSTL;
         default:
           return false;
       }
     });
 
     if (!hasAccess) {
-      // Redirect based on role
-      const redirectPath = isLMSAdmin 
-        ? "/" 
-        : isLMSContentEditor 
-          ? "/modules" 
-          : isLMSStudent 
-            ? "/learner-dashboard" 
-            : "/login";
+      // Redirect based on user type from LMS Users
+      let redirectPath = "/login";
+      
+      if (isLMSAdmin) {
+        redirectPath = "/admin-dashboard";
+      } else if (isLMSContentEditor) {
+        redirectPath = "/modules";
+      } else if (isLMSTL) {
+        redirectPath = "/tl-dashboard";
+      } else if (isLMSStudent) {
+        redirectPath = "/learner-dashboard";
+      }
       
       return (
         <Route path={path}>

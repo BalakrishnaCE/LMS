@@ -4,7 +4,6 @@ import Quiz from "@/pages/Modules/Contents/Quiz";
 import QuestionAnswer from "@/pages/Modules/Contents/QuestionAnswer";
 import SlideContent from "@/pages/Modules/Contents/SlideContent";
 import FileAttachContent from "@/pages/Modules/Contents/FileAttachContent";
-import { useFrappeGetDoc } from "frappe-react-sdk";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import StepsContent from './Contents/StepsContent';
 import CheckListContent from './Contents/CheckListContent';
 import AccordionContent from './Contents/AccordionContent';
-import { LMS_API_BASE_URL } from "@/config/routes";
+import { useAPI } from "@/lib/api";
 const contentStyles = `
     .prose ul {
         list-style-type: disc;
@@ -60,22 +59,20 @@ export function useLessonDoc(lessonName: string) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
+  const api = useAPI();
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${LMS_API_BASE_URL}/api/resource/Lesson/${lessonName}`, {
-      credentials: 'include'
-    })
-      .then(res => res.json())
-      .then(res => {
-        setData(res.data);
+    api.getModuleDetails()
+      .then((res: any) => {
+        setData(res.message || res);
         setLoading(false);
       })
       .catch(e => {
         setError(e);
         setLoading(false);
       });
-  }, [lessonName]);
+  }, [lessonName, api]);
 
   return { data, loading, error };
 }
@@ -84,22 +81,20 @@ export function useChapterDoc(chapterName: string) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
+  const api = useAPI();
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${LMS_API_BASE_URL}/api/resource/Chapter/${chapterName}`, {
-      credentials: 'include'
-    })
-      .then(res => res.json())
-      .then(res => {
-        setData(res.data);
+    api.getModuleDetails()
+      .then((res: any) => {
+        setData(res.message || res);
         setLoading(false);
       })
       .catch(e => {
         setError(e);
         setLoading(false);
       });
-  }, [chapterName]);
+  }, [chapterName, api]);
 
   return { data, loading, error };
 }

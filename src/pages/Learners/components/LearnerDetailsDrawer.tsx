@@ -5,17 +5,32 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X, Mail, Users, TrendingUp, BookOpen, Award } from "lucide-react";
-import { useFrappeGetCall } from "frappe-react-sdk";
-import { useFrappeGetDocList } from "frappe-react-sdk";
+import { useLearnerModuleData } from "@/lib/api";
 
 export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, open: boolean, onClose: () => void }) {
   // Fetch module progress/activity for this learner
-  const { data: progressData, isLoading } = useFrappeGetCall<any>("LearnerModuleData", {
-    user: learner?.email
-  }, { enabled: !!learner });
+  const { data: progressData, isLoading } = useLearnerModuleData(learner?.email || "", {}, { enabled: !!learner });
   const modules = progressData?.data?.modules || [];
-  // Fetch departments for mapping
-  const { data: departments } = useFrappeGetDocList("Department", { fields: ["name", "department"], limit: 150 });
+  // Fetch departments for mapping - using direct fetch since useFrappeGetDocList is not available
+  const [departments, setDepartments] = React.useState<any[]>([]);
+  
+  React.useEffect(() => {
+    if (learner) {
+      fetch('/api/method/frappe.client.get_list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctype: 'Department',
+          fields: ['name', 'department'],
+          limit: 150
+        }),
+        credentials: 'include'
+      })
+      .then(res => res.json())
+      .then(data => setDepartments(data.message || []))
+      .catch(err => console.error('Error fetching departments:', err));
+    }
+  }, [learner]);
   const departmentIdToName = React.useMemo(() => Object.fromEntries((departments || []).map(d => [d.name, d.department])), [departments]);
   // Calculate completion rate
   const totalModules = modules.length;

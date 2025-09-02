@@ -1,5 +1,6 @@
 import * as React from "react"
-import { useUser } from "@/hooks/use-user"
+import { useLMSUserPermissions } from "@/hooks/use-lms-user-permissions"
+import { useFrappeAuth } from "frappe-react-sdk"
 import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -9,12 +10,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { useFrappeGetDocList, useFrappeUpdateDoc, useFrappeGetCall } from "frappe-react-sdk"
+import { useFrappeGetDocList, useFrappeUpdateDoc } from "frappe-react-sdk"
 import { BookOpen, Clock, Award, Calendar, Star, Target, Mail, Phone, MapPin, Flame, Camera } from "lucide-react"
 import { toast } from "sonner"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import AchievementShowcase from "@/components/AchievementShowcase";
+import { useLearnerModuleData } from "@/lib/api";
 import { LMS_API_BASE_URL } from "@/config/routes";
 
 // Define Achievement type at the top if not already:
@@ -27,15 +29,26 @@ type Achievement = {
 };
 
 export default function Profile() {
-  const { user, isLoading: userLoading } = useUser();
+  const { isLoading: userLoading } = useLMSUserPermissions();
+  const { currentUser } = useFrappeAuth();
   const [activeTab, setActiveTab] = React.useState("overview")
   const [isLoading, setIsLoading] = React.useState(true)
   const [isUploading, setIsUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
-  // Fetch module progress using LearnerModuleData API
-  const { data: learnerData, isLoading: learnerLoading } = useFrappeGetCall<any>("LearnerModuleData", {
-    user: user?.email,
+  // Fetch user data
+  const { data: userData, isLoading: userDataLoading } = useFrappeGetDocList(
+    "User",
+    {
+      fields: ["name", "full_name", "email", "user_image", "phone", "location", "roles"],
+      filters: [["name", "=", currentUser || ""]],
+    },
+    { enabled: !!currentUser }
+  );
+  const user = userData?.[0] || null;
+
+  // Fetch module progress using new API
+  const { data: learnerData, isLoading: learnerLoading } = useLearnerModuleData(currentUser || "", {
     limit: 100,
     offset: 0,
   });
@@ -59,9 +72,9 @@ export default function Profile() {
         "achievement.text",
         "achievement.description"
       ],
-      filters: [["user", "=", user?.name || ""]],
+      filters: [["user", "=", currentUser || ""]],
     },
-    { enabled: !!user?.name }
+    { enabled: !!currentUser }
   );
   let achievements: Achievement[] = [];
   if (userAchievements && Array.isArray(userAchievements)) {
@@ -77,10 +90,10 @@ export default function Profile() {
   const { updateDoc } = useFrappeUpdateDoc()
 
   React.useEffect(() => {
-    if (user) {
+    if (currentUser) {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [currentUser]);
 
   const handleImageClick = () => {
     fileInputRef.current?.click()
@@ -88,7 +101,7 @@ export default function Profile() {
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !user) return
+    if (!file || !currentUser) return
 
     try {
       setIsUploading(true)
@@ -97,7 +110,7 @@ export default function Profile() {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('doctype', 'User')
-      formData.append('docname', user.name)
+      formData.append('docname', currentUser)
       formData.append('fieldname', 'user_image')
       formData.append('is_private', '0')
 
@@ -115,7 +128,7 @@ export default function Profile() {
       const data = await response.json()
       
       // Update the user's image field
-      await updateDoc('User', user.name, {
+      await updateDoc('User', currentUser, {
         user_image: data.message.file_url
       })
 
@@ -163,8 +176,10 @@ export default function Profile() {
                     }}
                   >
                     <Avatar className="h-32 w-32 shadow-lg border-4 border-white">
-                      <AvatarImage src={user?.user_image ? `${LMS_API_BASE_URL}${user.user_image}` : undefined} alt={user?.full_name} />
-                      <AvatarFallback className="text-3xl">{user?.full_name?.charAt(0)}</AvatarFallback>
+                      <AvatarImage src={undefined} alt={currentUser || undefined} />
+                      <AvatarFallback className="text-3xl">
+                    {user?.full_name ? user.full_name.charAt(0) : (currentUser ? currentUser.charAt(0) : 'U')}
+                  </AvatarFallback>
                     </Avatar>
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                       <Camera className="h-8 w-8 text-white" />
@@ -185,25 +200,25 @@ export default function Profile() {
                   )}
                 </div>
                 <div className="flex-1 space-y-2">
-                  <h2 className="text-3xl font-bold leading-tight">{user?.full_name}</h2>
+                  <h2 className="text-3xl font-bold leading-tight">{user?.full_name || currentUser}</h2>
                   <div className="flex items-center gap-2 text-muted-foreground text-lg">
                     <Mail className="h-5 w-5" />
-                    <span>{user?.email}</span>
+                    <span>{user?.email || currentUser}</span>
                   </div>
-                  {typeof (user as any)?.phone === 'string' && (user as any).phone && (
+                  {user?.phone && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Phone className="h-4 w-4" />
-                      <span>{(user as any).phone}</span>
+                      <span>{user.phone}</span>
                     </div>
                   )}
-                  {typeof (user as any)?.location === 'string' && (user as any).location && (
+                  {user?.location && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <MapPin className="h-4 w-4" />
-                      <span>{(user as any).location}</span>
+                      <span>{user.location}</span>
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {user?.roles?.map((role) => (
+                    {user?.roles?.map((role: any) => (
                       <Badge key={role.role} variant="secondary">
                         {role.role}
                       </Badge>

@@ -5,7 +5,6 @@ import {
     CardTitle,
   } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {  useFrappeGetDocList } from "frappe-react-sdk"
 import { Link } from "wouter"
 import {
   Pagination,
@@ -22,7 +21,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion"
 import { Download } from "lucide-react"
 import { toast } from "sonner"
-import { LMS_API_BASE_URL } from "@/config/routes"
+import { useAdminModules } from "@/lib/api"
+import { useLMSUserPermissions } from "@/hooks/use-lms-user-permissions"
 
 interface ModulesProps {
     itemsPerPage: number;
@@ -73,54 +73,55 @@ function Modules({ itemsPerPage }: ModulesProps) {
     // Add image error state for all cards
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
 
-    // Get departments for filter
-    const { data: departments } = useFrappeGetDocList("Department", {
-        fields: ["name", "department"],
-        limit: 100,
-    })
+    // Get user permissions to determine routing
+    const { isLMSAdmin, isLMSContentEditor } = useLMSUserPermissions();
+
+    // Get departments for filter - using API service instead
+    const [departments, setDepartments] = useState<any[]>([]);
+    
+    useEffect(() => {
+        // Fetch departments using the API service
+        const fetchDepartments = async () => {
+            try {
+                const response = await fetch(`${process.env.NODE_ENV === 'production' ? "https://lms.noveloffice.in" : "http://10.80.4.85"}/api/resource/Department?fields=["name","department"]&limit=100`, {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setDepartments(data.data || []);
+                }
+            } catch (error) {
+                console.error("Error fetching departments:", error);
+            }
+        };
+        
+        fetchDepartments();
+    }, []);
     
     // Sort departments alphabetically by department name
     const sortedDepartments = departments?.sort((a, b) => 
         (a.department || a.name).localeCompare(b.department || b.name)
     ) || [];
-    const filters: Filter[] = []
-    if (selectedDepartment && selectedDepartment !== "all") {
-        filters.push(["department", "=", selectedDepartment])
-    }
-    if (selectedStatus && selectedStatus !== "all") {
-        filters.push(["status", "=", selectedStatus])
-    }
-    if (searchQuery) {
-        filters.push(["name1", "like", `%${searchQuery}%`])
-    }
 
-    const { data: module_data } = useFrappeGetDocList("LMS Module",
-        {
-          fields: ["name", "name1", "short_text", "description", "status", "image", "department"],
-          limit: itemsPerPage,
-          limit_start: (page - 1) * itemsPerPage,
-          filters: filters
-        }
-      )
+    // Get modules using new API
+    const { data: module_response, error, isLoading } = useAdminModules({
+        department: selectedDepartment !== "all" ? selectedDepartment : undefined,
+        module: searchQuery || undefined
+    });
 
-    const { data: total_count } = useFrappeGetDocList("LMS Module",
-        {
-          fields: ["name"],
-          limit: 0,
-          filters: filters
-        }
-      )
+    // Extract modules from the response structure
+    const module_data = module_response?.data?.modules || [];
+    const totalPages = Math.ceil((module_data?.length || 0) / itemsPerPage)
 
-    const totalPages = Math.ceil((total_count?.length || 0) / itemsPerPage)
-
-    const module_list = module_data?.map((module: { name: string; name1: string; description: string; status: string; image: string; short_text: string; department: string }) => ({
+    const module_list = module_data?.map((module: { name: string; title: string; description: string; image: string; short_text: string; order: number }) => ({
         name: module.name,
-        name1: module.name1,
+        name1: module.title || module.name,
         description: module.description,
-        status: module.status,
+        status: "Published", // Default status since we're only getting published modules
         image: module.image,
         short_text: module.short_text,
-        department: module.department,
+        department: "", // Department info not available in this API
+        order: module.order
       }))
 
     const handlePageChange = (newPage: number) => {
@@ -139,14 +140,17 @@ function Modules({ itemsPerPage }: ModulesProps) {
 
             // Prepare fields and filters for the API call
             const exportFields = ["name", "name1", "short_text", "description", "status", "department", "is_published", "image"];
+            const exportFilters = {
+                is_published: 1
+            };
             const query = new URLSearchParams({
                 fields: JSON.stringify(exportFields),
-                filters: JSON.stringify(filters),
+                filters: JSON.stringify(exportFilters),
                 limit: "0"
             }).toString();
 
             // Fetch all modules for export using regular fetch with fields and filters
-            const response = await fetch(`${LMS_API_BASE_URL}/api/resource/LMS Module?${query}`, {
+                            const response = await fetch(`${process.env.NODE_ENV === 'production' ? "https://lms.noveloffice.in" : "http://10.80.4.85"}/api/resource/LMS Module?${query}`, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -159,7 +163,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
             }
 
             const data = await response.json();
-            const exportModules = data.data?.map((module: any) => ({
+            const exportModules = data.data?.map((module: { name: string; name1: string; description: string; status: string; short_text: string; department: string; is_published: number; image: string }) => ({
                 name: module.name,
                 name1: module.name1,
                 description: module.description,
@@ -235,7 +239,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 max-w-300 p-4">
-                {module_list?.map((module) => {
+                {module_list?.map((module: { name: string; name1: string; description: string; status: string; image: string; short_text: string; department: string; order: number }) => {
                     // Status bar color logic
                     let statusColor = "bg-gray-200 text-gray-700";
                     if (module.status === "Published") statusColor = "bg-green-100 text-green-700";
@@ -249,7 +253,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
 
                     // Use imageErrors state for this module
                     const imageUrl = module.image
-                        ? (module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`)
+                        ? (module.image.startsWith('http') ? module.image : `${process.env.NODE_ENV === 'production' ? "https://lms.noveloffice.in" : "http://10.80.4.85"}${module.image}`)
                         : null;
                     const hasError = imageErrors[module.name];
 
@@ -289,12 +293,12 @@ function Modules({ itemsPerPage }: ModulesProps) {
                                     </div>
                                     <CardHeader className="space-y-1 pb-4">
                                         <CardTitle className="text-lg dark:text-foreground  ">
-                                            {module.name1}
+                                            {module.name1 || module.name}
                                         </CardTitle>
                                     </CardHeader>
                                 </div>
                                 <CardFooter className="pt-0 pb-4 mt-auto">
-                                    <Link href={`/modules/learner/${module.name}`} className="w-full">
+                                    <Link href={isLMSAdmin || isLMSContentEditor ? `/module/${module.name}` : `/modules/learner/${module.name}`} className="w-full">
                                         <Button 
                                             variant="outline"
                                             className="w-full transition-all duration-200 dark:text-foreground dark:hover:bg-primary dark:hover:text-primary-foreground dark:border-primary/50 hover:scale-[1.02] active:scale-[0.98]"
