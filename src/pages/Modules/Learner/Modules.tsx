@@ -63,7 +63,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
     const offset = (page - 1) * itemsPerPage
 
     // Fetch modules with optimized learner API using frappe-react-sdk
-    const { data, error, isLoading } = useFrappeGetCall<any>("LearnerModuleData", {
+    const { data, error, isLoading } = useFrappeGetCall<any>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
         user: user?.email,
         limit: itemsPerPage,
         offset,

@@ -17,6 +17,20 @@ interface ModuleSidebarProps {
   currentLessonName?: string;
   currentChapterName?: string;
   mode: 'admin' | 'learner' | 'review';
+  // Phase 2: Completion data for smart icon display
+  completionData?: {
+    completed_lessons: string[];
+    completed_chapters: string[];
+    in_progress_chapters: string[];
+    current_position: {
+      type: string;
+      reference_id: string;
+      start_time: string;
+    } | null;
+    total_lessons: number;
+    total_chapters: number;
+    overall_progress: number;
+  };
 }
 
 export function ModuleSidebar({
@@ -28,7 +42,8 @@ export function ModuleSidebar({
   onChapterClick,
   currentLessonName,
   currentChapterName,
-  mode
+  mode,
+  completionData
 }: ModuleSidebarProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false);
   const [expandedLessons, setExpandedLessons] = React.useState<Set<string>>(new Set());
@@ -67,8 +82,20 @@ export function ModuleSidebar({
     }
   };
 
-  // Helper function to check if a lesson is completed
+  // Phase 2: Helper function to check if a lesson is completed using completion data
   const isLessonCompleted = (lesson: any) => {
+    // Use completion data if available (more reliable)
+    if (completionData && completionData.completed_lessons) {
+      const isCompleted = completionData.completed_lessons.includes(lesson.name);
+      console.log('🔍 Lesson completion check:', {
+        lessonName: lesson.name,
+        completedLessons: completionData.completed_lessons,
+        isCompleted: isCompleted
+      });
+      return isCompleted;
+    }
+    
+    // Fallback to old logic
     if (lesson.progress === "Completed") return true;
     if (!lesson.chapters || lesson.chapters.length === 0) return false;
     
@@ -76,8 +103,21 @@ export function ModuleSidebar({
     return lesson.chapters.every((chapter: any) => isChapterCompleted(chapter, lesson));
   };
 
-  // Helper function to check if a chapter is completed
+  // Phase 2: Helper function to check if a chapter is completed using completion data
   const isChapterCompleted = (chapter: any, lesson: any) => {
+    // Use completion data if available (more reliable)
+    if (completionData && completionData.completed_chapters) {
+      const isCompleted = completionData.completed_chapters.includes(chapter.name);
+      console.log('🔍 Chapter completion check:', {
+        chapterName: chapter.name,
+        lessonName: lesson.name,
+        completedChapters: completionData.completed_chapters,
+        isCompleted: isCompleted
+      });
+      return isCompleted;
+    }
+    
+    // Fallback to old logic
     if (chapter.progress === "Completed") return true;
     
     // Check if this chapter is before the current chapter in progress
@@ -95,6 +135,17 @@ export function ModuleSidebar({
     }
     
     return false;
+  };
+
+  // Phase 2: Helper function to check if a chapter is in progress
+  const isChapterInProgress = (chapter: any) => {
+    // Use completion data if available (more reliable)
+    if (completionData && completionData.in_progress_chapters) {
+      return completionData.in_progress_chapters.includes(chapter.name);
+    }
+    
+    // Fallback to old logic
+    return chapter.progress === "In Progress";
   };
 
   return (
@@ -188,9 +239,11 @@ export function ModuleSidebar({
             >
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Progress</span>
-                <span className="font-medium">{Math.round(overallProgress)}%</span>
+                <span className="font-medium">
+                  {overallProgress === -1 ? "Loading..." : `${Math.round(overallProgress)}%`}
+                </span>
               </div>
-              <Progress value={overallProgress} className="h-2" />
+              <Progress value={overallProgress === -1 ? 0 : overallProgress} className="h-2" />
             </motion.div>
           )}
         </div>
@@ -296,7 +349,7 @@ export function ModuleSidebar({
                                 <>
                                   {isChapterCompleted(chapter, lesson) ? (
                                     <CheckCircle className="h-3 w-3 text-primary" />
-                                  ) : chapter.name === currentChapterName ? (
+                                  ) : isChapterInProgress(chapter) || chapter.name === currentChapterName ? (
                                     <PlayCircle className="h-3 w-3 text-primary" />
                                   ) : (
                                     <Circle className="h-3 w-3 text-muted-foreground" />

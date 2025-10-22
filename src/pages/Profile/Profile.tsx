@@ -34,7 +34,7 @@ export default function Profile() {
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   // Fetch module progress using LearnerModuleData API
-  const { data: learnerData, isLoading: learnerLoading } = useFrappeGetCall<any>("LearnerModuleData", {
+  const { data: learnerData, isLoading: learnerLoading } = useFrappeGetCall<any>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
     user: user?.email,
     limit: 100,
     offset: 0,

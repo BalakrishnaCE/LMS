@@ -40,7 +40,7 @@ export default function AccordionContent({ content }: AccordionContentProps) {
                 <div className="flex gap-4 items-start py-2">
                   {item.image ? (
                     <img
-                      src={LMS_API_BASE_URL + item.image}
+                      src={item.image.startsWith('http') ? item.image : `${LMS_API_BASE_URL}${item.image.startsWith('/') ? item.image.slice(1) : item.image}`}
                       alt="Accordion Item"
                       className="max-w-[120px] h-auto rounded shadow border"
                     />

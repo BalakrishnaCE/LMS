@@ -58,11 +58,11 @@ function Admindashboard() {
     const { user, isLoading: userLoading, error } = useUser();
     const [activeTab, setActiveTab] = useState("module")
 
-    // Fetch learners data using the same API as Learners.tsx
-    const { data: analyticsData, error: studentsError, isValidating: studentsLoading } = useFrappeGetCall<any>("getLearnerAnalytics");
+    // Fetch learners data from LMS Users doctype
+    const { data: analyticsData, error: studentsError, isValidating: studentsLoading } = useFrappeGetCall<any>("novel_lms.novel_lms.api.departments.get_learners_data");
     const message = analyticsData?.message || {};
     const users = message.users || [];
-    const stats = message.stats;
+    const stats = message.users_stats;
 
     React.useEffect(() => {
         if (user) {

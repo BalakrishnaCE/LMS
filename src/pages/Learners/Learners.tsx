@@ -1,11 +1,10 @@
 import * as React from "react";
-import { useFrappeGetCall, useFrappeGetDocList, useFrappePostCall } from "frappe-react-sdk";
-import { Card, CardHeader, CardTitle, CardDescription, CardAction, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { LearnersTable } from "@/pages/Learners/LearnersTable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Download, CheckCircle, PauseCircle, TrendingUp } from "lucide-react";
+import { Search, Download } from "lucide-react";
 import { toast } from "sonner";
 import { UserDetailsDrawer } from "./components/LearnerDetailsDrawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
@@ -18,6 +17,11 @@ import {
   PaginationNext, 
   PaginationPrevious 
 } from "@/components/ui/pagination";
+import { useAPI } from "@/lib/api";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import Lottie from 'lottie-react';
+import loadingAnimation from '@/assets/Loading.json';
+import { useEffect, useRef, useState } from "react";
 
 interface User {
   name: string;
@@ -25,12 +29,26 @@ interface User {
   email: string;
   enabled: number;
   department?: string;
+  department_id?: string;
   departments?: string[];
+  department_ids?: string[];
   mobile_no?: string;
   creation?: string;
   last_login?: string;
   user_image?: string;
   roles?: string[];
+  role?: string; // Add role field from backend
+  // Add fields from learner_analytics
+  learner_name?: string;
+  modules_enrolled?: number;
+  modules_completed?: number;
+  completion_rate?: number;
+  avg_progress?: number;
+  avg_score?: number;
+  total_time_spent?: number;
+  achievements_count?: number;
+  last_activity?: string;
+  progress_trackers?: any[];
 }
 
 interface ApiData {
@@ -45,11 +63,35 @@ interface ApiData {
 
 // Helper function to convert data to CSV
 function convertToCSV(data: User[]) {
-  const headers = ["Name", "Email", "Status"];
+  const headers = [
+    "Name", 
+    "Email", 
+    "Status", 
+    "Department", 
+    "Mobile No", 
+    "Modules Enrolled", 
+    "Modules Completed", 
+    "Completion Rate (%)", 
+    "Avg Progress (%)", 
+    "Avg Score (%)", 
+    "Total Time Spent (min)", 
+    "Achievements Count", 
+    "Last Activity"
+  ];
   const rows = data.map(user => [
     user.full_name,
     user.email,
-    user.enabled === 1 ? "Active" : "Inactive"
+    user.enabled === 1 ? "Active" : "Inactive",
+    user.department || "N/A",
+    user.mobile_no || "N/A",
+    user.modules_enrolled || 0,
+    user.modules_completed || 0,
+    user.completion_rate || 0,
+    user.avg_progress || 0,
+    user.avg_score || 0,
+    user.total_time_spent || 0,
+    user.achievements_count || 0,
+    user.last_activity ? new Date(user.last_activity).toLocaleDateString() : "N/A"
   ]);
   
   return [
@@ -75,94 +117,186 @@ function downloadCSV(csv: string, filename: string) {
 
 // Stats Cards Component
 function StatsCards({ stats }: { stats: ApiData["stats"] }) {
-  const percentageChange = stats.percentage_change ?? 0;
-  const isPositive = percentageChange >= 0;
-  const activePercent = stats.total > 0 ? ((stats.active / stats.total) * 100) : 0;
-  const inactivePercent = stats.total > 0 ? ((stats.inactive / stats.total) * 100) : 0;
+  const { total, active, inactive } = stats;
+
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const [hoveredSlice, setHoveredSlice] = useState<{ name: string; value: number } | null>(null);
+
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  const [colors, setColors] = useState({
+    primary: "#0ea5e9",
+    published: "#22c55e",
+    draft: "#9ca3af",
+  });
+
+  useEffect(() => {
+    setColors({
+      primary: (getComputedStyle(document.documentElement).getPropertyValue("--primary") || "#0ea5e9").trim(),
+      published: (getComputedStyle(document.documentElement).getPropertyValue("--accent") || "#22c55e").trim(),
+      draft: "#9ca3af",
+    });
+  }, []);
+
+  const activePercent = total > 0 ? (active / total) * 100 : 0;
+  const inactivePercent = total > 0 ? (inactive / total) * 100 : 0;
+
+  const pieData = [
+    { name: "Total Learners", value: total, percentage: 100, fill: colors.primary },
+    { name: "Active Learners", value: active, percentage: activePercent, fill: colors.published },
+    { name: "Inactive Learners", value: inactive, percentage: inactivePercent, fill: colors.draft },
+  ];
+
+  // mouse move: compute local pos, hit-test exact SVG element under pointer
+  const onWrapperMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const bounds = el.getBoundingClientRect();
+    const mouseX = e.clientX - bounds.left;
+    const mouseY = e.clientY - bounds.top;
+
+    // prefer tooltip below cursor with a small offset, but flip if near bottom
+    const OFFSET = 16;
+    const EST_TOOLTIP_H = 56; // estimate
+    let tooltipY = mouseY + OFFSET;
+    if (mouseY + OFFSET + EST_TOOLTIP_H > bounds.height) {
+      tooltipY = mouseY - OFFSET - EST_TOOLTIP_H; // flip above if would overflow
+    }
+
+    // keep horizontal centered on mouse
+    const tooltipX = mouseX;
+
+    setCursorPos({ x: tooltipX, y: tooltipY });
+
+    // hit-test real element under cursor (client coordinates)
+    const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const sliceEl = target?.closest("[data-pie-index]") as HTMLElement | null;
+
+    if (sliceEl && sliceEl.dataset && typeof sliceEl.dataset.pieIndex !== "undefined") {
+      const idx = Number(sliceEl.dataset.pieIndex);
+      if (!Number.isNaN(idx) && pieData[idx]) {
+        setHoveredSlice({ name: pieData[idx].name, value: pieData[idx].value });
+        return;
+      }
+    }
+
+    // nothing under pointer (hole or outside) -> hide
+    setHoveredSlice(null);
+  };
+
+  const onWrapperMouseLeave = () => {
+    setCursorPos(null);
+    setHoveredSlice(null);
+  };
+
+  const TooltipDiv = ({ top, left, slice }: { top: number; left: number; slice: { name: string; value: number } }) => (
+    <div
+      className="absolute bg-card border border-border rounded-lg p-3 shadow-lg pointer-events-none"
+      style={{
+        top,
+        left,
+        transform: "translate(-50%, 0)", // center horizontally; vertical already chosen in onMouseMove
+        whiteSpace: "nowrap",
+        zIndex: 50,
+      }}
+    >
+      <p className="font-medium text-card-foreground">{slice.name}</p>
+      <p className="text-sm text-muted-foreground">
+        Count: <span className="font-semibold">{slice.value}</span>
+      </p>
+    </div>
+  );
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      {/* Total Learners */}
-      <Card className="@container/card">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      {/* Left Card */}
+      <Card className="bg-card border-border">
         <CardHeader>
-          <CardDescription>Total Learners</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {stats.total}
-          </CardTitle>
-          <CardAction>
-            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${isPositive ? 'border-green-300 text-green-700 bg-green-50' : 'border-red-300 text-red-700 bg-red-50'}`}> 
-              {isPositive ? <TrendingUp className="w-4 h-4 text-green-500" /> : <TrendingUp className="w-4 h-4 text-red-500 rotate-180" />} 
-              {`${Math.abs(percentageChange).toFixed(1)}%`}
-            </span>
-          </CardAction>
+          <CardTitle className="text-xl font-semibold text-card-foreground">Learner Statistics</CardTitle>
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">
-            {isPositive ? '+' : '-'}{Math.abs(percentageChange)}% from last month
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+            <div>
+              <h3 className="text-sm font-medium">Total Learners</h3>
+              <p className="text-2xl font-bold" style={{ color: colors.primary }}>{total}</p>
+            </div>
           </div>
-        </CardFooter>
-      </Card>
-      {/* Active Learners */}
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Active Learners</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {stats.active}
-          </CardTitle>
-          <CardAction>
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border border-green-300 text-green-700 bg-green-50">
-              <CheckCircle className="w-4 h-4 text-green-500" />
-              {`${activePercent.toFixed(1)}%`}
-            </span>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">
-            {stats.active} of {stats.total} learners active
+          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+            <div>
+              <h3 className="text-sm font-medium">Active Learners</h3>
+              <p className="text-2xl font-bold" style={{ color: colors.published }}>{active}</p>
+            </div>
           </div>
-        </CardFooter>
-      </Card>
-      {/* Inactive Learners */}
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Inactive Learners</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {stats.inactive}
-          </CardTitle>
-          <CardAction>
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border border-blue-300 text-blue-700 bg-blue-50">
-              <PauseCircle className="w-4 h-4 text-blue-400" />
-              {`${inactivePercent.toFixed(1)}%`}
-            </span>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">
-            {stats.inactive} of {stats.total} learners inactive
+          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+            <div>
+              <h3 className="text-sm font-medium">Inactive Learners</h3>
+              <p className="text-2xl font-bold" style={{ color: colors.draft }}>{inactive}</p>
+            </div>
           </div>
-        </CardFooter>
+        </CardContent>
       </Card>
-      {/* Growth Rate */}
-      <Card className="@container/card">
+
+      {/* Right Card - Pie Chart */}
+      <Card className="bg-card border-border">
         <CardHeader>
-          <CardDescription>Growth Rate</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {stats.percentage_change}%
-          </CardTitle>
-          <CardAction>
-            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${isPositive ? 'border-green-300 text-green-700 bg-green-50' : 'border-red-300 text-red-700 bg-red-50'}`}> 
-              {isPositive ? <TrendingUp className="w-4 h-4 text-green-500" /> : <TrendingUp className="w-4 h-4 text-red-500 rotate-180" />} 
-              {isPositive ? '+' : '-'}{Math.abs(percentageChange)}%
-            </span>
-          </CardAction>
+          <CardTitle className="text-xl font-semibold text-card-foreground">Learner Distribution</CardTitle>
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">Monthly growth rate</div>
-        </CardFooter>
+
+        <CardContent>
+          <div
+            ref={wrapperRef}
+            className="h-60 w-full relative"
+            onMouseMove={onWrapperMouseMove}
+            onMouseLeave={onWrapperMouseLeave}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={80}
+                  innerRadius={40}
+                  paddingAngle={8}
+                  dataKey="value"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      data-pie-index={index} // <- important: used by hit-test
+                      fill={entry.fill}
+                      stroke={entry.fill}
+                      strokeWidth={2}
+                      // keep onMouseEnter to support keyboard/focus interactions if needed
+                      onMouseEnter={() => setHoveredSlice({ name: entry.name, value: entry.value })}
+                    />
+                  ))}
+                </Pie>
+
+                <Legend
+                  verticalAlign="bottom"
+                  height={36}
+                  formatter={(value, entry: any) => (
+                    <span style={{ color: entry.payload.fill }}>
+                      {value} ({entry.payload.value})
+                    </span>
+                  )}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+
+            {cursorPos && hoveredSlice && (
+              <TooltipDiv top={cursorPos.y} left={cursorPos.x} slice={hoveredSlice} />
+            )}
+          </div>
+        </CardContent>
       </Card>
     </div>
   );
 }
+
+
 
 // Filters Component
 function Filters({ 
@@ -280,32 +414,197 @@ export default function Learners() {
   });
   const [learnerToEdit, setLearnerToEdit] = React.useState<User | null>(null);
 
-  const { call: addLearnerPost } = useFrappePostCall("addLMSUser");
-  const { call: updateLearnerPost } = useFrappePostCall("updateLearner");
-  const { data: analyticsData, error, isValidating, mutate } = useFrappeGetCall<{ message: ApiData }>("getLearnerAnalytics", {
-    limit: 1000, // Increase limit to handle large datasets
-    page_length: 1000
-  });
-  const message = analyticsData?.message;
-  const users = message?.users || [];
-  const stats = message?.stats;
-  // Log on every update for more accurate debugging
-  React.useEffect(() => {
-    console.log('Learner stats (effect):', stats);
-    console.log('Learner users (effect):', users);
-    console.log('Total users fetched:', users.length);
-    if (stats && users && typeof stats.total === 'number' && stats.total !== users.length) {
-      console.warn('Mismatch: stats.total does not match users.length', stats.total, users.length);
+  const api = useAPI();
+  const [analyticsData, setAnalyticsData] = React.useState<{ message: any } | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isValidating, setIsValidating] = React.useState(false);
+
+  // Fetch learner data from departments API
+  const fetchLearnerData = React.useCallback(async () => {
+    setIsValidating(true);
+    setError(null);
+    try {
+      // console.log("=== FETCHING LEARNER DATA ===");
+      // console.log("API URL: /api/method/novel_lms.novel_lms.api.departments.get_learners_data");
+      
+      const response = await api.getLearnersData();
+      // console.log("=== API RESPONSE ===");
+      // console.log("Full response:", response);
+      // console.log("Response type:", typeof response);
+      // console.log("Has message:", !!response.message);
+      
+      if (response.message) {
+        // console.log("Message keys:", Object.keys(response.message));
+        // console.log("Users count:", response.message.users?.length || 0);
+        // console.log("Users data:", response.message.users);
+        // console.log("Stats:", response.message.users_stats);
+        // console.log("Departments:", response.message.departments?.length || 0);
+      }
+      
+      setAnalyticsData(response);
+    } catch (err: any) {
+      console.error("=== API ERROR ===");
+      console.error("Error details:", err);
+      console.error("Error message:", err.message);
+      console.error("Error stack:", err.stack);
+      setError(err.message || "Failed to fetch learner data");
+    } finally {
+      setIsValidating(false);
     }
-  }, [stats, users]);
+  }, [api]);
 
-  // Fetch all departments for filter and selection (limit 150)
-  const { data: allDepartmentsData } = useFrappeGetDocList("Department", { fields: ["name", "department"], limit: 150 });
+  React.useEffect(() => {
+    fetchLearnerData();
+  }, [fetchLearnerData]);
+
+  const mutate = fetchLearnerData;
+  const message = analyticsData?.message;
+  
+  // Get departments from the learners data API response
+  const [allDepartmentsData, setAllDepartmentsData] = React.useState<any[]>([]);
+  const [userDepartmentMapping, setUserDepartmentMapping] = React.useState<Record<string, any>>({});
+  const [departmentDataLoaded, setDepartmentDataLoaded] = React.useState(false);
+  
+  React.useEffect(() => {
+    if (message?.departments) {
+      setAllDepartmentsData(message.departments);
+      setDepartmentDataLoaded(true);
+    }
+  }, [message?.departments]);
+
+  // Create fallback department mapping when users data is available
+  React.useEffect(() => {
+    if (message?.users && Object.keys(userDepartmentMapping).length === 0) {
+      const fallbackMapping: Record<string, any> = {};
+      message.users.forEach((user: any) => {
+        if (user.department) {
+          const userKey = user.email || user.name;
+          if (!fallbackMapping[userKey]) {
+            fallbackMapping[userKey] = {
+              departments: [],
+              department_ids: []
+            };
+          }
+          fallbackMapping[userKey].departments.push(user.department);
+          fallbackMapping[userKey].department_ids.push(""); // No ID available
+        }
+      });
+      setUserDepartmentMapping(fallbackMapping);
+    }
+  }, [message?.users]); // Removed userDepartmentMapping from dependencies to prevent infinite loop
+  
+  // Transform LearnersData to expected format
+  const transformedData = React.useMemo(() => {
+    // console.log("=== TRANSFORMING DATA ===");
+    // console.log("Message exists:", !!message);
+    // console.log("Message:", message);
+    
+    if (!message) {
+      // console.log("No message, returning empty data");
+      return { users: [], stats: null };
+    }
+    
+    // Get users data from the new departments API
+    const users = message.users || [];
+    const learnerStats = message.learner_analytics || [];
+    const stats = message.users_stats || {};
+    
+    // console.log("=== RAW DATA ===");
+    // console.log("Users array:", users);
+    // console.log("Users length:", users.length);
+    // console.log("Learner stats:", learnerStats);
+    // console.log("Stats:", stats);
+    // console.log("Message keys:", Object.keys(message));
+    
+    // Debug: Log if no users found
+    if (users.length === 0) {
+      // console.log("❌ NO USERS FOUND - This is the problem!");
+      // console.log("Possible causes:");
+      // console.log("1. No users with LMS roles in the system");
+      // console.log("2. LMS Users single doctype is empty");
+      // console.log("3. API is not returning users data");
+    } else {
+      // console.log("✅ Users found:", users.length);
+    }
+    
+    // Transform users to match frontend expectations
+    const mergedUsers = users.map((user: any) => ({
+      name: user.name || "",
+      full_name: user.full_name || "",
+      email: user.email || "",
+      enabled: user.enabled || 0,
+      department: user.department || "",
+      department_id: user.department_id || "",
+      departments: user.departments || [],
+      department_ids: user.department_ids || [],
+      mobile_no: user.mobile_no || "",
+      creation: user.creation || "",
+      last_login: user.last_login || "",
+      user_image: user.user_image || "",
+      // Convert single role to roles array for frontend compatibility
+      roles: user.role ? [user.role] : [],
+      role: user.role || "",
+      // Learner analytics fields (already merged by the API)
+      learner_name: user.learner_name || user.full_name || "",
+      modules_enrolled: user.modules_enrolled || 0,
+      modules_completed: user.modules_completed || 0,
+      completion_rate: user.completion_rate || 0,
+      avg_progress: user.avg_progress || 0,
+      avg_score: user.avg_score || 0,
+      total_time_spent: user.total_time_spent || 0,
+      achievements_count: user.achievements_count || 0,
+      last_activity: user.last_activity || user.last_login || "",
+      progress_trackers: user.progress_trackers || []
+    }));
+    
+    // Use stats from the API or calculate from merged users
+    const finalStats = stats.total !== undefined ? stats : {
+      total: mergedUsers.length,
+      active: mergedUsers.filter((user: User) => user.enabled === 1).length,
+      inactive: mergedUsers.filter((user: User) => user.enabled === 0).length,
+      percentage_change: 0
+    };
+    
+    // console.log("=== FINAL TRANSFORMED DATA ===");
+    // console.log("Merged users:", mergedUsers);
+    // console.log("Merged users length:", mergedUsers.length);
+    // console.log("Final stats:", finalStats);
+    
+    const result = {
+      users: mergedUsers,
+      stats: finalStats
+    };
+    
+    // console.log("=== FINAL RESULT ===");
+    // console.log("Result:", result);
+    
+    return result;
+  }, [message?.users, message?.learner_analytics, message?.users_stats, userDepartmentMapping]);
+
+  const users = transformedData.users;
+  const stats = transformedData.stats;
+  
+  // Log on every update for more accurate debugging (commented out for performance)
+  // React.useEffect(() => {
+  //   console.log('Learner stats (effect):', stats);
+  //   console.log('Learner users (effect):', users);
+  //   console.log('Total users fetched:', users.length);
+  //   if (stats && users && typeof stats.total === 'number' && stats.total !== users.length) {
+  //     console.warn('Mismatch: stats.total does not match users.length', stats.total, users.length);
+  //   }
+  // }, [stats?.total, users?.length]); // Only depend on specific values, not entire objects
+  
   const allDepartmentOptions = allDepartmentsData || [];
-  const departmentIdToName = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map(dep => [dep.name, dep.department])), [allDepartmentOptions]);
+  const departmentIdToName = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map((dep: any) => [dep.name, dep.department])), [allDepartmentOptions]);
+  const departmentNameToId = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map((dep: any) => [dep.department, dep.name])), [allDepartmentOptions]);
 
-  const departmentOptions = allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }));
-
+  const departmentOptions = allDepartmentOptions
+  .map((dep: any) => ({ value: dep.name, label: dep.department || dep.name }))
+  .sort((a, b) => a.label.localeCompare(b.label)); // Sort alphabetically by department name
+  // For edit form: filter out already selected departments
+  //const getFilteredDepartmentOptions = (selectedDepartments: string[]) => {
+  //return departmentOptions.filter(option => !selectedDepartments.includes(option.value));
+  //;
   // Filter users based on search criteria with improved logic
   const filteredUsers = React.useMemo(() => {
     if (!users || users.length === 0) return [];
@@ -332,12 +631,16 @@ export default function Learners() {
         (searchStatus === "inactive" && user.enabled === 0);
       
       // Department filter - check if any selected department matches user's departments
+      // Also check against department names (not just IDs)
       const departmentMatch = departmentFilter.length === 0 || 
-        departmentFilter.some(dep => userDepartments.includes(dep));
+        departmentFilter.some(depId => {
+          const depName = departmentIdToName[depId] || depId;
+          return userDepartments.includes(depId) || userDepartments.includes(depName);
+        });
       
       return nameMatch && emailMatch && statusMatch && departmentMatch;
     });
-  }, [users, searchName, searchEmail, searchStatus, departmentFilter]);
+  }, [users, searchName, searchEmail, searchStatus, departmentFilter, departmentIdToName]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
@@ -350,9 +653,7 @@ export default function Learners() {
     setCurrentPage(1);
   }, [searchName, searchEmail, searchStatus, departmentFilter]);
 
-  console.log("Total users:", users.length);
-  console.log("Filtered users:", filteredUsers.length);
-  console.log("Current page:", currentPage, "of", totalPages);
+  // Performance logging removed
 
   const handleExport = () => {
     try {
@@ -366,7 +667,7 @@ export default function Learners() {
     }
   };
 
-  // Add Learner handler (placeholder)
+  // Add Learner handler
   async function handleAddLearner(e: React.FormEvent) {
     e.preventDefault();
     setAddError(null);
@@ -376,7 +677,7 @@ export default function Learners() {
     }
     setAddLoading(true);
     try {
-      const response = await addLearnerPost({
+      const response = await api.addLearner({
         email: addForm.email,
         full_name: `${addForm.first_name} ${addForm.last_name}`.trim(),
         first_name: addForm.first_name,
@@ -384,8 +685,7 @@ export default function Learners() {
         mobile_no: addForm.mobile_no,
         departments: addForm.departments,
         password: addForm.password || undefined,
-        send_welcome_email: addForm.send_welcome_email ? 1 : 0,
-        role: "LMS Student"
+        send_welcome_email: addForm.send_welcome_email
       });
       // Check for backend error structure in response (for 200 OK with error)
       const msg = response?.message;
@@ -452,7 +752,7 @@ export default function Learners() {
         last_name: editForm.last_name,
         email: editForm.email,
         mobile_no: editForm.mobile_no,
-        enabled: editForm.enabled,
+        enabled: editForm.enabled === 1,
         departments: editForm.departments
       };
 
@@ -461,7 +761,7 @@ export default function Learners() {
         updateData.password = editForm.password;
       }
 
-      const response = await updateLearnerPost(updateData);
+      const response = await api.updateLearner(updateData);
       
       // Check for backend error structure in response
       const msg = response?.message;
@@ -532,6 +832,27 @@ export default function Learners() {
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
     
+    // Convert department names to department IDs for pre-selection
+    const getDepartmentIds = (learner: User) => {
+      const departments = learner.departments || [];
+      const singleDepartment = learner.department ? [learner.department] : [];
+      const allDepartmentNames = [...departments, ...singleDepartment].filter(Boolean);
+      
+      // Convert department names to IDs
+      const departmentIds = allDepartmentNames
+        .map(deptName => departmentNameToId[deptName] || deptName) // Use ID if mapping exists, otherwise use as-is
+        .filter(Boolean);
+      
+      // console.log("Edit learner - Department mapping:", {
+      //   learnerName: learner.full_name,
+      //   originalDepartments: allDepartmentNames,
+      //   departmentIds: departmentIds,
+      //   departmentNameToId: departmentNameToId
+      // });
+      
+      return departmentIds;
+    };
+    
     setEditForm({
       first_name: firstName,
       last_name: lastName,
@@ -539,7 +860,7 @@ export default function Learners() {
       mobile_no: (learner as User).mobile_no || '',
       password: '',
       enabled: learner.enabled,
-      departments: (learner as User).departments || [(learner as User).department || ''].filter(Boolean) // Convert single department to array
+      departments: getDepartmentIds(learner) // Pre-select current departments using IDs
     });
     setEditOpen(true);
   };
@@ -547,7 +868,19 @@ export default function Learners() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-red-500">Error loading learners: {error.message}</p>
+        <p className="text-red-500">Error loading learners: {error}</p>
+      </div>
+    );
+  }
+
+  // Show loading state while data is being fetched
+  if (isValidating || !departmentDataLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+          <p className="text-muted-foreground mt-4">Loading learners data...</p>
+        </div>
       </div>
     );
   }
@@ -582,7 +915,7 @@ export default function Learners() {
             <div>
               <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
                              <MultiSelect
-                 options={allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }))}
+                 options={allDepartmentOptions.map((dep: any) => ({ value: dep.name, label: dep.department || dep.name }))}
                  selected={addForm.departments}
                  onSelect={(selected) => setAddForm(f => ({ ...f, departments: selected }))}
                  placeholder="Select departments"
@@ -594,11 +927,11 @@ export default function Learners() {
                 </div>
               )}
             </div>
-            {addForm.departments && addForm.departments.length > 0 && (
+            {/*addForm.departments && addForm.departments.length > 0 && (
               <div className="mt-2 text-xs text-muted-foreground">
-                Selected: {addForm.departments.map(depId => departmentIdToName[depId] || depId).join(', ')}
+                Selected: {addForm.departments.map((depId: string) => departmentIdToName[depId] || depId).join(', ')}
               </div>
-            )}
+            )}*/}
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
               <Input value={addForm.mobile_no} onChange={e => setAddForm(f => ({ ...f, mobile_no: e.target.value }))} disabled={addLoading} />
@@ -649,18 +982,18 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
-                             <MultiSelect
-                 options={allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }))}
-                 selected={editForm.departments}
-                 onSelect={(selected) => setEditForm(f => ({ ...f, departments: selected }))}
-                 placeholder="Select departments"
-                 disabled={editLoading}
-               />
-              {editForm.departments && editForm.departments.length > 0 && (
+              <MultiSelect
+              options={departmentOptions}  // Show ALL departments (not filtered)
+              selected={editForm.departments}  // Pre-select current departments
+              onSelect={(selected) => setEditForm(f => ({ ...f, departments: selected }))}
+              placeholder="Select departments"
+              disabled={editLoading}
+              />
+                          {/*editForm.departments && editForm.departments.length > 0 && (
                 <div className="mt-2 text-xs text-muted-foreground">
-                  Selected: {editForm.departments.map(depId => departmentIdToName[depId] || depId).join(', ')}
+                  Selected: {editForm.departments.map((depId: string) => departmentIdToName[depId] || depId).join(', ')}
                 </div>
-              )}
+              )}*/}
             </div>
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
@@ -696,12 +1029,7 @@ export default function Learners() {
         </div>
       )}
       
-      {/* Show loading state */}
-      {isValidating && (
-        <div className="mb-4 p-3 rounded bg-blue-100 text-blue-800 border border-blue-300">
-          <strong>Loading:</strong> Fetching learner data... ({users.length} users loaded so far)
-        </div>
-      )}
+      
       
       {stats && <StatsCards stats={stats} />}
       
@@ -722,9 +1050,10 @@ export default function Learners() {
 
       <LearnersTable
         learners={paginatedUsers}
-        isLoading={isValidating}
+        isLoading={false}
         onEdit={handleEdit}
         onViewDetails={handleViewDetails}
+        departmentIdToName={departmentIdToName}
       />
 
       {/* Pagination */}
@@ -742,18 +1071,96 @@ export default function Learners() {
                 />
               </PaginationItem>
               
-              {/* Page numbers */}
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    isActive={currentPage === page}
-                    onClick={() => setCurrentPage(page)}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
+              {/* Page numbers with ellipsis */}
+              {(() => {
+                const pages = [];
+                const maxVisiblePages = 7; // Show max 7 page numbers
+                
+                if (totalPages <= maxVisiblePages) {
+                  // Show all pages if total is small
+                  for (let i = 1; i <= totalPages; i++) {
+                    pages.push(
+                      <PaginationItem key={i}>
+                        <PaginationLink
+                          isActive={currentPage === i}
+                          onClick={() => setCurrentPage(i)}
+                          className="cursor-pointer"
+                        >
+                          {i}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  }
+                } else {
+                  // Show first page
+                  pages.push(
+                    <PaginationItem key={1}>
+                      <PaginationLink
+                        isActive={currentPage === 1}
+                        onClick={() => setCurrentPage(1)}
+                        className="cursor-pointer"
+                      >
+                        1
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                  
+                  // Show ellipsis after first page if needed
+                  if (currentPage > 4) {
+                    pages.push(
+                      <PaginationItem key="ellipsis1">
+                        <span className="px-2 text-muted-foreground">...</span>
+                      </PaginationItem>
+                    );
+                  }
+                  
+                  // Show pages around current page
+                  const startPage = Math.max(2, currentPage - 1);
+                  const endPage = Math.min(totalPages - 1, currentPage + 1);
+                  
+                  for (let i = startPage; i <= endPage; i++) {
+                    if (i !== 1 && i !== totalPages) {
+                      pages.push(
+                        <PaginationItem key={i}>
+                          <PaginationLink
+                            isActive={currentPage === i}
+                            onClick={() => setCurrentPage(i)}
+                            className="cursor-pointer"
+                          >
+                            {i}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    }
+                  }
+                  
+                  // Show ellipsis before last page if needed
+                  if (currentPage < totalPages - 3) {
+                    pages.push(
+                      <PaginationItem key="ellipsis2">
+                        <span className="px-2 text-muted-foreground">...</span>
+                      </PaginationItem>
+                    );
+                  }
+                  
+                  // Show last page
+                  if (totalPages > 1) {
+                    pages.push(
+                      <PaginationItem key={totalPages}>
+                        <PaginationLink
+                          isActive={currentPage === totalPages}
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="cursor-pointer"
+                        >
+                          {totalPages}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  }
+                }
+                
+                return pages;
+              })()}
               
               <PaginationItem>
                 <PaginationNext 

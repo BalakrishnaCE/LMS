@@ -38,6 +38,7 @@ export function useUser(): UseUserReturn {
     }
   );
 
+
   useEffect(() => {
     // If auth is still loading, keep loading state
     if (isAuthLoading) {

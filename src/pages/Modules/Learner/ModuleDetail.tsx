@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useUser } from "@/hooks/use-user";
 import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
+import { useLearnerCompletionData, CompletionData } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar";
 import { CompletionScreen } from "@/pages/Modules/Learner/components/CompletionScreen";
@@ -220,25 +221,151 @@ export default function LearnerModuleDetail() {
     const [showQuizQAAlert, setShowQuizQAAlert] = useState(false);
     const [incompleteQuizQATitles, setIncompleteQuizQATitles] = useState<string[]>([]);
 
+    // Phase 2: Completion data state management
+    const [completionData, setCompletionData] = useState<CompletionData>({
+        completed_lessons: [],
+        completed_chapters: [],
+        in_progress_chapters: [],
+        current_position: null,
+        total_lessons: 0,
+        total_chapters: 0,
+        overall_progress: 0
+    });
+
     // Fetch module data
-    const { data: moduleListData, error: moduleListError } = useFrappeGetCall<ApiResponse<{ modules: Module[] }>>("LearnerModuleData", {
+    const { data: moduleListData, error: moduleListError } = useFrappeGetCall<ApiResponse<{ modules: Module[] }>>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
         user: user?.email,
         limit: 1,
         offset: 0,
         filters: [["name", "=", moduleName]]
     });
-    const moduleData = moduleListData?.data?.modules?.[0];
+    const moduleData = (moduleListData as any)?.message?.message?.modules?.[0];
     // Post call for starting module
-    const { call: startModule } = useFrappePostCall('addLearnerProgress');
+    const { call: startModule } = useFrappePostCall('novel_lms.novel_lms.api.progress_tracking.add_learner_progress');
     // Fetch progress and module structure
-    const { data: progressData } = useFrappeGetCall<ApiResponse<{ module: Module }>>("getLearnerProgress", {
+    const shouldFetchProgress = started && !!moduleData && !!user?.email && !!moduleName && !userLoading;
+    const { data: progressData } = useFrappeGetCall<ApiResponse<{ module: Module }>>("novel_lms.novel_lms.api.progress_tracking.get_learner_progress", {
         user: user?.email,
         module: moduleName
     }, {
-        enabled: started && !!moduleData
+        enabled: shouldFetchProgress
     });
+
+    // Debug logging
+    console.log('getLearnerProgress call - user:', user?.email, 'module:', moduleName, 'enabled:', shouldFetchProgress);
+    console.log('getLearnerProgress call - user object:', user);
+    console.log('getLearnerProgress call - userLoading:', userLoading);
+    console.log('getLearnerProgress call - started:', started, 'moduleData:', !!moduleData);
     // Post call for updating progress
-    const { call: updateProgress, loading: updateLoading } = useFrappePostCall('updateLearnerProgress');
+    const { call: updateProgress, loading: updateLoading } = useFrappePostCall('novel_lms.novel_lms.api.progress_tracking.update_learner_progress');
+    
+    // Phase 2: Completion data API hook with refetch capability - Always enabled
+    const { data: completionDataResponse, error: completionDataError, mutate: refetchCompletionData } = useLearnerCompletionData(
+        user?.email || '',
+        moduleName || '',
+        { enabled: true } // Always enabled to prevent API call blocking
+    );
+
+    // Phase 2: Update completion data when fetched - Proper State Management
+    useEffect(() => {
+        try {
+            if (completionDataResponse?.message) {
+                // Handle the case where the API returns a different structure
+                const data = completionDataResponse.message;
+                if (data.completed_lessons !== undefined) {
+                    // This is the correct structure from our API
+                    setCompletionData(data);
+                    console.log('🔄 Completion data updated from API:', data);
+                    console.log('🔄 Progress will be:', data.overall_progress || 'calculated');
+                } else {
+                    // This might be from a different API call, ignore it
+                    console.log('⚠️ Ignoring completion data with unexpected structure:', data);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error updating completion data:', error);
+        }
+    }, [completionDataResponse]);
+
+    // Phase 2: Force completion data refresh when resuming
+    useEffect(() => {
+        if (started && user?.email && moduleName && !isLMSAdmin) {
+            console.log('🔄 Forcing completion data refresh on resume');
+            refetchCompletionData();
+        }
+    }, [started, user?.email, moduleName, isLMSAdmin, refetchCompletionData]);
+
+    // Phase 2: Immediate API call on mount to prevent 0% progress
+    useEffect(() => {
+        if (user?.email && moduleName && !isLMSAdmin) {
+            console.log('🔄 Immediate API call on mount to prevent 0% progress');
+            refetchCompletionData();
+        }
+    }, [user?.email, moduleName, isLMSAdmin, refetchCompletionData]);
+
+    // Phase 2: Handle completion data error
+    useEffect(() => {
+        if (completionDataError) {
+            console.warn('⚠️ Completion data fetch error:', completionDataError);
+            // Keep default completion data state - don't break the page
+        }
+    }, [completionDataError]);
+
+    // Phase 2: Debug logging for hook dependencies
+    useEffect(() => {
+        console.log('🔍 Hook dependencies debug:', {
+            userEmail: user?.email,
+            moduleName: moduleName,
+            isLMSAdmin: isLMSAdmin,
+            reviewing: reviewing,
+            started: started,
+            completionDataResponse: !!completionDataResponse,
+            completionDataError: !!completionDataError
+        });
+    }, [user?.email, moduleName, isLMSAdmin, reviewing, started, completionDataResponse, completionDataError]);
+
+    // Phase 2: Helper function to check if a lesson is completed based on its chapters
+    const isLessonCompletedByChapters = (lessonName: string, completedChapters: string[]) => {
+        if (!module?.lessons) return false;
+        
+        const lesson = module.lessons.find(l => l.name === lessonName);
+        if (!lesson?.chapters || lesson.chapters.length === 0) return false;
+        
+        // Check if all chapters in the lesson are completed
+        return lesson.chapters.every(chapter => completedChapters.includes(chapter.name));
+    };
+
+    // Phase 2: Function to track chapter start (In Progress)
+    const trackChapterStart = async (lessonName: string, chapterName: string) => {
+        if (!user || !moduleName) return;
+        
+        try {
+            // Check if chapter is already completed
+            const isChapterCompleted = completionData?.completed_chapters?.includes(chapterName) || false;
+            const isChapterInProgress = completionData?.in_progress_chapters?.includes(chapterName) || false;
+            
+            if (!isChapterCompleted && !isChapterInProgress) {
+                // Track as "In Progress"
+                await updateProgress({
+                    user: user.email,
+                    module: moduleName,
+                    lesson: lessonName,
+                    chapter: chapterName,
+                    status: "In Progress"
+                });
+                
+                // Update local completion data
+                setCompletionData(prev => ({
+                    ...prev,
+                    in_progress_chapters: [...(prev?.in_progress_chapters || []), chapterName]
+                }));
+                
+                console.log('🔄 Chapter started:', chapterName);
+            }
+        } catch (error) {
+            console.error('❌ Error tracking chapter start:', error);
+        }
+    };
 
     // Update module data when fetched
     useEffect(() => {
@@ -288,19 +415,30 @@ export default function LearnerModuleDetail() {
         }
     }, [progress, module]);
 
-    // Force progress recalculation when current indices change
+    // Force progress recalculation when completion data changes
     useEffect(() => {
         // This will trigger a re-render and recalculate overallProgress
-    }, [currentLessonIdx, currentChapterIdx, module]);
+        console.log('🔄 Progress recalculation triggered - completionData changed');
+    }, [completionData, currentLessonIdx, currentChapterIdx, module]);
 
-    // Calculate overall progress
-    const getOverallProgress = () => {
+    // Unified Progress Calculation - Single Source of Truth
+    const getUnifiedProgress = () => {
+        // If module is completed, return 100%
         if (progress?.status === "Completed") return 100;
+        
+        // Use completionData if available and valid
+        if (completionData?.total_chapters && completionData.total_chapters > 0) {
+            const completedCount = completionData.completed_chapters?.length || 0;
+            const progressPercentage = Math.round((completedCount / completionData.total_chapters) * 100 * 100) / 100;
+            console.log('📊 Using completionData progress:', progressPercentage, `(${completedCount}/${completionData.total_chapters})`);
+            return progressPercentage;
+        }
+        
+        // Fallback to module-based calculation
         if (!module?.lessons?.length) return 0;
         let totalChapters = 0;
         let completedChapters = 0;
         
-        // Calculate based on current position and completed chapters
         module.lessons.forEach((lesson, lessonIdx) => {
             lesson.chapters.forEach((chapter, chapterIdx) => {
                 totalChapters += 1;
@@ -317,9 +455,23 @@ export default function LearnerModuleDetail() {
             });
         });
         
-        return totalChapters === 0 ? 0 : Math.round((completedChapters / totalChapters) * 100);
+        const fallbackProgress = totalChapters === 0 ? 0 : Math.round((completedChapters / totalChapters) * 100 * 100) / 100;
+        console.log('📊 Using fallback progress:', fallbackProgress, `(${completedChapters}/${totalChapters})`);
+        return fallbackProgress;
     };
-    const overallProgress = getOverallProgress();
+    // Phase 2: Use unified progress calculation - Single Source of Truth
+    const overallProgress = getUnifiedProgress();
+    
+    // Phase 2: Debug progress calculation
+    console.log('📊 Progress calculation debug:', {
+        overallProgress: overallProgress,
+        completionData: completionData,
+        progressStatus: progress?.status,
+        hasCompletionData: !!completionDataResponse
+    });
+
+    // Phase 2: Show loading state if completion data is not loaded yet
+    const isCompletionDataLoading = !completionDataResponse && !completionDataError && user?.email && moduleName;
 
     // Navigation handlers
     const handlePrevious = async () => {
@@ -389,12 +541,20 @@ export default function LearnerModuleDetail() {
             setCompleted(true);
             return;
         }
+        
         let lessonIdx = currentLessonIdx;
         let chapterIdx = currentChapterIdx;
         const currentLesson = module.lessons[lessonIdx];
         const currentChapter = currentLesson.chapters[chapterIdx];
         
-        // If this is the last chapter of the last lesson, check Quiz/QA completion BEFORE calling updateProgress
+        // Phase 2: Smart completion checking - only update if not already completed
+        const isCurrentChapterCompleted = completionData?.completed_chapters?.includes(currentChapter.name) || false;
+        const isCurrentLessonCompleted = completionData?.completed_lessons?.includes(currentLesson.name) || false;
+        
+        console.log('🔄 handleNext - Current chapter completed:', isCurrentChapterCompleted);
+        console.log('🔄 handleNext - Current lesson completed:', isCurrentLessonCompleted);
+        
+        // If this is the last chapter of the last lesson, check Quiz/QA completion
         const isLastLesson = lessonIdx === module.lessons.length - 1;
         const isLastChapter = chapterIdx === currentLesson.chapters.length - 1;
         
@@ -428,7 +588,50 @@ export default function LearnerModuleDetail() {
                 ...progress!,
                 status: "Completed"
             });
-            // Now call updateProgress to mark module as completed
+            
+            // Only update backend if not already completed
+            if (!isCurrentChapterCompleted) {
+                await updateProgress({
+                    user: user.email,
+                    module: moduleName,
+                    lesson: currentLesson.name,
+                    chapter: currentChapter.name,
+                    status: "Completed"
+                });
+                
+                // Optimistic Update: Immediately update UI with real-time progress calculation
+                setCompletionData(prev => {
+                    const newCompletedChapters = [...(prev?.completed_chapters || []), currentChapter.name];
+                    const newInProgressChapters = (prev?.in_progress_chapters || []).filter(ch => ch !== currentChapter.name);
+                    const newOverallProgress = prev?.total_chapters ? Math.round((newCompletedChapters.length / prev.total_chapters) * 100 * 100) / 100 : 0;
+                    
+                    // Check if current lesson is now completed
+                    const isCurrentLessonNowCompleted = isLessonCompletedByChapters(currentLesson.name, newCompletedChapters);
+                    const newCompletedLessons = [...(prev?.completed_lessons || [])];
+                    
+                    if (isCurrentLessonNowCompleted && !newCompletedLessons.includes(currentLesson.name)) {
+                        newCompletedLessons.push(currentLesson.name);
+                        console.log('🎉 Lesson completed:', currentLesson.name);
+                    }
+                    
+                    console.log('🚀 Optimistic update - Module completed:', currentChapter.name);
+                    console.log('🚀 New progress:', newOverallProgress, `(${newCompletedChapters.length}/${prev?.total_chapters})`);
+                    console.log('🚀 Completed lessons:', newCompletedLessons);
+                    
+                    return {
+                        ...prev,
+                        completed_chapters: newCompletedChapters,
+                        completed_lessons: newCompletedLessons,
+                        in_progress_chapters: newInProgressChapters,
+                        overall_progress: newOverallProgress
+                    };
+                });
+            }
+            return;
+        }
+        
+        // Mark current chapter as completed (only if not already completed)
+        if (!isCurrentChapterCompleted) {
             await updateProgress({
                 user: user.email,
                 module: moduleName,
@@ -436,96 +639,68 @@ export default function LearnerModuleDetail() {
                 chapter: currentChapter.name,
                 status: "Completed"
             });
-            return;
+            
+            // Optimistic Update: Immediately update UI with real-time progress calculation
+            setCompletionData(prev => {
+                const newCompletedChapters = [...(prev?.completed_chapters || []), currentChapter.name];
+                const newInProgressChapters = (prev?.in_progress_chapters || []).filter(ch => ch !== currentChapter.name);
+                const newOverallProgress = prev?.total_chapters ? Math.round((newCompletedChapters.length / prev.total_chapters) * 100 * 100) / 100 : 0;
+                
+                // Check if current lesson is now completed
+                const isCurrentLessonNowCompleted = isLessonCompletedByChapters(currentLesson.name, newCompletedChapters);
+                const newCompletedLessons = [...(prev?.completed_lessons || [])];
+                
+                if (isCurrentLessonNowCompleted && !newCompletedLessons.includes(currentLesson.name)) {
+                    newCompletedLessons.push(currentLesson.name);
+                    console.log('🎉 Lesson completed:', currentLesson.name);
+                }
+                
+                console.log('🚀 Optimistic update - Chapter completed:', currentChapter.name);
+                console.log('🚀 New progress:', newOverallProgress, `(${newCompletedChapters.length}/${prev?.total_chapters})`);
+                console.log('🚀 Completed lessons:', newCompletedLessons);
+                
+                return {
+                    ...prev,
+                    completed_chapters: newCompletedChapters,
+                    completed_lessons: newCompletedLessons,
+                    in_progress_chapters: newInProgressChapters,
+                    overall_progress: newOverallProgress
+                };
+            });
+            
+            console.log('✅ Updated chapter progress:', currentChapter.name);
+        } else {
+            console.log('⏭️ Skipped chapter update - already completed:', currentChapter.name);
         }
         
-        // Mark current chapter as completed
-        await updateProgress({
-            user: user.email,
-            module: moduleName,
-            lesson: currentLesson.name,
-            chapter: currentChapter.name,
-            status: "Completed"
-        });
-        
-        // Update module progress to reflect completed chapter
-        if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
-            const updatedModule = { ...module };
-            if (updatedModule.lessons[lessonIdx]?.chapters[chapterIdx]) {
-                updatedModule.lessons[lessonIdx].chapters[chapterIdx].progress = "Completed";
-            }
-            setModule(updatedModule);
-        }
-        
+        // Calculate next position
         if (chapterIdx < currentLesson.chapters.length - 1) {
             // Move to next chapter in the same lesson
             chapterIdx += 1;
-            setCurrentLessonIdx(lessonIdx);
-            setCurrentChapterIdx(chapterIdx);
-            
-            // Update progress for next chapter
-            await updateProgress({
-                user: user.email,
-                module: moduleName,
-                lesson: currentLesson.name,
-                chapter: currentLesson.chapters[chapterIdx].name,
-                status: "In Progress"
-            });
-            
-            // Update local progress state
-            setProgress({
-                ...progress!,
-                current_lesson: currentLesson.name,
-                current_chapter: currentLesson.chapters[chapterIdx].name,
-                status: "In Progress"
-            });
-            
-            // Update module progress to reflect current chapter
-            if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
-                const updatedModule = { ...module };
-                if (updatedModule.lessons[lessonIdx]?.chapters[chapterIdx]) {
-                    updatedModule.lessons[lessonIdx].chapters[chapterIdx].progress = "In Progress";
-                }
-                setModule(updatedModule);
-            }
-            return;
-        }
-        
-        // At the end of the last chapter in the lesson, mark lesson as completed
-        if (lessonIdx < module.lessons.length - 1) {
+        } else if (lessonIdx < module.lessons.length - 1) {
             // Move to next lesson and its first chapter
             lessonIdx += 1;
             chapterIdx = 0;
-            setCurrentLessonIdx(lessonIdx);
-            setCurrentChapterIdx(chapterIdx);
-            
-            // Update progress for next lesson's first chapter
-            await updateProgress({
-                user: user.email,
-                module: moduleName,
-                lesson: module.lessons[lessonIdx].name,
-                chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
-                status: "In Progress"
-            });
-            
-            // Update local progress state
-            setProgress({
-                ...progress!,
-                current_lesson: module.lessons[lessonIdx].name,
-                current_chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
-                status: "In Progress"
-            });
-            
-            // Update module progress to reflect current chapter
-            if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
-                const updatedModule = { ...module };
-                if (updatedModule.lessons[lessonIdx]?.chapters[chapterIdx]) {
-                    updatedModule.lessons[lessonIdx].chapters[chapterIdx].progress = "In Progress";
-                }
-                setModule(updatedModule);
-            }
-            return;
         }
+        
+        // Navigate to next position
+        setCurrentLessonIdx(lessonIdx);
+        setCurrentChapterIdx(chapterIdx);
+        
+        // Update local progress state
+        const nextLesson = module.lessons[lessonIdx];
+        const nextChapter = nextLesson.chapters[chapterIdx];
+        setProgress({
+            ...progress!,
+            current_lesson: nextLesson.name,
+            current_chapter: nextChapter.name,
+            status: "In Progress"
+        });
+        
+        // Track chapter start
+        trackChapterStart(nextLesson.name, nextChapter.name);
+        
+        console.log('🔄 Navigated to:', nextLesson.name, nextChapter.name);
     };
 
     const handleStartModule = async () => {
@@ -597,16 +772,8 @@ export default function LearnerModuleDetail() {
                         current_chapter: module.lessons[lessonIdx].chapters[chapterIdx]?.name || "",
                         status: "In Progress"
                     });
-                    // Optionally, call updateProgress API here to persist
-                    if (user) {
-                        updateProgress({
-                            user: user.email,
-                            module: moduleName,
-                            lesson: module.lessons[lessonIdx].name,
-                            chapter: module.lessons[lessonIdx].chapters[chapterIdx]?.name || "",
-                            status: "In Progress"
-                        });
-                    }
+                    // Track chapter start
+                    trackChapterStart(lessonName, chapterName);
                 }
             }
         }
@@ -721,6 +888,7 @@ export default function LearnerModuleDetail() {
                         currentLessonName={currentLesson?.name}
                         currentChapterName={currentChapter?.name}
                         mode='admin'
+                        completionData={undefined} // no completion data for admin
                     />
                 </div>
                 {/* Main Content */}
@@ -910,12 +1078,13 @@ export default function LearnerModuleDetail() {
                             module={module}
                             progress={isLMSAdmin ? null : (reviewing ? null : progress)}
                             started={started || reviewing}
-                            overallProgress={overallProgress}
+                            overallProgress={isCompletionDataLoading ? -1 : overallProgress} // -1 indicates loading
                             onLessonClick={handleLessonClick}
                             onChapterClick={handleChapterClick}
                             currentLessonName={module.lessons?.[currentLessonIdx]?.name}
                             currentChapterName={module.lessons?.[currentLessonIdx]?.chapters?.[currentChapterIdx]?.name}
                             mode={isLMSAdmin ? 'admin' : (reviewing ? 'review' : 'learner')}
+                            completionData={isLMSAdmin ? undefined : completionData}
                         />
                     </div>
                     {/* Main Content */}

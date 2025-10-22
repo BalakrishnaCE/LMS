@@ -139,9 +139,9 @@ export function ModuleDetailsDrawer({ item, isOpen, onClose }: ModuleDetailsDraw
     isLoading,
     mutate
   } = useFrappeGetCall(
-    'getModuleAnalytics',
+    'novel_lms.novel_lms.api.analytics.getModuleAnalytics',
     isOpen && item?.module_id ? { module_id: item.module_id } : undefined,
-    'getModuleAnalytics'
+    'novel_lms.novel_lms.api.analytics.getModuleAnalytics'
   );
 
   const details = moduleDetails?.message as ModuleDetailsResponse;

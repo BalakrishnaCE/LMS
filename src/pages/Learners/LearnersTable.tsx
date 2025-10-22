@@ -2,17 +2,10 @@ import * as React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Eye, MoreHorizontal, Pencil } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Pencil } from "lucide-react";
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import { Badge } from "@/components/ui/badge";
-import { useFrappeGetDocList } from "frappe-react-sdk";
 
 interface User {
   name: string;
@@ -20,12 +13,26 @@ interface User {
   email: string;
   enabled: number;
   department?: string;
+  department_id?: string;
   departments?: string[];
+  department_ids?: string[];
   mobile_no?: string;
   creation?: string;
   last_login?: string;
   user_image?: string;
   roles?: string[];
+  role?: string; // Add role field from backend
+  // Add fields from learner_analytics
+  learner_name?: string;
+  modules_enrolled?: number;
+  modules_completed?: number;
+  completion_rate?: number;
+  avg_progress?: number;
+  avg_score?: number;
+  total_time_spent?: number;
+  achievements_count?: number;
+  last_activity?: string;
+  progress_trackers?: any[];
 }
 
 interface LearnersTableProps {
@@ -34,47 +41,32 @@ interface LearnersTableProps {
   showActions?: boolean;
   onViewDetails?: (learner: User) => void;
   onEdit?: (learner: User) => void;
+  departmentIdToName?: Record<string, string>;
 }
 
-export function LearnersTable({ learners, isLoading, showActions = true, onViewDetails, onEdit }: LearnersTableProps) {
-  const [dropdownKey, setDropdownKey] = React.useState(0);
-  const [openDropdown, setOpenDropdown] = React.useState<string | null>(null);
-
-  // Fetch departments for mapping IDs to names
-  const { data: departments } = useFrappeGetDocList("Department", {
-    fields: ["name", "department"],
-    limit: 150,
-  });
-  const departmentIdToName = React.useMemo(() =>
-    Object.fromEntries((departments || []).map(d => [d.name, d.department])), [departments]);
-
+export function LearnersTable({ learners, isLoading, showActions = true, onViewDetails, onEdit, departmentIdToName = {} }: LearnersTableProps) {
   const handleEdit = (learner: User) => {
-    // Reset dropdown key to force re-render and close any open dropdowns
-    setDropdownKey(prev => prev + 1);
-    setOpenDropdown(null);
     if (onEdit) {
       onEdit(learner);
     }
   };
 
-  const handleViewDetails = (learner: User) => {
-    // Reset dropdown key to force re-render and close any open dropdowns
-    setDropdownKey(prev => prev + 1);
-    setOpenDropdown(null);
-    if (onViewDetails) {
-      onViewDetails(learner);
+  const handleRowClick = (learner: User, event: React.MouseEvent) => {
+    // Prevent row click when clicking on edit button
+    if (!(event.target as HTMLElement).closest('button')) {
+      if (onViewDetails) {
+        onViewDetails(learner);
+      }
     }
-  };
-
-  const handleDropdownOpenChange = (learnerName: string, open: boolean) => {
-    setOpenDropdown(open ? learnerName : null);
   };
 
   // Helper function to get departments to display
   const getDepartmentsToDisplay = (learner: User) => {
-    if (learner.departments && learner.departments.length > 0) {
+    // Check for multiple departments first
+    if (learner.departments && Array.isArray(learner.departments) && learner.departments.length > 0) {
       return learner.departments;
     }
+    // Fallback to single department
     if (learner.department) {
       return [learner.department];
     }
@@ -92,28 +84,29 @@ export function LearnersTable({ learners, isLoading, showActions = true, onViewD
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
+            {/*<TableHead>Role</TableHead>*/}
             <TableHead>Departments</TableHead>
             <TableHead>Status</TableHead>
-            {showActions && <TableHead>Actions</TableHead>}
+            {showActions && <TableHead>Edit</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody className="text-secondary-foreground">
-          {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={showActions ? 5 : 4} className="text-center">
-                <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
-                <div className="mt-2 text-muted-foreground">Loading learners...</div>
-              </TableCell>
-            </TableRow>
-          ) : learners.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={showActions ? 5 : 4} className="text-center py-8">
-                <div className="text-muted-foreground">No learners found matching your criteria</div>
-              </TableCell>
-            </TableRow>
+        {isLoading ? (
+  <TableRow>
+    <TableCell colSpan={showActions ? 5 : 4} className="text-center">
+      <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
+      <div className="mt-2 text-muted-foreground">Loading learners...</div>
+    </TableCell>
+  </TableRow>
+) : learners.length === 0 ? (
+  <TableRow>
+    <TableCell colSpan={showActions ? 5 : 4} className="text-center py-8">
+      <div className="text-muted-foreground">No learners found matching your criteria</div>
+    </TableCell>
+  </TableRow>
           ) : (
-            <AnimatePresence mode="wait">
-              {learners.map((learner, index) => (
+            <AnimatePresence mode="popLayout">
+              {learners.map((learner) => (
                 <motion.tr
                   key={`${learner.name}-${learner.email}`}
                   initial={{ opacity: 0, y: 10 }}
@@ -123,10 +116,12 @@ export function LearnersTable({ learners, isLoading, showActions = true, onViewD
                     duration: 0.15,
                     ease: "easeOut"
                   }}
-                  className="group hover:bg-muted/50 transition-colors duration-200"
+                  className="group hover:bg-muted/50 transition-colors duration-200 cursor-pointer"
+                  onClick={(e) => handleRowClick(learner, e)}
                 >
                   <TableCell className="group-hover:text-primary transition-colors duration-200">{learner.full_name}</TableCell>
                   <TableCell className="group-hover:text-primary transition-colors duration-200">{learner.email}</TableCell>
+                  
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {getDepartmentsToDisplay(learner).length > 0 ? (
@@ -151,23 +146,17 @@ export function LearnersTable({ learners, isLoading, showActions = true, onViewD
                   </TableCell>
                   {showActions && (
                     <TableCell>
-                      <DropdownMenu key={`${learner.name}-${dropdownKey}`} open={openDropdown === learner.name} onOpenChange={handleDropdownOpenChange.bind(null, learner.name)}>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={handleViewDetails.bind(null, learner)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={handleEdit.bind(null, learner)}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(learner);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   )}
                 </motion.tr>
@@ -178,4 +167,4 @@ export function LearnersTable({ learners, isLoading, showActions = true, onViewD
       </Table>
     </motion.div>
   );
-} 
+}

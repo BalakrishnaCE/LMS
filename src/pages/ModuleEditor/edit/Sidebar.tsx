@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ModuleInfo } from "./ModuleEdit";
 import { useLocation } from "wouter";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { ArrowLeftIcon, X, Pencil } from "lucide-react";
-import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc, useFrappeGetDoc } from "frappe-react-sdk";
+import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc, useFrappeGetCall } from "frappe-react-sdk";
 import { toast } from "sonner";
 import {
   Select,
@@ -285,8 +286,8 @@ function SettingsDialog({
                         setUploadingImage(true);
                         try {
                           const url = await uploadFileToFrappe(file);
-                          const fullUrl = url.startsWith('http') ? url : `${LMS_API_BASE_URL}${url}`;
-                          handleFieldChange("image", fullUrl);
+                          // Store only the relative path, not the full URL
+                          handleFieldChange("image", url);
                           toast.success("Image uploaded successfully");
                         } catch (err) {
                           toast.error("Failed to upload image");
@@ -713,7 +714,7 @@ function SortableLesson({ lesson, activeLessonId, setActiveLessonId, setActiveCh
             <ul className="ml-6 mt-1 space-y-1">
               {lesson.chapters.map((chapter: any, chapterIndex: number) => (
                 <SortableChapter
-                  key={chapter.id || `chapter-${lesson.id}-${chapterIndex}`}
+                  key={chapter.id || `chapter-${lesson.id}-${chapterIndex}-${chapter.title || 'untitled'}`}
                   chapter={chapter}
                   index={chapterIndex}
                   activeChapterId={activeChapterId}
@@ -733,6 +734,7 @@ function SortableLesson({ lesson, activeLessonId, setActiveLessonId, setActiveCh
 
 export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFinishSetup, isMobile, onLessonAdded, activeLessonId, setActiveLessonId, activeChapterId, setActiveChapterId }: ModuleSidebarProps) {
   const [, setLocation] = useLocation();
+  const { getPreviousModulePath } = useNavigation();
   const { updateDoc, loading: saving } = useFrappeUpdateDoc();
   const [editState, setEditState] = useState<ModuleInfo | null>(null);
   const [learners, setLearners] = useState<LearnerRow[]>([]); // Add learners state
@@ -759,12 +761,18 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   });
 
   // In Sidebar component, add a refetch function for moduleInfo
-  type LMSModule = ModuleInfo; // or import the correct type if available
-  const { data: freshModuleInfo, mutate: refetchModuleInfo } = useFrappeGetDoc<LMSModule>(
-    "LMS Module",
-    moduleInfo?.id || "",
-    { swrConfig: { revalidateOnFocus: false } }
+  // Use the same API endpoint as ModuleEdit to avoid CORS issues
+  const { data: freshModuleData, mutate: refetchModuleInfo, error: refetchError } = useFrappeGetCall(
+    'novel_lms.novel_lms.api.module_management.get_module_with_details',
+    { module_id: moduleInfo?.id || "" },
+    { 
+      swrConfig: { revalidateOnFocus: false },
+      enabled: !!moduleInfo?.id // Only fetch if we have a valid module ID
+    }
   );
+  
+  // Extract the module info from the API response
+  const freshModuleInfo = freshModuleData?.data || freshModuleData?.message || freshModuleData;
 
   // Initialize edit state and learners when moduleInfo changes
   useEffect(() => {
@@ -783,6 +791,14 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       setHasChanges(false);
     }
   }, [moduleInfo]);
+
+  // Handle refetch errors
+  useEffect(() => {
+    if (refetchError) {
+      console.warn("Failed to refetch module info:", refetchError);
+      // Don't show error to user as this is just a background refresh
+    }
+  }, [refetchError]);
 
   // Check for changes in module info and content structure
   useEffect(() => {
@@ -838,10 +854,15 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       setHasChanges(false);
       setShowSettings(false);
       // Refetch the latest module info from backend
-      await refetchModuleInfo();
-      if (freshModuleInfo) {
-        setEditState({ ...freshModuleInfo });
-        setLearners(freshModuleInfo.learners || []);
+      try {
+        await refetchModuleInfo();
+        if (freshModuleInfo) {
+          setEditState({ ...freshModuleInfo });
+          setLearners(freshModuleInfo.learners || []);
+        }
+      } catch (refetchErr) {
+        console.warn("Failed to refetch module info after save:", refetchErr);
+        // Continue without updating the state - the save was successful
       }
       onFinishSetup?.(editState);
     } catch (err) {
@@ -907,18 +928,82 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   // Delete lesson handler
   const handleDeleteLesson = async () => {
     if (!lessonToDelete || !moduleInfo || !module) return;
+    
     try {
-      // 1. Remove the lesson from the module's lessons array
+      // Find the lesson to get its chapters
+      const lessonToDeleteData = (module.lessons || []).find(l => l.id === lessonToDelete);
+      
+      // 1. Remove the lesson from the module's lessons array FIRST
       const updatedLessons = (module.lessons || []).filter(l => l.id !== lessonToDelete);
       await updateDoc("LMS Module", moduleInfo.id, {
         lessons: updatedLessons.map((l, idx) => ({ lesson: l.id, order: idx + 1 }))
       });
-      // 2. Delete the lesson doc
+      
+      // 2. Remove chapter references from the lesson FIRST (breaks the link)
+      if (lessonToDeleteData?.chapters && lessonToDeleteData.chapters.length > 0) {
+        await updateDoc("Lesson", lessonToDelete, {
+          chapters: [] // Clear all chapter references
+        });
+      }
+      
+      // 3. COMPLETE CASCADE DELETION - Delete all content and chapters
+      if (lessonToDeleteData?.chapters) {
+        for (const chapter of lessonToDeleteData.chapters) {
+          
+          // 3a. Clear content references from chapter FIRST (breaks the links)
+          try {
+            await updateDoc("Chapter", chapter.id, {
+              contents: [] // Clear all content references
+            });
+          } catch (updateErr) {
+            console.warn(`Failed to clear content references from chapter ${chapter.id}:`, updateErr);
+          }
+          
+          // 3b. Now delete all content types (safe to delete after removing links)
+          if (chapter.contents && chapter.contents.length > 0) {
+            for (const content of chapter.contents) {
+              const contentDocname = content.docname || content.content_reference;
+              const contentType = content.type || content.content_type;
+              
+              if (contentDocname && contentType) {
+                try {
+                  await deleteDoc(contentType, contentDocname);
+                } catch (contentErr) {
+                  console.warn(`Failed to delete ${contentType} ${contentDocname}:`, contentErr);
+                  // Continue with other content even if one fails
+                }
+              }
+            }
+          }
+          
+          // 3c. Delete the chapter
+          try {
+            await deleteDoc("Chapter", chapter.id);
+          } catch (chapterErr) {
+            console.warn(`Failed to delete chapter ${chapter.id}:`, chapterErr);
+          }
+        }
+      }
+      
+      // 4. Finally delete the lesson document (now that all links are broken)
       await deleteDoc("Lesson", lessonToDelete);
-      toast.success("Lesson deleted successfully");
-      onLessonAdded?.();
+      
+      toast.success("Lesson, chapters, and all content deleted successfully");
+      
+      // Reset active states since the lesson is deleted
+      if (activeLessonId === lessonToDelete) {
+        setActiveLessonId?.("");
+        setActiveChapterId?.("");
+      }
+      
+      // Force refresh the module data with a small delay to ensure backend operations complete
+      setTimeout(() => {
+        onLessonAdded?.();
+      }, 500);
     } catch (err) {
-      toast.error("Failed to delete lesson");
+      console.error("Error deleting lesson:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      toast.error("Failed to delete lesson: " + errorMessage);
     } finally {
       setShowDeleteLessonDialog(false);
       setLessonToDelete(null);
@@ -1016,9 +1101,17 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                 variant="outline"
                 size="sm"
                 className="mb-4 w-full hover:bg-accent hover:text-primary"
-                onClick={() => setLocation('/modules')}
+                onClick={() => {
+                  // Navigate to the learner module page
+                  if (moduleInfo?.id) {
+                    setLocation(`/modules/learner/${moduleInfo.id}`);
+                  } else {
+                    // Fallback to modules list if no module info
+                    setLocation('/modules');
+                  }
+                }}
               >
-                <ArrowLeftIcon className="w-4 h-4" /> Back to Modules
+                <ArrowLeftIcon className="w-4 h-4" /> Back to Module
               </Button>
 
               <AnimatePresence mode="wait">
@@ -1079,7 +1172,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                               <ul className="space-y-2">
                                 {module.lessons.map((lesson, lessonIndex) => (
                                   <SortableLesson
-                                    key={lesson.id || `lesson-${lessonIndex}`}
+                                    key={lesson.id || `lesson-${lessonIndex}-${lesson.title || 'untitled'}`}
                                     lesson={lesson}
                                     activeLessonId={activeLessonId}
                                     setActiveLessonId={setActiveLessonId}

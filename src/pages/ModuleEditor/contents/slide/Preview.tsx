@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Presentation, Play, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LMS_API_BASE_URL } from "@/config/routes";
 
@@ -20,6 +20,7 @@ export default function SlidePreview({
 }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const hasSlides = slide_show_items && slide_show_items.length > 0;
+
 
   const nextSlide = () => {
     if (hasSlides) {

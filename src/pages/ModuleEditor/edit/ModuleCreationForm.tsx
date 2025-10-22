@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import RichEditor from "@/components/RichEditor";
 import { toast } from "sonner";
+import { ArrowLeft } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -27,7 +28,7 @@ export default function ModuleCreationForm() {
   const [duration, setDuration] = useState("");
   const [assignmentBased, setAssignmentBased] = useState("Everyone");
   const [departmentSelected, setDepartmentSelected] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [order, setOrder] = useState(1);
@@ -61,7 +62,7 @@ export default function ModuleCreationForm() {
         status: "Draft",
         assignment_based: assignmentBased,
         department: assignmentBased === "Department" ? departmentSelected : "",
-        created_by: user?.email,
+        created_by: user?.name, // Use user name for link field
         image: imageUrl,
       });
 
@@ -84,7 +85,8 @@ export default function ModuleCreationForm() {
     setUploading(true);
     try {
       const url = await uploadFileToFrappe(file);
-      setImageUrl(`${LMS_API_BASE_URL}${url}`);
+      // Store only the relative path, not the full URL
+      setImageUrl(url);
       toast.success("Image uploaded successfully");
     } catch (err) {
       toast.error("Failed to upload image");
@@ -97,7 +99,18 @@ export default function ModuleCreationForm() {
 
   return (
     <div className="container mx-auto p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-6">Create New Module</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Create New Module</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          className="hover:bg-accent hover:text-primary"
+          onClick={() => window.history.back()}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+      </div>
       <div className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="moduleName">Module Name</Label>
@@ -185,7 +198,11 @@ export default function ModuleCreationForm() {
           />
           {uploading && <div className="text-sm text-muted-foreground">Uploading...</div>}
           {imageUrl && (
-            <img src={imageUrl} alt="Module" className="mt-2 max-h-32 rounded" />
+            <img 
+              src={imageUrl.startsWith('http') ? imageUrl : `${LMS_API_BASE_URL.replace(/\/$/, '')}${imageUrl}`} 
+              alt="Module" 
+              className="mt-2 max-h-32 rounded" 
+            />
           )}
         </div>
 
