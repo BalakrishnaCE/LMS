@@ -42,9 +42,32 @@ interface LearnersTableProps {
   onViewDetails?: (learner: User) => void;
   onEdit?: (learner: User) => void;
   departmentIdToName?: Record<string, string>;
+  // Pagination props
+  learnerCurrentPage?: number;
+  learnerTotalPages?: number;
+  itemsPerPage?: number;
+  totalLearners?: number;
+  handleLearnerPageChange?: (page: number) => void;
+  handleLearnerPrevPage?: () => void;
+  handleLearnerNextPage?: () => void;
 }
 
-export function LearnersTable({ learners, isLoading, showActions = true, onViewDetails, onEdit, departmentIdToName = {} }: LearnersTableProps) {
+export function LearnersTable({ 
+  learners, 
+  isLoading, 
+  showActions = true, 
+  onViewDetails, 
+  onEdit, 
+  departmentIdToName = {},
+  learnerCurrentPage = 1,
+  learnerTotalPages = 1,
+  itemsPerPage = 20,
+  totalLearners = 0,
+  handleLearnerPageChange,
+  handleLearnerPrevPage,
+  handleLearnerNextPage
+}: LearnersTableProps) {
+
   const handleEdit = (learner: User) => {
     if (onEdit) {
       onEdit(learner);
@@ -59,6 +82,7 @@ export function LearnersTable({ learners, isLoading, showActions = true, onViewD
       }
     }
   };
+
 
   // Helper function to get departments to display
   const getDepartmentsToDisplay = (learner: User) => {
@@ -165,6 +189,101 @@ export function LearnersTable({ learners, isLoading, showActions = true, onViewD
           )}
         </TableBody>
       </Table>
+      
+      {/* Pagination Controls - Vertical Layout */}
+      {learners.length > 0 && handleLearnerPageChange && handleLearnerPrevPage && handleLearnerNextPage && (
+        <div className="flex flex-col items-center gap-4 mt-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {((learnerCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(learnerCurrentPage * itemsPerPage, totalLearners)} of {totalLearners} learners
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Previous Button */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLearnerPrevPage}
+              disabled={learnerCurrentPage === 1}
+            >
+              <span className="mr-1">&lt;</span> Previous
+            </Button>
+            
+            {/* Page Numbers */}
+            {(() => {
+              const totalPages = learnerTotalPages;
+              const currentPage = learnerCurrentPage;
+              const pages = [];
+              
+              // Show first page
+              if (currentPage > 3) {
+                pages.push(
+                  <Button
+                    key={1}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleLearnerPageChange(1)}
+                    className="w-8 h-8 p-0"
+                  >
+                    1
+                  </Button>
+                );
+                if (currentPage > 4) {
+                  pages.push(<span key="ellipsis1" className="px-2">...</span>);
+                }
+              }
+              
+              // Show pages around current page
+              const startPage = Math.max(1, currentPage - 2);
+              const endPage = Math.min(totalPages, currentPage + 2);
+
+              for (let i = startPage; i <= endPage; i++) {
+                pages.push(
+                  <Button
+                    key={i}
+                    variant={currentPage === i ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleLearnerPageChange(i)}
+                    className="w-8 h-8 p-0"
+                  >
+                    {i}
+                  </Button>
+                );
+              }
+              
+              // Show last page
+              if (currentPage < totalPages - 2) {
+                if (currentPage < totalPages - 3) {
+                  pages.push(<span key="ellipsis2" className="px-2">...</span>);
+                }
+                pages.push(
+                  <Button
+                    key={totalPages}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleLearnerPageChange(totalPages)}
+                    className="w-8 h-8 p-0"
+                  >
+                    {totalPages}
+                  </Button>
+                );
+              }
+              
+              return pages;
+            })()}
+            
+            {/* Next Button */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLearnerNextPage}
+              disabled={learnerCurrentPage === learnerTotalPages}
+            >
+              Next <span className="ml-1">&gt;</span>
+            </Button>
+          </div>
+        </div>
+      )}
+      
     </motion.div>
   );
 }

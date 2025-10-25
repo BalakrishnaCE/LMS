@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import { useUser } from "@/hooks/use-user";
 import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
@@ -8,7 +8,7 @@ import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar"
 import { CompletionScreen } from "@/pages/Modules/Learner/components/CompletionScreen";
 import { Button } from "@/components/ui/button";
 import { ContentRenderer } from "@/pages/Modules/Learner/components/ContentRenderer";
-import { BookOpen, ArrowLeft, ArrowRight, Edit } from "lucide-react";
+import { BookOpen, ArrowLeft, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { ROUTES, LMS_API_BASE_URL } from "@/config/routes";
 import Lottie from "lottie-react";
@@ -58,12 +58,13 @@ interface ApiResponse<T> {
     data: T;
 }
 
-const initialModule: Module = {
-    name: "",
-    name1: "",
-    description: "",
-    lessons: []
-};
+interface ModuleApiResponse {
+    message: {
+        modules: Module[];
+        meta: any;
+    };
+}
+
 
 function getInitialProgress(module: Module): ModuleProgress {
     if (!module.lessons?.length) {
@@ -213,13 +214,11 @@ export default function LearnerModuleDetail() {
     const [progress, setProgress] = useState<ModuleProgress | null>(null);
     const [completed, setCompleted] = useState(false);
     const [started, setStarted] = useState(false);
+    // Initialize current position based on user's actual progress
     const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
     const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
     const [reviewing, setReviewing] = useState(false);
     const [quizQAScores, setQuizQAScores] = useState<Array<{title: string, score: number, maxScore: number, type: string}>>([]);
-    const [quizQAIncomplete, setQuizQAIncomplete] = useState(false);
-    const [showQuizQAAlert, setShowQuizQAAlert] = useState(false);
-    const [incompleteQuizQATitles, setIncompleteQuizQATitles] = useState<string[]>([]);
 
     // Phase 2: Completion data state management
     const [completionData, setCompletionData] = useState<CompletionData>({
@@ -232,38 +231,134 @@ export default function LearnerModuleDetail() {
         overall_progress: 0
     });
 
-    // Fetch module data
-    const { data: moduleListData, error: moduleListError } = useFrappeGetCall<ApiResponse<{ modules: Module[] }>>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
-        user: user?.email,
+    // Get user identifier with multiple fallbacks for Administrator compatibility
+    const getUserIdentifier = () => {
+        if (!user) return null;
+        return user.email || user.name || (user as any).user || (user as any).user_id || (user as any).id || user;
+    };
+
+    const userIdentifier = getUserIdentifier();
+
+    // Fetch module data with retry mechanism - only when user and moduleName are available
+    const { data: moduleListData, error: moduleListError, isLoading: moduleDataLoading, mutate: refetchModuleData } = useFrappeGetCall<ModuleApiResponse>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
+        user: userIdentifier, // Use robust user identifier extraction
         limit: 1,
         offset: 0,
         filters: [["name", "=", moduleName]]
+    }, {
+        enabled: !!(userIdentifier && moduleName && !userLoading && userIdentifier !== '') // Only call API when user is loaded and moduleName exists
     });
-    const moduleData = (moduleListData as any)?.message?.message?.modules?.[0];
+    
+    // Simplified retry mechanism - only retry on actual errors, not empty results
+    useEffect(() => {
+        if (moduleListError && userIdentifier && moduleName) {
+            console.log('🔄 API call failed, retrying in 1 second...', moduleListError);
+            const retryTimeout = setTimeout(() => {
+                refetchModuleData();
+            }, 1000);
+            return () => clearTimeout(retryTimeout);
+        }
+    }, [moduleListError, userIdentifier, moduleName, refetchModuleData]);
+
+    // Retry API call when user becomes available (fixes timing issue)
+    useEffect(() => {
+        if (userIdentifier && moduleName && !userLoading && !moduleListData && !moduleDataLoading && !moduleListError) {
+            console.log('🔄 User became available, triggering module data fetch...', { userIdentifier, moduleName });
+            refetchModuleData();
+        }
+    }, [userIdentifier, moduleName, userLoading, moduleListData, moduleDataLoading, moduleListError, refetchModuleData]);
+
+    // Debug API call state
+    useEffect(() => {
+        console.log('🔍 API CALL STATE:', {
+            moduleName,
+            userEmail: user?.email,
+            userName: user?.name,
+            userIdentifier: userIdentifier,
+            fullUserObject: user,
+            userKeys: user ? Object.keys(user) : [],
+            isLoading: moduleDataLoading,
+            hasData: !!moduleListData,
+            hasError: !!moduleListError,
+            timestamp: new Date().toISOString()
+        });
+    }, [moduleName, userIdentifier, moduleDataLoading, moduleListData, moduleListError]);
+    
+    
+    // Extract module data only when API call is complete - Simplified logic
+    let moduleData = null;
+    if (moduleListData && !moduleDataLoading) {
+        console.log('🔍 EXTRACTION START:', new Date().toISOString());
+        console.log('🔍 API Call completed, extracting module data...');
+        
+        const response = moduleListData as any;
+        
+        // Simplified extraction - try the most common path first
+        if (response?.message?.message?.modules && Array.isArray(response.message.message.modules) && response.message.message.modules.length > 0) {
+            moduleData = response.message.message.modules[0];
+            console.log('✅ Module data extracted via primary path (message.message.modules[0])');
+        }
+        // Fallback to direct message.modules
+        else if (response?.message?.modules && Array.isArray(response.message.modules) && response.message.modules.length > 0) {
+            moduleData = response.message.modules[0];
+            console.log('✅ Module data extracted via fallback path (message.modules[0])');
+        }
+        else {
+            console.log('❌ Failed to extract module data - no modules found in response');
+            console.log('🔍 Response structure:', {
+                hasMessage: !!response?.message,
+                hasNestedMessage: !!response?.message?.message,
+                hasModules: !!response?.message?.modules,
+                hasNestedModules: !!response?.message?.message?.modules,
+                modulesLength: response?.message?.modules?.length || 0,
+                nestedModulesLength: response?.message?.message?.modules?.length || 0
+            });
+        }
+        
+        // Log extracted data for debugging
+        if (moduleData) {
+            console.log('🔍 Extracted moduleData:', {
+                name: moduleData.name,
+                name1: moduleData.name1,
+                hasLessons: !!moduleData.lessons,
+                lessonsLength: moduleData.lessons?.length || 0
+            });
+        }
+    }
+
+    // Administrator-specific: Force immediate data display
+    useEffect(() => {
+        if (isLMSAdmin && moduleData && !module) {
+            console.log('🔧 Admin mode: Force setting module data immediately');
+            setModule(moduleData);
+            setStarted(true);
+        }
+    }, [isLMSAdmin, moduleData, module]);
+
     // Post call for starting module
     const { call: startModule } = useFrappePostCall('novel_lms.novel_lms.api.progress_tracking.add_learner_progress');
     // Fetch progress and module structure
-    const shouldFetchProgress = started && !!moduleData && !!user?.email && !!moduleName && !userLoading;
+    const shouldFetchProgress = started && !!moduleData && !!userIdentifier && userIdentifier !== '' && !!moduleName && !userLoading;
     const { data: progressData } = useFrappeGetCall<ApiResponse<{ module: Module }>>("novel_lms.novel_lms.api.progress_tracking.get_learner_progress", {
-        user: user?.email,
+        user: userIdentifier,
         module: moduleName
     }, {
         enabled: shouldFetchProgress
     });
 
     // Debug logging
-    console.log('getLearnerProgress call - user:', user?.email, 'module:', moduleName, 'enabled:', shouldFetchProgress);
+    console.log('getLearnerProgress call - user:', userIdentifier, 'module:', moduleName, 'enabled:', shouldFetchProgress);
     console.log('getLearnerProgress call - user object:', user);
     console.log('getLearnerProgress call - userLoading:', userLoading);
     console.log('getLearnerProgress call - started:', started, 'moduleData:', !!moduleData);
     // Post call for updating progress
     const { call: updateProgress, loading: updateLoading } = useFrappePostCall('novel_lms.novel_lms.api.progress_tracking.update_learner_progress');
     
-    // Phase 2: Completion data API hook with refetch capability - Always enabled
+    // Phase 2: Completion data API hook with refetch capability - Only enabled when user is available
     const { data: completionDataResponse, error: completionDataError, mutate: refetchCompletionData } = useLearnerCompletionData(
-        user?.email || '',
+        userIdentifier || '',
         moduleName || '',
-        { enabled: true } // Always enabled to prevent API call blocking
+        { enabled: !!(userIdentifier && userIdentifier !== '' && moduleName && !userLoading) } // Only enabled when user is properly loaded
     );
 
     // Phase 2: Update completion data when fetched - Proper State Management
@@ -289,19 +384,127 @@ export default function LearnerModuleDetail() {
 
     // Phase 2: Force completion data refresh when resuming
     useEffect(() => {
-        if (started && user?.email && moduleName && !isLMSAdmin) {
+        if (started && userIdentifier && moduleName && !isLMSAdmin) {
             console.log('🔄 Forcing completion data refresh on resume');
             refetchCompletionData();
         }
-    }, [started, user?.email, moduleName, isLMSAdmin, refetchCompletionData]);
+    }, [started, userIdentifier, moduleName, isLMSAdmin, refetchCompletionData]);
+    
+    // Force refresh completion data when module changes (navigation back from dashboard)
+    useEffect(() => {
+        if (moduleName && userIdentifier && !isLMSAdmin) {
+            console.log('🔄 Module changed, forcing completion data refresh');
+            // Just refetch - don't clear data to avoid 0% flash
+            refetchCompletionData();
+        }
+    }, [moduleName, userIdentifier, isLMSAdmin, refetchCompletionData]);
+
+    // Fix resume bug: Set current position based on user's actual progress
+    useEffect(() => {
+        if (module?.lessons && !isLMSAdmin) {
+            console.log('🎯 Setting resume position from module data:', (module.progress as any)?.current_position);
+            console.log('🎯 Module progress:', {
+                status: module.progress?.status,
+                overall_progress: (module.progress as any)?.overall_progress,
+                current_position: (module.progress as any)?.current_position
+            });
+            
+            // If module is completed, don't set position - let completion screen show
+            if (module.progress?.status === "Completed") {
+                console.log('🎯 Module completed - not setting resume position');
+                return;
+            }
+            
+            // PRIORITY 1: Use module data's current_position (MOST RELIABLE)
+            if ((module.progress as any)?.current_position?.chapter) {
+                const currentChapterName = (module.progress as any).current_position.chapter;
+                
+                // Find the lesson containing this chapter
+                const lessonIdx = module.lessons.findIndex(lesson => 
+                    lesson.chapters?.some(chapter => chapter.name === currentChapterName)
+                );
+                
+                if (lessonIdx !== -1) {
+                    // Find the chapter index within that lesson
+                    const chapterIdx = module.lessons[lessonIdx].chapters?.findIndex(
+                        chapter => chapter.name === currentChapterName
+                    ) ?? 0;
+                    
+                    console.log('🎯 Resume position found (module data):', { lessonIdx, chapterIdx, currentChapterName });
+                    setCurrentLessonIdx(lessonIdx);
+                    setCurrentChapterIdx(chapterIdx);
+                    return;
+                }
+            }
+            
+            // PRIORITY 2: Use completion data's in_progress_chapters as fallback
+            if (completionData?.in_progress_chapters?.length > 0) {
+                const currentChapterName = completionData.in_progress_chapters[0];
+                console.log('🎯 Using completion data in_progress_chapters:', currentChapterName);
+                
+                // Find the lesson containing this chapter
+                const lessonIdx = module.lessons.findIndex(lesson => 
+                    lesson.chapters?.some(chapter => chapter.name === currentChapterName)
+                );
+                
+                if (lessonIdx !== -1) {
+                    // Find the chapter index within that lesson
+                    const chapterIdx = module.lessons[lessonIdx].chapters?.findIndex(
+                        chapter => chapter.name === currentChapterName
+                    ) ?? 0;
+                    
+                    console.log('🎯 Resume position found (completion data):', { lessonIdx, chapterIdx, currentChapterName });
+                    setCurrentLessonIdx(lessonIdx);
+                    setCurrentChapterIdx(chapterIdx);
+                    return;
+                }
+            }
+            
+            // PRIORITY 3: Use completion data's current_position as final fallback
+            if (completionData?.current_position) {
+                console.log('🎯 Using completion data current_position:', completionData.current_position);
+                
+                if (completionData.current_position.type === 'Chapter') {
+                    const currentChapterName = completionData.current_position.reference_id;
+                    
+                    // Find the lesson containing this chapter
+                    const lessonIdx = module.lessons.findIndex(lesson => 
+                        lesson.chapters?.some(chapter => chapter.name === currentChapterName)
+                    );
+                    
+                    if (lessonIdx !== -1) {
+                        // Find the chapter index within that lesson
+                        const chapterIdx = module.lessons[lessonIdx].chapters?.findIndex(
+                            chapter => chapter.name === currentChapterName
+                        ) ?? 0;
+                        
+                        console.log('🎯 Resume position found (completion data fallback):', { lessonIdx, chapterIdx, currentChapterName });
+                        setCurrentLessonIdx(lessonIdx);
+                        setCurrentChapterIdx(chapterIdx);
+                        return;
+                    }
+                }
+            }
+            
+            console.log('🎯 No resume position found - starting from beginning');
+        }
+    }, [module?.progress, module?.lessons, completionData, isLMSAdmin]);
 
     // Phase 2: Immediate API call on mount to prevent 0% progress
     useEffect(() => {
-        if (user?.email && moduleName && !isLMSAdmin) {
+        if (userIdentifier && moduleName && !isLMSAdmin) {
             console.log('🔄 Immediate API call on mount to prevent 0% progress');
             refetchCompletionData();
         }
-    }, [user?.email, moduleName, isLMSAdmin, refetchCompletionData]);
+    }, [userIdentifier, moduleName, isLMSAdmin, refetchCompletionData]);
+
+    // Retry completion data API when user becomes available (fixes timing issue)
+    useEffect(() => {
+        if (userIdentifier && userIdentifier !== '' && moduleName && !userLoading && !completionDataResponse && !completionDataError && !isLMSAdmin) {
+            console.log('🔄 User became available, triggering completion data fetch...', { userIdentifier, moduleName });
+            refetchCompletionData();
+        }
+    }, [userIdentifier, moduleName, userLoading, completionDataResponse, completionDataError, isLMSAdmin, refetchCompletionData]);
 
     // Phase 2: Handle completion data error
     useEffect(() => {
@@ -315,6 +518,8 @@ export default function LearnerModuleDetail() {
     useEffect(() => {
         console.log('🔍 Hook dependencies debug:', {
             userEmail: user?.email,
+            userName: user?.name,
+            userIdentifier: userIdentifier,
             moduleName: moduleName,
             isLMSAdmin: isLMSAdmin,
             reviewing: reviewing,
@@ -322,7 +527,7 @@ export default function LearnerModuleDetail() {
             completionDataResponse: !!completionDataResponse,
             completionDataError: !!completionDataError
         });
-    }, [user?.email, moduleName, isLMSAdmin, reviewing, started, completionDataResponse, completionDataError]);
+    }, [userIdentifier, moduleName, isLMSAdmin, reviewing, started, completionDataResponse, completionDataError]);
 
     // Phase 2: Helper function to check if a lesson is completed based on its chapters
     const isLessonCompletedByChapters = (lessonName: string, completedChapters: string[]) => {
@@ -334,6 +539,67 @@ export default function LearnerModuleDetail() {
         // Check if all chapters in the lesson are completed
         return lesson.chapters.every(chapter => completedChapters.includes(chapter.name));
     };
+
+    // Phase 3: Frontend-only locking using calculated completionData
+    const buildIsAccessible = (completionData: CompletionData | null, moduleData: Module | null) => {
+        if (!moduleData?.lessons?.length) return () => false;
+
+        // Use calculated data from getSidebarCompletionData (not empty API arrays)
+        const completedLessons = new Set(completionData?.completed_lessons ?? []);
+        const completedChapters = new Set(completionData?.completed_chapters ?? []);
+        
+        console.log('🔍 buildIsAccessible using calculated data:', {
+            completedLessons: Array.from(completedLessons),
+            completedChapters: Array.from(completedChapters),
+            inProgressChapters: completionData?.in_progress_chapters
+        });
+        
+        // Get current position from completionData OR from in_progress_chapters OR from UI state as fallback
+        const currentChapter = completionData?.current_position?.type === 'Chapter'
+            ? completionData.current_position.reference_id
+            : (completionData?.in_progress_chapters?.[0] || module?.lessons?.[currentLessonIdx]?.chapters?.[currentChapterIdx]?.name || null);
+
+        const firstLesson = moduleData.lessons[0]?.name;
+        const firstChapter = moduleData.lessons[0]?.chapters?.[0]?.name || null;
+
+        // Find next lesson (first not in completed_lessons)
+        const nextLesson = moduleData.lessons.find(l => !completedLessons.has(l.name))?.name || null;
+        const nextLessonFirstChapter = nextLesson
+            ? (moduleData.lessons.find(l => l.name === nextLesson)?.chapters?.[0]?.name || null)
+            : null;
+
+        // Quick mapping chapter -> lesson
+        const chapterToLesson = new Map<string, string>();
+        for (const l of moduleData.lessons) {
+            for (const c of l.chapters || []) {
+                chapterToLesson.set(c.name, l.name);
+            }
+        }
+
+        return (lessonName: string, chapterName?: string) => {
+            // 1) First lesson/first chapter
+            if (!chapterName) {
+                if (lessonName === firstLesson) return true;
+                if (completedLessons.has(lessonName)) return true;
+                if (nextLesson && lessonName === nextLesson) return true; // lesson-level access (first chapter visible)
+                // Current chapter's lesson access
+                if (currentChapter && chapterToLesson.get(currentChapter) === lessonName) return true;
+                return false;
+            }
+
+            // Chapter-level
+            if (chapterName === firstChapter) return true;
+            if (completedChapters.has(chapterName)) return true;
+            if (currentChapter === chapterName) return true;
+            if (nextLesson && lessonName === nextLesson && chapterName === nextLessonFirstChapter) return true;
+            // Any chapter in a completed lesson is allowed
+            if (completedLessons.has(lessonName)) return true;
+
+            return false;
+        };
+    };
+
+    // Note: isAccessible function moved to sidebarIsAccessible after sidebarCompletionData is created
 
     // Phase 2: Function to track chapter start (In Progress)
     const trackChapterStart = async (lessonName: string, chapterName: string) => {
@@ -347,7 +613,7 @@ export default function LearnerModuleDetail() {
             if (!isChapterCompleted && !isChapterInProgress) {
                 // Track as "In Progress"
                 await updateProgress({
-                    user: user.email,
+                    user: userIdentifier,
                     module: moduleName,
                     lesson: lessonName,
                     chapter: chapterName,
@@ -360,6 +626,9 @@ export default function LearnerModuleDetail() {
                     in_progress_chapters: [...(prev?.in_progress_chapters || []), chapterName]
                 }));
                 
+                // Force refresh completion data to get latest progress
+                refetchCompletionData();
+                
                 console.log('🔄 Chapter started:', chapterName);
             }
         } catch (error) {
@@ -367,16 +636,23 @@ export default function LearnerModuleDetail() {
         }
     };
 
-    // Update module data when fetched
+    // Update module data when fetched - Consolidated state setting with Admin priority
     useEffect(() => {
-        if (moduleData) {
+        console.log('🔄 Module data useEffect triggered:', { moduleData, hasModuleData: !!moduleData, isLMSAdmin });
+        if (moduleData && !module) { // Only set if module is not already set to prevent race conditions
+            console.log('✅ Setting module state with data:', moduleData);
             setModule(moduleData);
-            if (moduleData.progress?.status === "In Progress" || moduleData.progress?.status === "Completed") {
+            
+            // For Administrator, immediately set started to true to bypass welcome screen
+            if (isLMSAdmin) {
+                setStarted(true);
+                console.log('🔧 Admin mode: Bypassing welcome screen');
+            } else if (moduleData.progress?.status === "In Progress" || moduleData.progress?.status === "Completed") {
                 setStarted(true);
                 setProgress(moduleData.progress);
             }
         }
-    }, [moduleData]);
+    }, [moduleData, isLMSAdmin, module]);
 
     // Update progress when fetched
     useEffect(() => {
@@ -395,21 +671,23 @@ export default function LearnerModuleDetail() {
         }
     }, [progress]);
 
-    // Sync UI indices with progress
+    // Sync UI indices with progress (only when progress has valid current_lesson/chapter)
     useEffect(() => {
         if (
             progress &&
-            (module?.lessons?.length ?? 0) > 0
+            (module?.lessons?.length ?? 0) > 0 &&
+            progress.current_lesson && // Only run if progress has valid current_lesson
+            progress.current_chapter    // Only run if progress has valid current_chapter
         ) {
-            let lessonIdx = progress.current_lesson
-                ? module?.lessons?.findIndex(l => l.name === progress.current_lesson) ?? 0
-                : 0;
+            let lessonIdx = module?.lessons?.findIndex(l => l.name === progress.current_lesson) ?? 0;
             if (lessonIdx < 0) lessonIdx = 0;
             const lesson = module?.lessons[lessonIdx];
-            let chapterIdx = progress.current_chapter && lesson?.chapters?.length
+            let chapterIdx = lesson?.chapters?.length
                 ? lesson.chapters.findIndex(c => c.name === progress.current_chapter)
                 : 0;
             if (chapterIdx < 0) chapterIdx = 0;
+            
+            console.log('🔄 Syncing UI indices with progress:', { lessonIdx, chapterIdx, current_lesson: progress.current_lesson, current_chapter: progress.current_chapter });
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
         }
@@ -426,52 +704,250 @@ export default function LearnerModuleDetail() {
         // If module is completed, return 100%
         if (progress?.status === "Completed") return 100;
         
-        // Use completionData if available and valid
+        // PRIORITY 1: Use module progress data (most reliable when completion data is incomplete)
+        if (module?.progress && (module.progress as any)?.overall_progress !== undefined) {
+            console.log('📊 Using module progress data (PRIORITY 1):', (module.progress as any).overall_progress);
+            return (module.progress as any).overall_progress;
+        }
+        
+        // PRIORITY 2: Use completion data only if it's valid and not 0
+        if (completionData?.overall_progress !== undefined && completionData.overall_progress > 0) {
+            console.log('📊 Using completion data progress (PRIORITY 2):', completionData.overall_progress);
+            return completionData.overall_progress;
+        }
+        
+        // Fallback: Calculate from completion data arrays
         if (completionData?.total_chapters && completionData.total_chapters > 0) {
             const completedCount = completionData.completed_chapters?.length || 0;
             const progressPercentage = Math.round((completedCount / completionData.total_chapters) * 100 * 100) / 100;
-            console.log('📊 Using completionData progress:', progressPercentage, `(${completedCount}/${completionData.total_chapters})`);
+            console.log('📊 Using completionData calculated progress:', progressPercentage, `(${completedCount}/${completionData.total_chapters})`);
             return progressPercentage;
         }
         
-        // Fallback to module-based calculation
-        if (!module?.lessons?.length) return 0;
-        let totalChapters = 0;
-        let completedChapters = 0;
+        // Final fallback: Use module progress data if available, otherwise 0
+        if (module?.progress && (module.progress as any)?.overall_progress !== undefined) {
+            console.log('📊 Using module progress data (final fallback):', (module.progress as any).overall_progress);
+            return (module.progress as any).overall_progress;
+        }
         
-        module.lessons.forEach((lesson, lessonIdx) => {
-            lesson.chapters.forEach((chapter, chapterIdx) => {
-                totalChapters += 1;
-                
-                // Mark as completed if:
-                // 1. Chapter has explicit "Completed" status
-                // 2. Chapter is before current position
-                // 3. Chapter is at current position and we've moved past it
-                if (chapter.progress === "Completed" || 
-                    (lessonIdx < currentLessonIdx) || 
-                    (lessonIdx === currentLessonIdx && chapterIdx < currentChapterIdx)) {
-                    completedChapters += 1;
-                }
-            });
-        });
+        // If no progress data available, return 0
+        console.log('📊 No progress data available, returning 0');
+        return 0;
+    };
+    // Add this new function after getUnifiedProgress()
+    const getCompletionBasedProgress = () => {
+        if (!sidebarCompletionData) return getUnifiedProgress();
         
-        const fallbackProgress = totalChapters === 0 ? 0 : Math.round((completedChapters / totalChapters) * 100 * 100) / 100;
-        console.log('📊 Using fallback progress:', fallbackProgress, `(${completedChapters}/${totalChapters})`);
-        return fallbackProgress;
+        const completedChapters = sidebarCompletionData.completed_chapters?.length || 0;
+        
+        // Calculate total chapters from module data instead of API data
+        const totalChapters = module?.lessons?.reduce((total, lesson) => total + lesson.chapters.length, 0) || 0;
+        
+        if (totalChapters === 0) return 0;
+        
+        const progressPercentage = Math.round((completedChapters / totalChapters) * 100 * 100) / 100;
+        console.log('📊 Using completion-based progress:', progressPercentage, `(${completedChapters}/${totalChapters})`);
+        return progressPercentage;
     };
     // Phase 2: Use unified progress calculation - Single Source of Truth
     const overallProgress = getUnifiedProgress();
+    
+    // Convert completion data to sidebar-compatible format with real-time updates
+    const getSidebarCompletionData = () => {
+        if (isLMSAdmin) return undefined;
+        
+        // Use real completion data if available, but calculate completed items if arrays are empty
+        if (completionData) {
+            console.log('🔍 Using real completion data for sidebar:', completionData);
+            
+            // If completion data has empty arrays, calculate completed items from in_progress_chapters
+            let completedChapters = completionData.completed_chapters || [];
+            let completedLessons = completionData.completed_lessons || [];
+            
+            // If arrays are empty, calculate completed items from module data or in_progress_chapters
+            if (completedChapters.length === 0 && completedLessons.length === 0) {
+                let currentChapterName = null;
+                
+                // Try to get current chapter from in_progress_chapters first
+                if (completionData.in_progress_chapters?.length > 0) {
+                    currentChapterName = completionData.in_progress_chapters[0];
+                    console.log('🔍 Calculating completed items from in_progress_chapters:', completionData.in_progress_chapters);
+                }
+                // Fallback to module data current position
+                else if (module?.progress && (module.progress as any)?.current_position?.chapter) {
+                    currentChapterName = (module.progress as any).current_position.chapter;
+                    console.log('🔍 Calculating completed items from module current_position:', currentChapterName);
+                }
+                
+                if (currentChapterName && module?.lessons) {
+                    let foundCurrentChapter = false;
+                    
+                    module.lessons.forEach((lesson: any) => {
+                        let lessonCompleted = true;
+                        
+                        lesson.chapters.forEach((chapter: any) => {
+                            if (chapter.name === currentChapterName) {
+                                foundCurrentChapter = true;
+                                lessonCompleted = false;
+                            } else if (!foundCurrentChapter) {
+                                // Chapter is before current chapter, so it's completed
+                                completedChapters.push(chapter.name);
+                            } else {
+                                // Chapter is after current chapter, so it's not completed
+                                lessonCompleted = false;
+                            }
+                        });
+                        
+                        // If all chapters in lesson are completed, mark lesson as completed
+                        if (lessonCompleted && lesson.chapters.length > 0) {
+                            completedLessons.push(lesson.name);
+                        }
+                    });
+                    
+                    console.log('🔍 Calculated completed items:', {
+                        completedChapters,
+                        completedLessons,
+                        currentChapterName
+                    });
+                }
+            }
+            
+            return {
+                completed_lessons: completedLessons,
+                completed_chapters: completedChapters,
+                in_progress_chapters: completionData.in_progress_chapters || [],
+                current_position: completionData.current_position,
+                total_lessons: completionData.total_lessons || 0,
+                total_chapters: completionData.total_chapters || 0,
+                overall_progress: completionData.overall_progress || 0
+            };
+        }
+        
+        // Fallback to module progress data
+        if (!module?.progress) return undefined;
+        
+        const moduleProgress = module.progress as any;
+        const completionDetails = moduleProgress.completion_details || {};
+        const currentPosition = moduleProgress.current_position;
+        
+        // Calculate completed chapters based on current position
+        const completedChapters: string[] = [];
+        const completedLessons: string[] = [];
+        const inProgressChapters: string[] = [];
+        
+        // Check if module is completed
+        if (moduleProgress.status === "Completed") {
+            // If module is completed, mark ALL chapters and lessons as completed
+            console.log('🎯 Module is completed - marking all chapters as completed');
+            
+            module.lessons.forEach((lesson: any) => {
+                completedLessons.push(lesson.name);
+                lesson.chapters.forEach((chapter: any) => {
+                    completedChapters.push(chapter.name);
+                });
+            });
+        } else if (module?.lessons && currentPosition?.chapter) {
+            // Normal logic for in-progress modules
+            const currentChapterName = currentPosition.chapter;
+            let foundCurrentChapter = false;
+            
+            // Go through all lessons and chapters to determine completion status
+            module.lessons.forEach((lesson: any) => {
+                let lessonCompleted = true;
+                
+                lesson.chapters.forEach((chapter: any) => {
+                    const chapterName = chapter.name;
+                    
+                    if (chapterName === currentChapterName) {
+                        foundCurrentChapter = true;
+                        inProgressChapters.push(chapterName);
+                        lessonCompleted = false;
+                    } else if (!foundCurrentChapter) {
+                        // Chapters before current position are completed
+                        completedChapters.push(chapterName);
+                    } else {
+                        // Chapters after current position are not completed
+                        lessonCompleted = false;
+                    }
+                });
+                
+                // If all chapters in lesson are completed, mark lesson as completed
+                if (lessonCompleted && lesson.chapters.length > 0) {
+                    completedLessons.push(lesson.name);
+                }
+            });
+        }
+        
+        console.log('🔍 Sidebar completion data calculated (fallback):', {
+            moduleStatus: moduleProgress.status,
+            completedChapters,
+            completedLessons,
+            inProgressChapters,
+            currentPosition
+        });
+        
+        return {
+            completed_lessons: completedLessons,
+            completed_chapters: completedChapters,
+            in_progress_chapters: inProgressChapters,
+            current_position: currentPosition,
+            total_lessons: module?.lessons?.length || 0,
+            total_chapters: completionDetails.total_lesson_chapter_items || 0,
+            overall_progress: moduleProgress.overall_progress || 0
+        };
+    };
+    
+    const sidebarCompletionData = getSidebarCompletionData();
+    
+    // Create the sidebar isAccessible function using sidebar completion data
+    const sidebarIsAccessible = buildIsAccessible(sidebarCompletionData || null, module);
+    
+    // Phase 2: Show loading state only if completion data is actually loading and not available
+    const isCompletionDataLoading = !completionDataResponse && !completionDataError && userIdentifier && userIdentifier !== '' && moduleName && !completionData;
     
     // Phase 2: Debug progress calculation
     console.log('📊 Progress calculation debug:', {
         overallProgress: overallProgress,
         completionData: completionData,
+        sidebarCompletionData: sidebarCompletionData,
         progressStatus: progress?.status,
         hasCompletionData: !!completionDataResponse
     });
-
-    // Phase 2: Show loading state if completion data is not loaded yet
-    const isCompletionDataLoading = !completionDataResponse && !completionDataError && user?.email && moduleName;
+    
+    // Synchronize completion data with module progress for real-time updates
+    useEffect(() => {
+        if (completionData && progress) {
+            console.log('🔄 Syncing completion data with progress state');
+            // Update progress state to match completion data
+            setProgress(prev => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    status: prev.status || "In Progress"
+                };
+            });
+        }
+    }, [completionData]);
+    
+    // Update sidebar completion data when completion data changes for real-time sidebar updates
+    useEffect(() => {
+        if (completionData) {
+            console.log('🔄 Updating sidebar completion data for real-time updates');
+            // This will trigger sidebar re-render with correct data
+            // The getSidebarCompletionData function will be called again with updated completionData
+        }
+    }, [completionData, module?.progress]);
+    
+    // Debug sidebar data
+    console.log('🔍 Sidebar data being passed:', {
+        module: module?.name,
+        progress: progress,
+        started: started || reviewing,
+        overallProgress: isCompletionDataLoading ? -1 : overallProgress,
+        currentLessonName: module?.lessons?.[currentLessonIdx]?.name,
+        currentChapterName: module?.lessons?.[currentLessonIdx]?.chapters?.[currentChapterIdx]?.name,
+        completionData: sidebarCompletionData
+    });
 
     // Navigation handlers
     const handlePrevious = async () => {
@@ -488,7 +964,7 @@ export default function LearnerModuleDetail() {
         setCurrentChapterIdx(chapterIdx);
         if (!reviewing && !completed && user) {
             await updateProgress({
-                user: user.email,
+                user: userIdentifier,
                 module: moduleName,
                 lesson: module.lessons[lessonIdx].name,
                 chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
@@ -509,6 +985,9 @@ export default function LearnerModuleDetail() {
                 }
                 setModule(updatedModule);
             }
+            
+            // Force refresh completion data to get latest progress
+            refetchCompletionData();
         }
     };
 
@@ -559,15 +1038,9 @@ export default function LearnerModuleDetail() {
         const isLastChapter = chapterIdx === currentLesson.chapters.length - 1;
         
         if (isLastLesson && isLastChapter) {
-            setQuizQAIncomplete(false);
-            setShowQuizQAAlert(false);
-            setIncompleteQuizQATitles([]);
             const { allCompleted, scores } = await checkQuizQACompletion(module, user);
             if (!allCompleted) {
                 const incompleteTitles = await getIncompleteQuizQATitles(module, user);
-                setIncompleteQuizQATitles(incompleteTitles);
-                setQuizQAIncomplete(true);
-                setShowQuizQAAlert(true);
                 toast.warning(
                     <div>
                         <div>You must complete all Quiz and Question/Answer sections before completing this module.</div>
@@ -592,7 +1065,7 @@ export default function LearnerModuleDetail() {
             // Only update backend if not already completed
             if (!isCurrentChapterCompleted) {
                 await updateProgress({
-                    user: user.email,
+                    user: userIdentifier,
                     module: moduleName,
                     lesson: currentLesson.name,
                     chapter: currentChapter.name,
@@ -633,7 +1106,7 @@ export default function LearnerModuleDetail() {
         // Mark current chapter as completed (only if not already completed)
         if (!isCurrentChapterCompleted) {
             await updateProgress({
-                user: user.email,
+                user: userIdentifier,
                 module: moduleName,
                 lesson: currentLesson.name,
                 chapter: currentChapter.name,
@@ -673,6 +1146,9 @@ export default function LearnerModuleDetail() {
             console.log('⏭️ Skipped chapter update - already completed:', currentChapter.name);
         }
         
+        // Force refresh completion data to get latest progress
+        refetchCompletionData();
+        
         // Calculate next position
         if (chapterIdx < currentLesson.chapters.length - 1) {
             // Move to next chapter in the same lesson
@@ -708,7 +1184,7 @@ export default function LearnerModuleDetail() {
         setIsTransitioning(true);
         try {
             const result = await startModule({
-                user: user.email,
+                user: userIdentifier,
                 module: moduleName
             });
             if (!result) {
@@ -729,6 +1205,15 @@ export default function LearnerModuleDetail() {
     // Sidebar click handlers (for learners)
     const handleLessonClick = (lessonName: string) => {
         if (!module?.lessons?.length) return;
+        
+        // Check if lesson is accessible using sidebar completion data
+        const isAccessible = sidebarIsAccessible(lessonName);
+        console.log('🔍 Lesson accessibility check:', { lessonName, isAccessible, sidebarCompletionData });
+        if (!isAccessible) {
+            toast.error("Complete previous lessons to unlock this content");
+            return;
+        }
+        
         const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
         if (lessonIdx !== -1) {
             setCurrentLessonIdx(lessonIdx);
@@ -744,7 +1229,7 @@ export default function LearnerModuleDetail() {
                 // Optionally, call updateProgress API here to persist
                 if (user) {
                     updateProgress({
-                        user: user.email,
+                        user: userIdentifier,
                         module: moduleName,
                         lesson: module.lessons[lessonIdx].name,
                         chapter: module.lessons[lessonIdx].chapters[0]?.name || "",
@@ -752,11 +1237,23 @@ export default function LearnerModuleDetail() {
                     });
                 }
             }
+            
+            // Force refresh completion data to get latest progress
+            refetchCompletionData();
         }
     };
 
     const handleChapterClick = (lessonName: string, chapterName: string) => {
         if (!module?.lessons?.length) return;
+        
+        // Check if chapter is accessible using sidebar completion data
+        const isAccessible = sidebarIsAccessible(lessonName, chapterName);
+        console.log('🔍 Chapter accessibility check:', { lessonName, chapterName, isAccessible, sidebarCompletionData });
+        if (!isAccessible) {
+            toast.error("Complete previous chapters to unlock this content");
+            return;
+        }
+        
         const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
         if (lessonIdx !== -1) {
             const lesson = module.lessons[lessonIdx];
@@ -775,6 +1272,9 @@ export default function LearnerModuleDetail() {
                     // Track chapter start
                     trackChapterStart(lessonName, chapterName);
                 }
+                
+                // Force refresh completion data to get latest progress
+                refetchCompletionData();
             }
         }
     };
@@ -784,6 +1284,13 @@ export default function LearnerModuleDetail() {
             setIsLoading(false);
         }
     }, [moduleListData, moduleListError]);
+    
+    // Update loading state based on module data loading
+    useEffect(() => {
+        if (moduleDataLoading !== undefined) {
+            setIsLoading(moduleDataLoading);
+        }
+    }, [moduleDataLoading]);
 
     useEffect(() => {
         if (module && user && progress?.status === "Completed") {
@@ -796,7 +1303,7 @@ export default function LearnerModuleDetail() {
 
     // --- ADMIN: UI-only navigation, no progress, no welcome, no completion ---
     if (isLMSAdmin) {
-        if (isLoading || userLoading) {
+        if (isLoading || userLoading || moduleDataLoading) {
             return (
                 <div className="flex flex-col items-center justify-center h-full">
                     <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
@@ -889,12 +1396,13 @@ export default function LearnerModuleDetail() {
                         currentChapterName={currentChapter?.name}
                         mode='admin'
                         completionData={undefined} // no completion data for admin
+                        isAccessible={() => true} // admin can access everything
                     />
                 </div>
                 {/* Main Content */}
                 <div className="flex-1 flex justify-center items-start p-8">
                     <div className="w-full rounded-xl shadow p-8 bg-card">
-                        {currentLesson && currentChapter && (
+                        {currentLesson && currentChapter && module && (
                             <div className="space-y-8">
                                 {/* Admin Preview Indicator */}
                                 <div className="flex items-center justify-between">
@@ -913,7 +1421,7 @@ export default function LearnerModuleDetail() {
                                 {/* Chapter Contents */}
                                 {currentChapter.contents && currentChapter.contents.length > 0 && (
                                     <div className="space-y-6">
-                                        {currentChapter.contents.map((content, idx) => (
+                                        {currentChapter.contents.map((content) => (
                                             <ContentRenderer
                                                 key={content.name}
                                                 contentType={content.content_type}
@@ -958,7 +1466,7 @@ export default function LearnerModuleDetail() {
     // --- END ADMIN LOGIC ---
 
     // --- LEARNER LOGIC (default, as before) ---
-    if (isLoading || userLoading) {
+    if (isLoading || userLoading || moduleDataLoading) {
         return (
             <div className="flex flex-col items-center justify-center h-full">
                 <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
@@ -974,7 +1482,30 @@ export default function LearnerModuleDetail() {
             </div>
         );
     }
-    if (!module) {
+    
+    // Additional loading check for moduleDataLoading (redundant but safe)
+    if (moduleDataLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full">
+                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                <div className="mt-4 text-muted-foreground">Loading module details...</div>
+            </div>
+        );
+    }
+    
+    // Debug logging for module state
+    console.log('🔍 Current module state:', { 
+        module, 
+        hasModule: !!module, 
+        moduleName: module?.name,
+        moduleDataLoading,
+        moduleListData: !!moduleListData,
+        moduleListError: !!moduleListError
+    });
+    
+    // More robust module not found handling - only show error after all loading is complete
+    if (!module && !moduleDataLoading && !isLoading && moduleListData && !moduleListError) {
+        console.log('❌ Module not found - showing error screen');
         return (
             <div className="flex flex-col items-center justify-center h-full">
                 <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
@@ -982,11 +1513,19 @@ export default function LearnerModuleDetail() {
             </div>
         );
     }
-    const currentLesson = module.lessons?.[currentLessonIdx];
+    
+    // Final loading state check - if we still don't have module data and we're not loading, show loading
+    if (!module && !moduleDataLoading && !isLoading && !moduleListData && !moduleListError) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full">
+                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                <div className="mt-4 text-muted-foreground">Loading module details...</div>
+            </div>
+        );
+    }
+    const currentLesson = module?.lessons?.[currentLessonIdx];
     const currentChapter = currentLesson?.chapters?.[currentChapterIdx];
     const isFirst = currentLessonIdx === 0 && currentChapterIdx === 0;
-    const isLast = currentLessonIdx === (module.lessons?.length ?? 0) - 1 && 
-                  currentChapterIdx === (currentLesson?.chapters?.length ?? 0) - 1;
 
     // If module is completed, show completion screen immediately
     if (progress?.status === "Completed" && !reviewing) {
@@ -1028,7 +1567,7 @@ export default function LearnerModuleDetail() {
                     </div>
                     <div className="flex flex-col items-center w-full mx-auto px-4 space-y-6 pt-8">
                         {/* Module Image or Avatar */}
-                        <h1 className="text-4xl font-bold leading-tight">{module.name1}</h1>
+                        <h1 className="text-4xl font-bold leading-tight">{module?.name1}</h1>
                         
                         {/* Lottie/Animated SVG Placeholder */}
                         <div className=" inset-0 w-full h-full flex items-center justify-center pointer-events-none z-0">
@@ -1040,7 +1579,7 @@ export default function LearnerModuleDetail() {
                         </div>
                         <div className="flex gap-4">
                             <div className="flex justify-center mb-2">
-                                {module.image ? (
+                                {module?.image ? (
                                     <img
                                         src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`}
                                         alt={module.name1}
@@ -1048,11 +1587,11 @@ export default function LearnerModuleDetail() {
                                     />
                                 ) : (
                                     <div className="w-32 h-32 flex items-center justify-center rounded-2xl shadow-lg border border-border bg-primary/10 text-primary text-6xl font-bold">
-                                        {module.name1?.charAt(0).toUpperCase()}
+                                        {module?.name1?.charAt(0).toUpperCase()}
                                     </div>
                                 )}
                             </div>
-                            {module.description && (
+                            {module?.description && (
                                 <div>
                                     <h2 className="text-2xl font-bold mb-2">About this module</h2>
                                     <p className="text-lg text-muted-foreground max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: module.description }} />
@@ -1078,19 +1617,20 @@ export default function LearnerModuleDetail() {
                             module={module}
                             progress={isLMSAdmin ? null : (reviewing ? null : progress)}
                             started={started || reviewing}
-                            overallProgress={isCompletionDataLoading ? -1 : overallProgress} // -1 indicates loading
+                            overallProgress={getCompletionBasedProgress()} // Show actual progress, not loading state
                             onLessonClick={handleLessonClick}
                             onChapterClick={handleChapterClick}
-                            currentLessonName={module.lessons?.[currentLessonIdx]?.name}
-                            currentChapterName={module.lessons?.[currentLessonIdx]?.chapters?.[currentChapterIdx]?.name}
+                            currentLessonName={module?.lessons?.[currentLessonIdx]?.name}
+                            currentChapterName={module?.lessons?.[currentLessonIdx]?.chapters?.[currentChapterIdx]?.name}
                             mode={isLMSAdmin ? 'admin' : (reviewing ? 'review' : 'learner')}
-                            completionData={isLMSAdmin ? undefined : completionData}
+                            completionData={isLMSAdmin ? undefined : sidebarCompletionData}
+                            isAccessible={isLMSAdmin ? () => true : sidebarIsAccessible} // admin can access everything, learners use locking
                         />
                     </div>
                     {/* Main Content */}
                     <div className="flex-1 flex justify-center items-start p-8">
                         <div className="w-full  rounded-xl shadow p-8">
-                            {(started || reviewing) && currentLesson && currentChapter && (
+                            {(started || reviewing) && currentLesson && currentChapter && module && (
                                 <div className="space-y-8">
                                     {/* Lesson and Chapter Header */}
                                     <div>
@@ -1100,7 +1640,7 @@ export default function LearnerModuleDetail() {
                                     {/* Chapter Contents */}
                                     {currentChapter.contents && currentChapter.contents.length > 0 && (
                                         <div className="space-y-6">
-                                    {currentChapter.contents.map((content, idx) => (
+                                    {currentChapter.contents.map((content) => (
                                                 <ContentRenderer
                                             key={content.name}
                                                     contentType={content.content_type}

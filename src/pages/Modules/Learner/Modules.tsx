@@ -1,6 +1,5 @@
 import {
     Card,
-    CardContent,
     CardFooter,
     CardHeader,
     CardTitle,
@@ -15,31 +14,23 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination"
-import { useState, useMemo, useEffect } from "react"
-import { Input } from "@/components/ui/input"
+import React, { useState, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useUser } from "@/hooks/use-user"
 import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Progress } from "@/components/ui/progress"
 import { useFrappeGetCall } from "frappe-react-sdk"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { CheckCircle, Clock, MinusCircle, ChevronDown, ChevronUp, Calendar, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Clock, ChevronDown, ChevronUp, Calendar, AlertTriangle, BookOpen, Target } from 'lucide-react';
 import Lottie from 'lottie-react';
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
-import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ModulesProps {
     itemsPerPage?: number;
 }
 
-const STATUS_COLORS = {
-    "Completed": "var(--accent)",
-    "In Progress": "var(--primary)",
-    "Not Started": "var(--muted)"
-};
 
 // Animation variants
 const containerVariants = {
@@ -56,22 +47,122 @@ const itemVariants = {
 
 export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
     const [page, setPage] = useState(1)
-    const [searchQuery, setSearchQuery] = useState("")
+    const [searchQuery] = useState("")
     const { user } = useUser()
     const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
 
-    const offset = (page - 1) * itemsPerPage
+    // Note: offset not needed for dashboard API as it returns all modules
 
-    // Fetch modules with optimized learner API using frappe-react-sdk
-    const { data, error, isLoading } = useFrappeGetCall<any>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
+    // Debug logging for user and API parameters
+    console.log('User object:', user);
+    console.log('User email:', user?.email);
+    console.log('API call parameters:', {
+        user: user?.email,
+    });
+
+    // Fetch modules using the working API (has proper structure generation)
+    const { data, error, isLoading, mutate } = useFrappeGetCall<any>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
         user: user?.email,
         limit: itemsPerPage,
-        offset,
+        offset: 0,
     })
 
-    const modules = data?.data?.modules || []
-    const meta = data?.data?.meta || {}
+    // Fetch progress data separately from dashboard API (real-time, no cache)
+    const { data: progressData, isLoading: progressLoading } = useFrappeGetCall<any>("novel_lms.novel_lms.api.progress_tracking.get_learner_dashboard", {
+        user: user?.email,
+    }, {
+        enabled: !!user?.email,
+    })
+
+    // Create progress map from dashboard API (real-time progress data)
+    const progressMap = React.useMemo(() => {
+        const map: { [key: string]: any } = {};
+        if (progressData?.message && Array.isArray(progressData.message)) {
+            progressData.message.forEach((item: any) => {
+                if (item.module && item.progress) {
+                    map[item.module.name] = item.progress;
+                }
+            });
+        }
+        console.log('Progress map from dashboard:', map);
+        return map;
+    }, [progressData]);
+
+    // Transform data to match expected format (working API structure)
+    const modules = React.useMemo(() => {
+        if (!data?.message?.message?.modules) {
+            return [];
+        }
+        const transformedModules = data.message.message.modules.map((module: any) => ({
+            ...module,
+            // Override progress with real-time data from dashboard API
+            progress: progressMap[module.name] || module.progress
+        }));
+        
+        // Debug logging
+        console.log('Raw API response:', data);
+        console.log('Transformed modules:', transformedModules);
+        if (transformedModules.length > 0) {
+            console.log('First module structure:', transformedModules[0].structure);
+            console.log('First module progress:', transformedModules[0].progress);
+        }
+        
+        return transformedModules;
+    }, [data, progressMap]);
+    
+    // Calculate meta from modules (use API meta or calculate from modules)
+    const meta = React.useMemo(() => {
+        // Use API meta if available, otherwise calculate from modules
+        if (data?.message?.message?.meta) {
+            return data.message.message.meta;
+        }
+        
+        if (!modules || modules.length === 0) {
+            return {
+                total_modules: 0,
+                completed_modules: 0,
+                in_progress_modules: 0,
+                not_started_modules: 0,
+                average_progress: 0,
+                total_count: 0,
+                total: 0
+            };
+        }
+        
+        return {
+            total_modules: modules.length,
+            completed_modules: modules.filter((m: any) => m.progress?.status === "Completed").length,
+            in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
+            not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
+            average_progress: modules.length > 0 ? 
+                Math.round(modules.reduce((sum: number, m: any) => sum + Math.round(m.progress?.progress || 0), 0) / modules.length) : 0,
+            total_count: modules.length,
+            total: modules.length
+        };
+    }, [modules, data]);
+    
     const totalPages = Math.ceil((meta.total_count || 0) / itemsPerPage)
+
+    // Retry function for failed API calls
+    const handleRetry = React.useCallback(() => {
+        setRetryCount(prev => prev + 1);
+        mutate();
+    }, [mutate]);
+
+    // Auto-retry on error (max 3 times)
+    React.useEffect(() => {
+        if (error) {
+            console.log('API Error:', error);
+            console.log('Error details:', JSON.stringify(error, null, 2));
+        }
+        if (error && retryCount < 3) {
+            const timer = setTimeout(() => {
+                handleRetry();
+            }, 1000 * (retryCount + 1)); // Exponential backoff
+            return () => clearTimeout(timer);
+        }
+    }, [error, retryCount, handleRetry]);
 
     // Client-side search (optional: can be moved to backend if needed)
     const filteredModules = useMemo(() => {
@@ -88,176 +179,253 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
         return [...ordered, ...unordered];
     }, [filteredModules]);
 
-    // Calculate stats and average progress on the frontend for reliability
+    // Calculate stats using the same logic as dashboard
     const completedCount = filteredModules.filter((m: any) => m.progress?.status === "Completed").length;
     const inProgressCount = filteredModules.filter((m: any) => m.progress?.status === "In Progress").length;
-    const notStartedCount = filteredModules.filter((m: any) => !m.progress || m.progress.status === "Not Started").length;
-    const progressValues = filteredModules.map((m: any) => {
-        if (m.progress?.status === "Completed") return 100;
-        if (m.progress?.status === "In Progress") return m.progress?.progress || 0;
-        return 0;
-    });
-    const averageProgress = progressValues.length > 0 ? (progressValues.reduce((a: number, b: number) => a + b, 0) / progressValues.length) : 0;
+    const notStartedCount = filteredModules.filter((m: any) => m.progress?.status === "Not Started").length;
 
-    // Bar chart data for status breakdown (frontend counts)
-    const barData = [
-        { name: "Completed", value: completedCount, color: '#22c55e', icon: <CheckCircle className="w-5 h-5 text-green-500" /> },
-        { name: "In Progress", value: inProgressCount, color: '#0ea5e9', icon: <Clock className="w-5 h-5 text-blue-500" /> },
-        { name: "Yet to Start", value: notStartedCount, color: '#9ca3af', icon: <MinusCircle className="w-5 h-5 text-gray-400" /> },
-    ];
-    const filteredBarData = barData.filter(d => d.value > 0);
+    // Use progress from dashboard API (real-time data)
+    const calculatedAverageProgress = filteredModules.length > 0 
+        ? Math.round(filteredModules.reduce((sum: number, m: any) => {
+            return sum + Math.round(m.progress?.progress || 0);
+        }, 0) / filteredModules.length)
+        : 0;
 
-    const [colors, setColors] = useState({
-        primary: '#0ea5e9', // fallback Tailwind blue-500
-        published: '#22c55e', // fallback Tailwind green-500 for published/completed
-        draft: '#9ca3af',    // Tailwind gray-400 for draft/yet to start
-        pending: '#f59e0b'   // Tailwind amber-500 for approval pending
-    });
+    // Use calculated progress or fallback to meta data
+    const averageProgress = calculatedAverageProgress || meta.average_progress || 0;
 
-    useEffect(() => {
-        setColors({
-            primary: getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#0ea5e9',
-            published: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#22c55e',
-            draft: '#9ca3af',
-            pending: '#f59e0b'
-        });
-    }, []);
 
-    // Custom Tooltip for clarity
-    const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-white rounded shadow px-3 py-2 text-xs text-foreground border border-border">
-                    <span className="font-semibold">{payload[0].name}:</span> {payload[0].value}
-                </div>
-            );
-        }
-        return null;
-    };
-
-    // Donut chart data for status breakdown (from meta)
-    const donutChartData = [
-        { name: "Completed", value: meta.completed_modules || 0, color: "#22c55e" },
-        { name: "In Progress", value: meta.in_progress_modules || 0, color: "#0ea5e9" },
-        { name: "Yet to Start", value: meta.not_started_modules || 0, color: "#9ca3af" },
-    ];
 
     return (
         <div className="space-y-6">
-            <AnimatePresence mode="wait">
+            <div className="space-y-6">
+                <AnimatePresence>
                 <motion.div
                     key="stats"
-                    initial={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.3 }}
+                        className="bg-gradient-to-r from-card to-card/80 border border-border rounded-xl p-6 shadow-lg backdrop-blur-sm"
+                    >
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                            {/* Title and Description */}
+                            <div className="space-y-2">
+                                <motion.h1 
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.5 }}
-                    className="flex justify-center w-full"
-                >
-                    <Card className="mx-auto w-full max-w-4xl bg-white/60 dark:bg-white/10 backdrop-blur-md shadow-2xl rounded-3xl p-6 md:p-10 flex flex-col gap-6 items-center border border-border">
-                        {/* Card Title */}
-                        <div className="w-full text-center text-2xl font-extrabold tracking-tight mb-2 text-foreground">Your Learning Stats</div>
-                        {/* Stats Row - stack vertically on mobile */}
-                        <div className="flex flex-col md:flex-row w-full justify-center items-center gap-6 md:gap-10">
-                            {barData.map((stat, idx) => (
-                                <div key={stat.name} className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center justify-center w-16 h-16 rounded-full shadow-lg" style={{ background: stat.color + '22' }}>
-                                        <span className="text-3xl font-extrabold" style={{ color: stat.color }}>{stat.value}</span>
+                                    className="text-3xl font-bold text-foreground"
+                                >
+                                    Available Modules
+                                </motion.h1>
+                                <motion.p 
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.5, delay: 0.1 }}
+                                    className="text-muted-foreground"
+                                >
+                                    Browse and enroll in modules to start your learning journey
+                                </motion.p>
+                            </div>
+                            
+                            {/* Enhanced Animated Stats */}
+                            <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+                                {/* Completed Modules */}
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.4, delay: 0.2 }}
+                                    className="flex items-center gap-3 bg-green-50 dark:bg-green-950/30 px-4 py-2 rounded-lg border border-green-200 dark:border-green-800"
+                                >
+                                    <motion.div 
+                                        className="w-4 h-4 flex items-center justify-center"
+                                        animate={{ scale: [1, 1.2, 1] }}
+                                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                    >
+                                        <CheckCircle className="w-4 h-4 text-green-500" />
+                                    </motion.div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                                            {completedCount}
+                                        </span>
+                                        <span className="text-xs text-green-600 dark:text-green-500">Completed</span>
                                     </div>
-                                    <span className="text-sm font-semibold text-muted-foreground mt-1 flex items-center gap-1">
-                                        {stat.icon}
-                                        {stat.name}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                        {/* Multi-segment Donut Chart for Module Status */}
-                        <div className="w-full flex flex-col items-center mt-2">
-                            <span className="text-xs text-muted-foreground font-medium">Module Status Breakdown</span>
-                            <div className="relative flex items-center justify-center w-full" style={{ minHeight: 180 }}>
-                                <ResponsiveContainer width={180} height={180}>
-                                    <PieChart>
-                                        <Pie
-                                            data={donutChartData}
-                                            dataKey="value"
-                                            nameKey="name"
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={80}
-                                            paddingAngle={2}
-                                            labelLine={false}
-                                        >
-                                            {donutChartData.map((entry, idx) => (
-                                                <Cell key={entry.name} fill={entry.color} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip formatter={(value, name) => [`${value} module${value === 1 ? '' : 's'}`, name]} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                {/* Center label for average progress */}
-                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <span className="text-3xl font-bold" style={{ color: '#0ea5e9' }}>{meta.average_progress?.toFixed(2) || '0.00'}%</span>
-                                    <span className="text-xs text-muted-foreground">Avg. Progress</span>
-                                </div>
-                            </div>
-                            {/* Legend below chart */}
-                            <div className="flex justify-center gap-6 mt-4 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-block w-4 h-4 rounded" style={{ background: '#22c55e' }} /> Completed
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-block w-4 h-4 rounded" style={{ background: '#0ea5e9' }} /> In Progress
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-block w-4 h-4 rounded" style={{ background: '#9ca3af' }} /> Yet to Start
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
-                </motion.div>
+                                </motion.div>
 
-                <motion.div
-                    key="search"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.4, delay: 0.1 }}
-                    className="flex gap-4 p-4"
-                >
-                <div className="flex-1">
-                    <Input
-                        placeholder="Search modules..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-background border-input"
-                        aria-label="Search modules"
-                    />
-                </div>
+                                {/* In Progress Modules */}
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.4, delay: 0.3 }}
+                                    className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950/30 px-4 py-2 rounded-lg border border-blue-200 dark:border-blue-800"
+                                >
+                                    <motion.div 
+                                        className="w-4 h-4 flex items-center justify-center"
+                                        animate={{ scale: [1, 1.2, 1] }}
+                                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                                    >
+                                        <Clock className="w-4 h-4 text-blue-500" />
+                                    </motion.div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+                                            {inProgressCount}
+                                        </span>
+                                        <span className="text-xs text-blue-600 dark:text-blue-500">In Progress</span>
+                                    </div>
+                                </motion.div>
+
+                                {/* Available Modules */}
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.4, delay: 0.4 }}
+                                    className="flex items-center gap-3 bg-gray-50 dark:bg-gray-950/30 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-800"
+                                >
+                                    <motion.div 
+                                        className="w-4 h-4 flex items-center justify-center"
+                                        animate={{ scale: [1, 1.2, 1] }}
+                                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                                    >
+                                        <BookOpen className="w-4 h-4 text-gray-500" />
+                                    </motion.div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-400">
+                                            {notStartedCount}
+                                        </span>
+                                        <span className="text-xs text-gray-600 dark:text-gray-500">Available</span>
+                                    </div>
+                                </motion.div>
+
+                                {/* Average Progress */}
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.4, delay: 0.5 }}
+                                    className="flex items-center gap-3 bg-primary/10 dark:bg-primary/20 px-4 py-2 rounded-lg border border-primary/20 dark:border-primary/30"
+                                >
+                                    <motion.div 
+                                        className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"
+                                        animate={{ rotate: [0, 360] }}
+                                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                    >
+                                        <Target className="w-4 h-4 text-primary-foreground" />
+                                    </motion.div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-semibold text-primary">
+                                            {Math.round(averageProgress)}%
+                                    </span>
+                                        <span className="text-xs text-primary/70">Avg Progress</span>
+                                    </div>
+                                </motion.div>
+                                </div>
+                        </div>
+
+                        {/* Enhanced Progress Bar for Overall Completion */}
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: 0.6 }}
+                            className="mt-4"
+                        >
+                            <div className="flex justify-between items-center text-xs text-muted-foreground mb-3">
+                                <span className="font-medium">Overall Progress</span>
+                                <span className="font-semibold text-foreground">
+                                    {averageProgress}% Complete
+                                </span>
+                            </div>
+                            
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="w-full bg-gray-200/60 dark:bg-gray-700/60 rounded-xl h-3 overflow-hidden shadow-inner border border-gray-300/20 dark:border-gray-600/20 cursor-pointer transition-all duration-200 hover:shadow-md">
+                                            <motion.div 
+                                                className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-xl relative shadow-lg"
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${averageProgress}%` }}
+                                                transition={{ duration: 1.2, delay: 0.8, ease: "easeOut" }}
+                                                style={{
+                                                    boxShadow: '0 0 20px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                                                }}
+                                            >
+                                                {/* Subtle shine effect */}
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-xl" />
+                                            </motion.div>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="bg-card border border-border shadow-lg">
+                                        <div className="space-y-2 p-2">
+                                            <div className="text-sm font-semibold text-foreground">Progress Breakdown</div>
+                                            <div className="space-y-1 text-xs">
+                                <div className="flex items-center gap-2">
+                                                    <CheckCircle className="w-3 h-3 text-green-500" />
+                                                    <span className="text-muted-foreground">Completed:</span>
+                                                    <span className="font-medium text-green-600 dark:text-green-400">{meta.completed_modules || 0} modules</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                                    <Clock className="w-3 h-3 text-blue-500" />
+                                                    <span className="text-muted-foreground">In Progress:</span>
+                                                    <span className="font-medium text-blue-600 dark:text-blue-400">{meta.in_progress_modules || 0} modules</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                                    <BookOpen className="w-3 h-3 text-gray-500" />
+                                                    <span className="text-muted-foreground">Available:</span>
+                                                    <span className="font-medium text-gray-600 dark:text-gray-400">{meta.not_started_modules || 0} modules</span>
+                                                </div>
+                                                <div className="pt-1 border-t border-border">
+                                                    <div className="flex items-center gap-2">
+                                                        <Target className="w-3 h-3 text-primary" />
+                                                        <span className="text-muted-foreground">Total:</span>
+                                                        <span className="font-medium text-foreground">{meta.total || filteredModules.length || 0} modules</span>
+                                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                </motion.div>
                 </motion.div>
             </AnimatePresence>
+            </div>
 
             {/* Loading and Error States */}
-            {isLoading && (
+            {(isLoading || progressLoading) && (
                 <div className="flex flex-col items-center justify-center p-8">
                     <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
-                    <div className="mt-4 text-muted-foreground">Loading modules...</div>
+                    <div className="mt-4 text-muted-foreground">Loading modules and progress...</div>
                 </div>
             )}
             {error && (
                 <div className="flex flex-col items-center justify-center p-8">
                     <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
                     <div className="mt-4 text-red-500">Error loading modules.</div>
+                    {retryCount < 3 && (
+                        <button 
+                            onClick={handleRetry}
+                            className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                        >
+                            Retry ({retryCount}/3)
+                        </button>
+                    )}
+                    {retryCount >= 3 && (
+                        <div className="mt-4 text-sm text-muted-foreground">
+                            Failed to load after 3 attempts. Please refresh the page.
+                        </div>
+                    )}
                 </div>
             )}
 
             {/* Modules Grid */}
-            {!isLoading && !error && sortedModules.length === 0 && (
+            {!isLoading && !progressLoading && !error && (!data || sortedModules.length === 0) && (
                 <div className="flex flex-col items-center justify-center p-8">
                     <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
-                    <div className="mt-4 text-muted-foreground text-lg">No modules found. Try a different search or check back later!</div>
+                    <div className="mt-4 text-muted-foreground text-lg">
+                        {!data ? "Loading modules..." : "No modules found. Try a different search or check back later!"}
+                    </div>
                 </div>
             )}
-            {!isLoading && !error && sortedModules.length > 0 && (
+            {!isLoading && !progressLoading && !error && data && sortedModules.length > 0 && (
                 <motion.div
                     key="grid"
                     variants={containerVariants}
@@ -270,11 +438,8 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                 {sortedModules.map((module: any, idx: number) => {
                     const status = module.progress?.status || "Not Started";
                     
-                    // Use the overall_progress from the API response
-                    let progress = module.progress?.overall_progress || 0;
-                    if (status === "Completed") {
-                        progress = 100;
-                    }
+                    // Use progress from dashboard API (real-time data)
+                    const progress = Math.round(module.progress?.progress || 0);
                     
                     const isCompleted = status === "Completed";
                     const isInProgress = status === "In Progress";

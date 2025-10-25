@@ -16,13 +16,22 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { motion } from "framer-motion"
-import { Download } from "lucide-react"
+import { Download, X } from "lucide-react"
 import { toast } from "sonner"
 import { LMS_API_BASE_URL } from "@/config/routes"
+
+// Debounce utility function
+const debounce = (fn: Function, delay: number) => {
+    let timeout: NodeJS.Timeout;
+    return (...args: any[]) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn(...args), delay);
+    };
+};
 
 interface ModulesProps {
     itemsPerPage: number;
@@ -66,12 +75,40 @@ function downloadCSV(csv: string, filename: string) {
 
 function Modules({ itemsPerPage }: ModulesProps) {
     const [page, setPage] = useState(1)
-    const [searchQuery, setSearchQuery] = useState("")
+    // Initialize search query from localStorage
+    const [searchQuery, setSearchQuery] = useState(() => {
+        return localStorage.getItem('modules_search') || "";
+    })
     const [selectedDepartment, setSelectedDepartment] = useState("all")
     const [selectedStatus, setSelectedStatus] = useState("all")
     const [isExporting, setIsExporting] = useState(false)
     // Add image error state for all cards
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+
+    // Debounced save function for search query
+    const saveSearchToStorage = useCallback(
+        debounce((value: string) => {
+            if (value && value.trim()) {
+                localStorage.setItem('modules_search', value.trim());
+            } else {
+                localStorage.removeItem('modules_search');
+            }
+        }, 300),
+        []
+    );
+
+    // Handle search query change
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        saveSearchToStorage(value);
+    };
+
+    // Handle clear search
+    const handleClearSearch = () => {
+        setSearchQuery("");
+        saveSearchToStorage("");
+    };
 
     // Get departments for filter
     const { data: departments } = useFrappeGetDocList("Department", {
@@ -188,12 +225,22 @@ function Modules({ itemsPerPage }: ModulesProps) {
     return (
         <div>
             <div className="flex gap-4 p-4 mb-4">
-                <div className="flex-1">
+                <div className="flex-1 relative">
                     <Input
                         placeholder="Search modules..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={handleSearchChange}
+                        className="pr-10"
                     />
+                    {searchQuery && (
+                        <button
+                            onClick={handleClearSearch}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                            type="button"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
                 </div>
                 <div className="w-[200px]">
                     <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>

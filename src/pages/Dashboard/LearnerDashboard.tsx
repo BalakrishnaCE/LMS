@@ -12,6 +12,7 @@ import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import AchievementShowcase from "@/components/AchievementShowcase";
 import { useLearnerDashboard, useLearnerModuleData } from "@/lib/api";
+import { useFrappeGetDocList } from "frappe-react-sdk";
 import { calculateProgressStats, calculateModuleProgress } from "@/utils/progressUtils";
 
 
@@ -131,9 +132,44 @@ export default function LearnerDashboard() {
     }));
     return modulesArray;
   };
-  // Fetch user achievements from API - temporarily disabled as useFrappeGetDocList is not available
-  const userAchievements: any[] = [];
-  const achievementsLoading = false;
+  // Fetch achievements using direct API call to avoid conflicts
+  const [dashboardAchievements, setDashboardAchievements] = React.useState<any[]>([]);
+  const [achievementsLoading, setAchievementsLoading] = React.useState(true);
+  
+  const fetchAchievements = React.useCallback(async () => {
+    if (!user?.name) return;
+    
+    try {
+      setAchievementsLoading(true);
+      const response = await fetch(`${LMS_API_BASE_URL}api/resource/User Achievement?filters=[["user","=","${user.name}"]]&fields=["name","achievement","created_on","user","achievement.icon_name","achievement.text","achievement.description"]`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+      const data = await response.json();
+      
+      if (data.data) {
+        setDashboardAchievements(data.data);
+        console.log('🔍 Dashboard - Direct API achievements:', data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching achievements:', error);
+      setDashboardAchievements([]);
+    } finally {
+      setAchievementsLoading(false);
+    }
+  }, [user?.name]);
+  
+  React.useEffect(() => {
+    fetchAchievements();
+  }, [fetchAchievements]);
+  
+  console.log('🔍 Dashboard - dashboardAchievements:', dashboardAchievements);
+  console.log('🔍 Dashboard - achievementsLoading:', achievementsLoading);
+  console.log('🔍 Dashboard - dashboardAchievements type:', typeof dashboardAchievements);
+  console.log('🔍 Dashboard - dashboardAchievements is array?', Array.isArray(dashboardAchievements));
 
   // Extract modules and meta - use both APIs but prioritize useLearnerDashboard
   // useLearnerModuleData returns data directly: { modules: [...], meta: {...} }
@@ -253,16 +289,29 @@ export default function LearnerDashboard() {
     return [...ordered, ...unordered];
   }, [modules]);
 
+  // Refresh achievements when component mounts or modules change
+  React.useEffect(() => {
+    console.log('🔍 Dashboard - Refreshing achievements due to module change');
+    fetchAchievements();
+  }, [modules.length, fetchAchievements]);
+
   // Map API data to AchievementShowcase props
   let achievements: Achievement[] = [];
-  if (userAchievements && Array.isArray(userAchievements)) {
-    achievements = userAchievements.map((ua: any) => ({
+  console.log('🔍 Dashboard - dashboardAchievements in mapping:', dashboardAchievements);
+  console.log('🔍 Dashboard - achievementsLoading in mapping:', achievementsLoading);
+  
+  if (dashboardAchievements && Array.isArray(dashboardAchievements)) {
+    console.log('🔍 Dashboard - dashboardAchievements is array, length:', dashboardAchievements.length);
+    achievements = dashboardAchievements.map((ua: any) => ({
       id: ua.name,
       icon_name: ua.icon_name,
       text: ua.text,
       description: ua.description,
       created_on: ua.created_on,
     }));
+    console.log('🔍 Dashboard - mapped achievements:', achievements);
+  } else {
+    console.log('🔍 Dashboard - dashboardAchievements is not array or empty:', dashboardAchievements);
   }
 
   // Loading and error states
@@ -818,15 +867,14 @@ export default function LearnerDashboard() {
                                         <Link
                                           href={ROUTES.LEARNER_MODULE_DETAIL(module.name)}
                                           className="rounded-full px-4 py-2 bg-primary text-white flex items-center gap-2 shadow hover:bg-primary/90 transition"
-                                          aria-label={`Start module: ${module.name1}`}
+                                          aria-label={`${module.progress?.status === "Completed" ? "Review" : module.progress?.status === "In Progress" ? "Resume" : "Start"} module: ${module.name1}`}
                                         >
-                                          {module.progress?.status === "In Progress" ? (
+                                          {module.progress?.status === "Completed" ? (
+                                            "Review"
+                                          ) : module.progress?.status === "In Progress" ? (
                                             "Resume"
                                           ) : (
-                                            <>
-                                              <PlayCircle className="h-5 w-5" />
-                                              Start
-                                            </>
+                                            "Start"
                                           )}
                                         </Link>
                                       )}
@@ -1137,9 +1185,15 @@ export default function LearnerDashboard() {
                                           <Link
                                             href={ROUTES.LEARNER_MODULE_DETAIL(module.name)}
                                             className="rounded-full px-4 py-2 bg-primary text-white flex items-center gap-2 shadow hover:bg-primary/90 transition"
-                                            aria-label={`Resume module: ${module.name1}`}
+                                            aria-label={`${module.progress?.status === "Completed" ? "Review" : "Resume"} module: ${module.name1}`}
                                           >
-                                            Resume
+                                            {module.progress?.status === "Completed" ? (
+                                              "Review"
+                                            ) : module.progress?.status === "In Progress" ? (
+                                              "Resume"
+                                            ) : (
+                                              "Start"
+                                            )}
                                           </Link>
                                         )}
                                       </div>

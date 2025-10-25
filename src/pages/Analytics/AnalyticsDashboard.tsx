@@ -20,7 +20,8 @@ import {
   Clock,
   Target,
   FileText,
-  MessageSquare
+  MessageSquare,
+  AlertCircle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -136,9 +137,12 @@ export default function AnalyticsDashboard() {
   const [scoreValue, setScoreValue] = useState('');
   const [loadingAddScore, setLoadingAddScore] = useState(false);
   const [scoreUpdateSuccess, setScoreUpdateSuccess] = useState(false);
+  const [scoreError, setScoreError] = useState('');
   const [learnerSidebarData, setLearnerSidebarData] = useState<any>(null);
   const [loadingLearnerSidebar, setLoadingLearnerSidebar] = useState(false);
   const [learnerModuleFilter, setLearnerModuleFilter] = useState<string>('all');
+  const [learnerCurrentPage, setLearnerCurrentPage] = useState(1);
+  const [learnerTotalPages, setLearnerTotalPages] = useState(1);
   const itemsPerPage = 10;
   
   
@@ -380,11 +384,20 @@ export default function AnalyticsDashboard() {
     }
   }, [qaScoreFilter, qaScoredData, qaPendingData]);
 
+  // Update pagination when learners data changes
+  React.useEffect(() => {
+    if (learnersData?.message?.message?.learner_analytics?.length > 0) {
+      setLearnerTotalPages(Math.ceil(learnersData.message.message.learner_analytics.length / itemsPerPage));
+      setLearnerCurrentPage(1); // Reset to first page when data changes
+    }
+  }, [learnersData]);
+
   const handleFilterChange = (key: keyof FilterState, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     // Reset pagination when filters change
     modulePagination.reset();
     quizPagination.reset();
+    setLearnerCurrentPage(1);
   };
 
   // Helper function to convert data to CSV
@@ -793,6 +806,30 @@ export default function AnalyticsDashboard() {
     }
   };
 
+  // Get current page data for learners
+  const getCurrentLearnerPageData = () => {
+    const startIndex = (learnerCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return learnersData?.message?.message?.learner_analytics?.slice(startIndex, endIndex) || [];
+  };
+
+  // Pagination handlers for learners
+  const handleLearnerPageChange = (page: number) => {
+    setLearnerCurrentPage(page);
+  };
+
+  const handleLearnerPrevPage = () => {
+    if (learnerCurrentPage > 1) {
+      setLearnerCurrentPage(learnerCurrentPage - 1);
+    }
+  };
+
+  const handleLearnerNextPage = () => {
+    if (learnerCurrentPage < learnerTotalPages) {
+      setLearnerCurrentPage(learnerCurrentPage + 1);
+    }
+  };
+
   const fetchQuizDetails = async (quizProgressId: string) => {
     setLoadingQuizDetails(true);
     try {
@@ -958,10 +995,45 @@ export default function AnalyticsDashboard() {
     setShowAddScoreModal(true);
     setScoreValue('');
     setScoreUpdateSuccess(false);
+    setScoreError('');
+  };
+
+  const handleScoreInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setScoreValue(value);
+    
+    // Clear previous error
+    setScoreError('');
+    
+    // Validate score if value is not empty
+    if (value) {
+      const numericValue = parseFloat(value);
+      if (!isNaN(numericValue)) {
+        if (numericValue < 0) {
+          setScoreError('Score cannot be negative');
+        } else if (qaDetailsData?.max_score && numericValue > qaDetailsData.max_score) {
+          setScoreError(`Score cannot exceed maximum score of ${qaDetailsData.max_score}`);
+        }
+      }
+    }
   };
 
   const handleSaveScore = async () => {
     if (!qaDetailsData || !scoreValue) return;
+    
+    const numericValue = parseFloat(scoreValue);
+    
+    // Check if score is negative
+    if (numericValue < 0) {
+      setScoreError('Score cannot be negative');
+      return;
+    }
+    
+    // Check if score exceeds max score
+    if (qaDetailsData?.max_score && numericValue > qaDetailsData.max_score) {
+      setScoreError(`Score cannot exceed maximum score of ${qaDetailsData.max_score}`);
+      return;
+    }
     
     setLoadingAddScore(true);
     try {
@@ -1490,9 +1562,24 @@ export default function AnalyticsDashboard() {
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="modules">Modules</TabsTrigger>
-          <TabsTrigger value="quizzes">Test</TabsTrigger>
-          <TabsTrigger value="learners">Learners</TabsTrigger>
+          <TabsTrigger 
+            value="modules"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
+            Modules
+          </TabsTrigger>
+          <TabsTrigger 
+            value="quizzes"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
+            Test
+          </TabsTrigger>
+          <TabsTrigger 
+            value="learners"
+            className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
+            Learners
+          </TabsTrigger>
         </TabsList>
 
 
@@ -1564,10 +1651,10 @@ export default function AnalyticsDashboard() {
               </div>
               
               {/* Pagination Controls */}
-              {modulePagination.maxPage > 1 && (
+              {(finalDataWithFallback?.module_analytics?.length || 0) > 0 && (
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-muted-foreground">
-                    Showing {((modulePagination.currentPage - 1) * 10) + 1} to {Math.min(modulePagination.currentPage * 10, finalDataWithFallback?.module_analytics?.length || 0)} of {finalDataWithFallback?.module_analytics?.length || 0} modules
+                    Showing {((modulePagination.currentPage - 1) * 10) + 1} to {Math.min(modulePagination.currentPage * 10, finalDataWithFallback?.module_analytics?.length || 0)} of {finalDataWithFallback?.module_analytics?.length || 0} entries
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -1576,7 +1663,7 @@ export default function AnalyticsDashboard() {
                       onClick={modulePagination.prev}
                       disabled={!modulePagination.hasPrev}
                     >
-                      Previous
+                      <span className="mr-1">&lt;</span> Previous
                     </Button>
                     <div className="flex items-center gap-1">
                       {(() => {
@@ -1647,7 +1734,7 @@ export default function AnalyticsDashboard() {
                       onClick={modulePagination.next}
                       disabled={!modulePagination.hasNext}
                     >
-                      Next
+                      Next <span className="ml-1">&gt;</span>
                     </Button>
                   </div>
                 </div>
@@ -2110,7 +2197,7 @@ export default function AnalyticsDashboard() {
                   </thead>
                   <tbody>
                     {learnersData?.message?.message?.learner_analytics?.length > 0 ? (
-                      learnersData.message.message.learner_analytics.map((learner: any, index: number) => (
+                      getCurrentLearnerPageData().map((learner: any, index: number) => (
                         <tr key={index} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => handleLearnerClick(learner)}>
                           <td className="p-4">
                             <div className="flex items-center gap-3">
@@ -2125,20 +2212,20 @@ export default function AnalyticsDashboard() {
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-gray-600" />
-                              <span className="font-medium text-gray-700">{learner.total_modules || 0}</span>
+                              <Users className="h-4 w-4 text-primary" />
+                              <span className="font-medium text-foreground">{learner.total_modules || 0}</span>
                             </div>
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-gray-600" />
-                              <span className="font-medium text-gray-700">{learner.completed_modules || 0}</span>
+                              <CheckCircle className="h-4 w-4 text-primary" />
+                              <span className="font-medium text-foreground">{learner.completed_modules || 0}</span>
                             </div>
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-3">
-                              <span className="font-medium text-gray-700">{learner.completion_rate || 0}%</span>
-                              <div className="w-20 bg-gray-200 rounded-full h-2">
+                              <span className="font-medium text-foreground">{Math.round(learner.completion_rate || 0)}%</span>
+                              <div className="w-20 bg-muted rounded-full h-2">
                                 <div 
                                   className="bg-primary h-2 rounded-full transition-all duration-500"
                                   style={{ width: `${learner.completion_rate || 0}%` }}
@@ -2163,6 +2250,99 @@ export default function AnalyticsDashboard() {
                   </tbody>
                 </table>
               </div>
+              
+              {/* Learners Pagination */}
+              {(learnersData?.message?.message?.learner_analytics?.length || 0) > 0 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((learnerCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(learnerCurrentPage * itemsPerPage, learnersData.message.message.learner_analytics.length)} of {learnersData.message.message.learner_analytics.length} entries
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleLearnerPrevPage}
+                      disabled={learnerCurrentPage === 1}
+                    >
+                      <span className="mr-1">&lt;</span> Previous
+                    </Button>
+                    
+                    {/* Page Numbers */}
+                    <div className="flex items-center gap-1">
+                      {(() => {
+                        const totalPages = learnerTotalPages;
+                        const currentPage = learnerCurrentPage;
+                        const pages = [];
+                        
+                        // Show first page
+                        if (currentPage > 3) {
+                          pages.push(
+                            <Button
+                              key={1}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleLearnerPageChange(1)}
+                              className="w-8 h-8 p-0"
+                            >
+                              1
+                            </Button>
+                          );
+                          if (currentPage > 4) {
+                            pages.push(<span key="ellipsis1" className="px-2">...</span>);
+                          }
+                        }
+                        
+                        // Show pages around current page
+                        const startPage = Math.max(1, currentPage - 2);
+                        const endPage = Math.min(totalPages, currentPage + 2);
+                        
+                        for (let i = startPage; i <= endPage; i++) {
+                          pages.push(
+                            <Button
+                              key={i}
+                              variant={currentPage === i ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleLearnerPageChange(i)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {i}
+                            </Button>
+                          );
+                        }
+                        
+                        // Show last page
+                        if (currentPage < totalPages - 2) {
+                          if (currentPage < totalPages - 3) {
+                            pages.push(<span key="ellipsis2" className="px-2">...</span>);
+                          }
+                          pages.push(
+                            <Button
+                              key={totalPages}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleLearnerPageChange(totalPages)}
+                              className="w-8 h-8 p-0"
+                            >
+                              {totalPages}
+                            </Button>
+                          );
+                        }
+                        
+                        return pages;
+                      })()}
+                    </div>
+                    
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleLearnerNextPage}
+                      disabled={learnerCurrentPage === learnerTotalPages}
+                    >
+                      Next <span className="ml-1">&gt;</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -2246,8 +2426,8 @@ export default function AnalyticsDashboard() {
                           onClick={() => setLearnerModuleFilter('all')}
                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                             learnerModuleFilter === 'all' 
-                              ? 'bg-blue-500 text-white' 
-                              : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'bg-primary/10 text-primary hover:bg-primary/20'
                           }`}
                         >
                           Total: {learnerSidebarData?.learner_info?.total_modules || 0}
@@ -2266,8 +2446,8 @@ export default function AnalyticsDashboard() {
                           onClick={() => setLearnerModuleFilter('in_progress')}
                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                             learnerModuleFilter === 'in_progress' 
-                              ? 'bg-orange-500 text-white' 
-                              : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'bg-primary/10 text-primary hover:bg-primary/20'
                           }`}
                         >
                           In Progress: {learnerSidebarData?.learner_info?.in_progress_modules || 0}
@@ -2276,8 +2456,8 @@ export default function AnalyticsDashboard() {
                           onClick={() => setLearnerModuleFilter('not_started')}
                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                             learnerModuleFilter === 'not_started' 
-                              ? 'bg-muted text-muted-foreground' 
-                              : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'bg-primary/10 text-primary hover:bg-primary/20'
                           }`}
                         >
                           Not Started: {learnerSidebarData?.learner_info?.not_started_modules || 0}
@@ -2335,7 +2515,7 @@ export default function AnalyticsDashboard() {
                                       module.status === 'Completed' 
                                         ? 'bg-primary/10 text-primary'
                                         : module.status === 'In Progress'
-                                        ? 'bg-orange-100 text-orange-700'
+                                        ? 'bg-primary/10 text-primary'
                                         : 'bg-muted text-muted-foreground'
                                     }`}>
                                       {module.status}
@@ -2343,17 +2523,17 @@ export default function AnalyticsDashboard() {
                                   </td>
                                   <td className="p-3">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium">{module.progress}%</span>
-                                      <div className="w-16 bg-gray-200 rounded-full h-1">
+                                      <span className="text-sm font-medium">{Math.round(module.progress)}%</span>
+                                      <div className="w-16 bg-muted rounded-full h-1">
                                         <div 
                                           className={`h-1 rounded-full ${
                                             module.status === 'Completed' 
                                               ? 'bg-primary'
                                               : module.status === 'In Progress'
-                                              ? 'bg-orange-500'
+                                              ? 'bg-primary'
                                               : 'bg-muted'
                                           }`}
-                                          style={{width: `${module.progress}%`}}
+                                          style={{width: `${Math.round(module.progress)}%`}}
                                         ></div>
                                       </div>
                                     </div>
@@ -2362,7 +2542,7 @@ export default function AnalyticsDashboard() {
                                     <span className="text-sm">{module.score}</span>
                                   </td>
                                   <td className="p-3">
-                                    <span className="text-sm text-gray-600">{module.start_date}</span>
+                                    <span className="text-sm text-muted-foreground">{module.start_date}</span>
                                   </td>
                                 </tr>
                                 ));
@@ -2456,7 +2636,7 @@ export default function AnalyticsDashboard() {
                                         qa.status === 'Scored' 
                                           ? 'bg-primary/10 text-primary' 
                                           : qa.status === 'Pending Score'
-                                          ? 'bg-orange-100 text-orange-800'
+                                          ? 'bg-primary/10 text-primary'
                                           : 'bg-muted text-muted-foreground'
                                       }`}>
                                         {qa.status}
@@ -2520,21 +2700,21 @@ export default function AnalyticsDashboard() {
                       <div className="grid grid-cols-3 gap-4">
                         <div className="bg-muted/50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <Users className="h-4 w-4 text-blue-600" />
+                            <Users className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Assigned</span>
                       </div>
                           <div className="text-2xl font-bold">{sidebarContent.data.enrolled_count}</div>
                       </div>
                         <div className="bg-muted/50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <CheckCircle className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Completed</span>
                       </div>
                           <div className="text-2xl font-bold">{sidebarContent.data.completed_count}</div>
                       </div>
                         <div className="bg-muted/50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <Target className="h-4 w-4 text-orange-600" />
+                            <Target className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Progress</span>
                           </div>
                           <div className="text-2xl font-bold">{sidebarContent.data.completion_rate.toFixed(1)}%</div>
@@ -2572,8 +2752,8 @@ export default function AnalyticsDashboard() {
                          onClick={() => fetchLearnerDetails('total')}
                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                            selectedStatus === 'total' 
-                             ? 'bg-blue-500 text-white' 
-                             : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                             ? 'bg-primary text-primary-foreground' 
+                             : 'bg-primary/10 text-primary hover:bg-primary/20'
                          }`}
                        >
                          Total: {allLearnerDetails.length}
@@ -2592,8 +2772,8 @@ export default function AnalyticsDashboard() {
                            onClick={() => fetchLearnerDetails('in_progress')}
                            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                              selectedStatus === 'in_progress' 
-                               ? 'bg-orange-500 text-white' 
-                               : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                               ? 'bg-primary text-primary-foreground' 
+                               : 'bg-primary/10 text-primary hover:bg-primary/20'
                            }`}
                          >
                            In Progress: {allLearnerDetails.filter(l => l.status === 'in_progress').length}
@@ -2602,8 +2782,8 @@ export default function AnalyticsDashboard() {
                            onClick={() => fetchLearnerDetails('not_started')}
                            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                              selectedStatus === 'not_started' 
-                               ? 'bg-muted text-muted-foreground' 
-                               : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                               ? 'bg-primary text-primary-foreground' 
+                               : 'bg-primary/10 text-primary hover:bg-primary/20'
                            }`}
                          >
                            Not Started: {allLearnerDetails.filter(l => l.status === 'not_started').length}
@@ -2655,13 +2835,13 @@ export default function AnalyticsDashboard() {
                                    
                                    return (
                                      <tr key={index} className="border-b hover:bg-muted/50">
-                                       <td className="p-3 text-sm font-medium bg-gray-50">{learner.learner_name || learner.full_name || 'N/A'}</td>
-                                       <td className="p-3 text-sm bg-gray-50">{learner.email || 'N/A'}</td>
-                                       <td className="p-3 text-sm bg-gray-50">{learner.department || 'N/A'}</td>
-                                       <td className="p-3 text-sm bg-gray-50">
+                                       <td className="p-3 text-sm font-medium bg-muted/50">{learner.learner_name || learner.full_name || 'N/A'}</td>
+                                       <td className="p-3 text-sm bg-muted/50">{learner.email || 'N/A'}</td>
+                                       <td className="p-3 text-sm bg-muted/50">{learner.department || 'N/A'}</td>
+                                       <td className="p-3 text-sm bg-muted/50">
                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                            learner.status === 'completed' ? 'bg-primary/10 text-primary' :
-                                           learner.status === 'in_progress' ? 'bg-orange-100 text-orange-800' :
+                                           learner.status === 'in_progress' ? 'bg-primary/10 text-primary' :
                                            learner.status === 'not_started' ? 'bg-muted text-muted-foreground' :
                                            'bg-muted text-muted-foreground'
                                          }`}>
@@ -2670,9 +2850,9 @@ export default function AnalyticsDashboard() {
                                             learner.status === 'not_started' ? 'Not Started' : 'N/A'}
                                          </span>
                                   </td>
-                                       <td className="p-3 text-sm bg-gray-50">{learner.avg_progress ? `${learner.avg_progress}%` : '0%'}</td>
-                                       <td className="p-3 text-sm bg-gray-50">{learner.avg_score || 'N/A'}</td>
-                                       <td className="p-3 text-sm bg-gray-50">
+                                       <td className="p-3 text-sm bg-muted/50">{learner.avg_progress ? `${Math.round(learner.avg_progress)}%` : '0%'}</td>
+                                       <td className="p-3 text-sm bg-muted/50">{learner.avg_score || 'N/A'}</td>
+                                       <td className="p-3 text-sm bg-muted/50">
                                          {learner.started_on ? 
                                            new Date(learner.started_on).toLocaleString('en-GB', {
                                              day: '2-digit',
@@ -2685,7 +2865,7 @@ export default function AnalyticsDashboard() {
                                            }) : 'Not started'
                                          }
                                        </td>
-                                       <td className="p-3 text-sm bg-gray-50">
+                                       <td className="p-3 text-sm bg-muted/50">
                                          {learner.completed_on ? 
                                            new Date(learner.completed_on).toLocaleString('en-GB', {
                                              day: '2-digit',
@@ -2748,24 +2928,24 @@ export default function AnalyticsDashboard() {
                       <div className="grid grid-cols-3 gap-4">
                         <div className="bg-muted/50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <BookOpen className="h-4 w-4 text-blue-600" />
+                            <BookOpen className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Modules Enrolled</span>
                           </div>
                           <div className="text-2xl font-bold">{sidebarContent.data.modules_enrolled}</div>
                         </div>
                         <div className="bg-muted/50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <CheckCircle className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Modules Completed</span>
                           </div>
                           <div className="text-2xl font-bold">{sidebarContent.data.modules_completed}</div>
                         </div>
                         <div className="bg-muted/50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center gap-2 mb-1">
-                            <Clock className="h-4 w-4 text-purple-600" />
+                            <Clock className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Avg Progress</span>
                           </div>
-                          <div className="text-2xl font-bold">{sidebarContent.data.avg_progress.toFixed(1)}%</div>
+                          <div className="text-2xl font-bold">{Math.round(sidebarContent.data.avg_progress)}%</div>
                         </div>
                       </div>
                     </div>
@@ -2776,7 +2956,7 @@ export default function AnalyticsDashboard() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>Completion Rate</span>
-                          <span>{sidebarContent.data.completion_rate.toFixed(1)}%</span>
+                          <span>{Math.round(sidebarContent.data.completion_rate)}%</span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2">
                           <div 
@@ -3143,13 +3323,20 @@ export default function AnalyticsDashboard() {
                         type="number"
                         placeholder="Enter score"
                         value={scoreValue}
-                        onChange={(e) => setScoreValue(e.target.value)}
+                        onChange={handleScoreInputChange}
+                        min="0"
                         max={qaDetailsData?.max_score || 100}
-                        className="mt-1"
+                        className={`mt-1 ${scoreError ? 'border-red-500 focus:border-red-500' : ''}`}
                       />
                       <p className="text-sm text-muted-foreground mt-1">
                         Max score: {qaDetailsData?.max_score || 'N/A'}
                       </p>
+                      {scoreError && (
+                        <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" />
+                          {scoreError}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="flex justify-end gap-2">
@@ -3162,7 +3349,7 @@ export default function AnalyticsDashboard() {
                       <Button
                         variant="default"
                         onClick={handleSaveScore}
-                        disabled={loadingAddScore || !scoreValue}
+                        disabled={loadingAddScore || !scoreValue || !!scoreError}
                       >
                         {loadingAddScore ? (
                           <>

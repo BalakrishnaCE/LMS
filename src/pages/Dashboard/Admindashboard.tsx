@@ -57,12 +57,48 @@ function Admindashboard() {
     const [isLoading, setIsLoading] = React.useState(true)
     const { user, isLoading: userLoading, error } = useUser();
     const [activeTab, setActiveTab] = useState("module")
+    
+    // Pagination state for learners (copied from Analytics dashboard)
+    const [learnerCurrentPage, setLearnerCurrentPage] = useState(1);
+    const [learnerTotalPages, setLearnerTotalPages] = useState(1);
+    const itemsPerPage = 20;
 
     // Fetch learners data from LMS Users doctype
     const { data: analyticsData, error: studentsError, isValidating: studentsLoading } = useFrappeGetCall<any>("novel_lms.novel_lms.api.departments.get_learners_data");
     const message = analyticsData?.message || {};
     const users = message.users || [];
     const stats = message.users_stats;
+
+    // Pagination logic for learners (copied from Analytics dashboard)
+    React.useEffect(() => {
+        if (users.length > 0) {
+            setLearnerTotalPages(Math.ceil(users.length / itemsPerPage));
+        }
+    }, [users.length, itemsPerPage]);
+
+    // Get current page data for learners
+    const getCurrentLearnerPageData = () => {
+        const startIndex = (learnerCurrentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return users.slice(startIndex, endIndex);
+    };
+
+    // Pagination handlers for learners
+    const handleLearnerPageChange = (page: number) => {
+        setLearnerCurrentPage(page);
+    };
+
+    const handleLearnerPrevPage = () => {
+        if (learnerCurrentPage > 1) {
+            setLearnerCurrentPage(learnerCurrentPage - 1);
+        }
+    };
+
+    const handleLearnerNextPage = () => {
+        if (learnerCurrentPage < learnerTotalPages) {
+            setLearnerCurrentPage(learnerCurrentPage + 1);
+        }
+    };
 
     React.useEffect(() => {
         if (user) {
@@ -129,9 +165,16 @@ function Admindashboard() {
                                                 transition={{ duration: 0.3 }}
                                             >
                                                 <LearnersTable
-                                                    learners={users}
+                                                    learners={getCurrentLearnerPageData()}
                                                     isLoading={studentsLoading}
                                                     showActions={false}
+                                                    learnerCurrentPage={learnerCurrentPage}
+                                                    learnerTotalPages={learnerTotalPages}
+                                                    itemsPerPage={itemsPerPage}
+                                                    totalLearners={users.length}
+                                                    handleLearnerPageChange={handleLearnerPageChange}
+                                                    handleLearnerPrevPage={handleLearnerPrevPage}
+                                                    handleLearnerNextPage={handleLearnerNextPage}
                                                 />
                                             </motion.div>
                                         </TabsContent>

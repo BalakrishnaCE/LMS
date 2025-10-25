@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle, Circle, PlayCircle, ArrowLeft, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
+import { CheckCircle, Circle, PlayCircle, ArrowLeft, ChevronDown, ChevronUp, BookOpen, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/config/routes";
 
@@ -31,6 +31,8 @@ interface ModuleSidebarProps {
     total_chapters: number;
     overall_progress: number;
   };
+  // Phase 3: Locking mechanism
+  isAccessible?: (lessonName: string, chapterName?: string) => boolean;
 }
 
 export function ModuleSidebar({
@@ -43,7 +45,8 @@ export function ModuleSidebar({
   currentLessonName,
   currentChapterName,
   mode,
-  completionData
+  completionData,
+  isAccessible
 }: ModuleSidebarProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false);
   const [expandedLessons, setExpandedLessons] = React.useState<Set<string>>(new Set());
@@ -271,12 +274,20 @@ export function ModuleSidebar({
                 >
                   <div
                     className={cn(
-                      "text-sm p-2 rounded-lg cursor-pointer font-medium flex items-center justify-between",
+                      "text-sm p-2 rounded-lg font-medium flex items-center justify-between",
                       isCurrentLesson
                         ? "text-primary"
-                        : "text-foreground"
+                        : "text-foreground",
+                      // Locked content styling
+                      mode !== 'admin' && isAccessible && !isAccessible(lesson.name)
+                        ? "cursor-not-allowed opacity-60"
+                        : "cursor-pointer"
                     )}
                     onClick={() => {
+                      // Check if lesson is accessible before allowing click
+                      if (mode !== 'admin' && isAccessible && !isAccessible(lesson.name)) {
+                        return; // Don't allow click for locked content
+                      }
                       onLessonClick?.(lesson.name);
                       toggleLesson(lesson.name);
                     }}
@@ -295,6 +306,10 @@ export function ModuleSidebar({
                         </>
                       )}
                       {lesson.lesson_name}
+                      {/* Lock icon for inaccessible lessons */}
+                      {mode !== 'admin' && isAccessible && !isAccessible(lesson.name) && (
+                        <Lock className="h-3 w-3 text-muted-foreground" />
+                      )}
                     </div>
                     {/* Expand/collapse indicator for admin */}
                     {mode === 'admin' && lesson.chapters && lesson.chapters.length > 0 && (
@@ -333,13 +348,21 @@ export function ModuleSidebar({
                               }
                             }}
                             className={cn(
-                              "text-sm p-2 rounded-md cursor-pointer transition-all duration-200",
+                              "text-sm p-2 rounded-md transition-all duration-200",
                               isCurrentChapter
                                 ? "bg-primary/20 text-primary font-medium"
-                                : "text-muted-foreground hover:bg-primary/5 hover:text-foreground"
+                                : "text-muted-foreground hover:bg-primary/5 hover:text-foreground",
+                              // Locked content styling
+                              mode !== 'admin' && isAccessible && !isAccessible(lesson.name, chapter.name)
+                                ? "cursor-not-allowed opacity-60"
+                                : "cursor-pointer"
                             )}
                             onClick={(e) => {
                               e.stopPropagation();
+                              // Check if chapter is accessible before allowing click
+                              if (mode !== 'admin' && isAccessible && !isAccessible(lesson.name, chapter.name)) {
+                                return; // Don't allow click for locked content
+                              }
                               onChapterClick?.(lesson.name, chapter.name);
                             }}
                           >
@@ -357,6 +380,10 @@ export function ModuleSidebar({
                                 </>
                               )}
                               {chapter.title}
+                              {/* Lock icon for inaccessible chapters */}
+                              {mode !== 'admin' && isAccessible && !isAccessible(lesson.name, chapter.name) && (
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                              )}
                             </div>
                           </div>
                         );

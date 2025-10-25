@@ -9,13 +9,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { useFrappeGetDocList, useFrappeUpdateDoc, useFrappeGetCall } from "frappe-react-sdk"
+import { useFrappeGetDocList, useFrappeUpdateDoc } from "frappe-react-sdk"
 import { BookOpen, Clock, Award, Calendar, Star, Target, Mail, Phone, MapPin, Flame, Camera } from "lucide-react"
 import { toast } from "sonner"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import AchievementShowcase from "@/components/AchievementShowcase";
 import { LMS_API_BASE_URL } from "@/config/routes";
+import { useLearnerModuleData } from "@/lib/api";
 
 // Define Achievement type at the top if not already:
 type Achievement = {
@@ -33,18 +34,31 @@ export default function Profile() {
   const [isUploading, setIsUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
-  // Fetch module progress using LearnerModuleData API
-  const { data: learnerData, isLoading: learnerLoading } = useFrappeGetCall<any>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
-    user: user?.email,
+  // Fetch module progress using the same hook as dashboard (with built-in deduplication)
+  const { data: learnerData, isLoading: learnerLoading } = useLearnerModuleData(user?.email || "", {
     limit: 100,
     offset: 0,
-  });
-  const modules = learnerData?.data?.modules || [];
-  const meta = learnerData?.data?.meta || {};
-  const totalModules = meta.total_count || 0;
+  }, { enabled: !userLoading && !!user?.email && user?.email.trim() !== "" });
+  
+  // Debug logging for API response structure
+  console.log('🔍 Profile - API Response:', learnerData);
+  
+  // Use correct API response structure (same as dashboard)
+  const modules = learnerData?.message?.modules || [];
+  const meta = learnerData?.message?.meta || {};
+  const totalModules = meta.total_modules || 0;
   const completedModules = meta.completed_modules || 0;
   const inProgressModules = meta.in_progress_modules || 0;
   const averageProgress = meta.average_progress || 0;
+  
+  // Debug logging for extracted data
+  console.log('🔍 Profile - Extracted data:', {
+    modulesCount: modules.length,
+    totalModules,
+    completedModules,
+    inProgressModules,
+    averageProgress
+  });
 
   // Fetch achievements using User Achievement doctype (like in LearnerDashboard)
   const { data: userAchievements, isLoading: achievementsLoading } = useFrappeGetDocList(

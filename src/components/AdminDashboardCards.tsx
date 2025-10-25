@@ -185,23 +185,25 @@ export function AdminDashboardCards() {
                   </div>
                 </div>
                 
-                {/* Badge */}
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.3 + index * 0.1, type: "spring", stiffness: 200 }}
-                >
-                  <Badge 
-                    variant="secondary"
-                    className={`
-                      ${data.isPositive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}
-                      border-0 shadow-sm
-                    `}
+                {/* Badge - Hide for Total Learners and Total Modules cards */}
+                {(config.key !== "learners" && config.key !== "modules") && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.3 + index * 0.1, type: "spring", stiffness: 200 }}
                   >
-                    {data.isPositive ? <IconTrendingUp className="h-3 w-3 mr-1" /> : <IconTrendingDown className="h-3 w-3 mr-1" />}
-                    {`${Math.abs(data.percentage).toFixed(1)}%`}
-                  </Badge>
-                </motion.div>
+                    <Badge 
+                      variant="secondary"
+                      className={`
+                        ${data.isPositive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}
+                        border-0 shadow-sm
+                      `}
+                    >
+                      {data.isPositive ? <IconTrendingUp className="h-3 w-3 mr-1" /> : <IconTrendingDown className="h-3 w-3 mr-1" />}
+                      {`${Math.abs(data.percentage).toFixed(1)}%`}
+                    </Badge>
+                  </motion.div>
+                )}
               </div>
               
               {/* Value */}

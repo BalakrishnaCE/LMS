@@ -1102,16 +1102,11 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                 size="sm"
                 className="mb-4 w-full hover:bg-accent hover:text-primary"
                 onClick={() => {
-                  // Navigate to the learner module page
-                  if (moduleInfo?.id) {
-                    setLocation(`/modules/learner/${moduleInfo.id}`);
-                  } else {
-                    // Fallback to modules list if no module info
-                    setLocation('/modules');
-                  }
+                  // Navigate to the modules list page
+                  setLocation('/modules');
                 }}
               >
-                <ArrowLeftIcon className="w-4 h-4" /> Back to Module
+                <ArrowLeftIcon className="w-4 h-4" /> Back to Modules
               </Button>
 
               <AnimatePresence mode="wait">

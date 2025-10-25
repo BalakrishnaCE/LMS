@@ -10,6 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import InstructionDialog from '@/components/InstructionDialog';
 
+// Cache validation helper function
+const isValidQuizCache = (attemptData: any, currentUser: string) => {
+  return attemptData.userEmail === currentUser && 
+         attemptData.timestamp && 
+         new Date(attemptData.timestamp) > new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours max
+};
+
 interface QuizProps {
   quizReference?: string;
   content?: any;
@@ -256,9 +263,10 @@ function QuizDialog({
       correctAnswers: correctAnswers,
       totalQuestions: totalQuestions,
       timestamp: new Date().toISOString(),
-      quizName: quiz?.name
+      quizName: quiz?.name,
+      userEmail: currentUser  // Add user identification
     };
-    localStorage.setItem(`quiz_attempt_${quiz?.name}`, JSON.stringify(attemptData));
+    localStorage.setItem(`quiz_attempt_${currentUser}_${quiz?.name}`, JSON.stringify(attemptData));
     
     // Now save to DocType after completion
     try {
@@ -335,14 +343,20 @@ function QuizDialog({
     
     // Check localStorage only if no DocType record exists for this quiz
     if (!hasAttempted) {
-      const quizAttemptKey = `quiz_attempt_${quiz?.name}`;
+      const quizAttemptKey = `quiz_attempt_${currentUser}_${quiz?.name}`;
       const savedAttempt = localStorage.getItem(quizAttemptKey);
       
       if (savedAttempt) {
         const attemptData = JSON.parse(savedAttempt);
-        setScore(attemptData.score);
-        setSubmitted(true);
-        setHasAttempted(true);
+        // Verify this data belongs to current user and is valid
+        if (isValidQuizCache(attemptData, currentUser || '')) {
+          setScore(attemptData.score);
+          setSubmitted(true);
+          setHasAttempted(true);
+        } else {
+          // Clear invalid cache
+          localStorage.removeItem(quizAttemptKey);
+        }
       }
     }
   }, [existingProgress, hasAttempted, quiz?.questions, quiz?.name]);

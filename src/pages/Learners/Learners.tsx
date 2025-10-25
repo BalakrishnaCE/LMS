@@ -4,7 +4,7 @@ import { LearnersTable } from "@/pages/Learners/LearnersTable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Download } from "lucide-react";
+import { Search, Download, Eye, EyeOff, X } from "lucide-react";
 import { toast } from "sonner";
 import { UserDetailsDrawer } from "./components/LearnerDetailsDrawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
@@ -18,7 +18,7 @@ import {
   PaginationPrevious 
 } from "@/components/ui/pagination";
 import { useAPI } from "@/lib/api";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import { useEffect, useRef, useState } from "react";
@@ -309,6 +309,8 @@ function Filters({
   onSearchEmailChange, 
   onSearchStatusChange,
   onDepartmentChange,
+  onClearNameSearch,
+  onClearEmailSearch,
   onExport
 }: {
   searchName: string;
@@ -320,6 +322,8 @@ function Filters({
   onSearchEmailChange: (value: string) => void;
   onSearchStatusChange: (value: string) => void;
   onDepartmentChange: (value: string[]) => void;
+  onClearNameSearch: () => void;
+  onClearEmailSearch: () => void;
   onExport: () => void;
 }) {
   return (
@@ -331,8 +335,17 @@ function Filters({
             placeholder="Search by name..."
             value={searchName}
             onChange={(e) => onSearchNameChange(e.target.value)}
-            className="w-full pl-8"
+            className="w-full pl-8 pr-10"
           />
+          {searchName && (
+            <button
+              onClick={onClearNameSearch}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
       <div className="flex-1">
@@ -342,8 +355,17 @@ function Filters({
             placeholder="Search by email..."
             value={searchEmail}
             onChange={(e) => onSearchEmailChange(e.target.value)}
-            className="w-full pl-8"
+            className="w-full pl-8 pr-10"
           />
+          {searchEmail && (
+            <button
+              onClick={onClearEmailSearch}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
       <div className="w-full md:w-48">
@@ -383,6 +405,15 @@ function Filters({
 export default function Learners() {
   const [searchName, setSearchName] = React.useState("");
   const [searchEmail, setSearchEmail] = React.useState("");
+
+  // Clear search functions
+  const handleClearNameSearch = () => {
+    setSearchName("");
+  };
+
+  const handleClearEmailSearch = () => {
+    setSearchEmail("");
+  };
   const [searchStatus, setSearchStatus] = React.useState("all");
   const [selectedLearner, setSelectedLearner] = React.useState<User | null>(null);
   const [departmentFilter, setDepartmentFilter] = React.useState<string[]>([]);
@@ -400,6 +431,7 @@ export default function Learners() {
     password: '',
     send_welcome_email: true
   });
+  const [showAddPassword, setShowAddPassword] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
   const [editLoading, setEditLoading] = React.useState(false);
   const [editError, setEditError] = React.useState<string | null>(null);
@@ -412,6 +444,7 @@ export default function Learners() {
     enabled: 1,
     departments: [] as string[] // Multi-department selection
   });
+  const [showEditPassword, setShowEditPassword] = React.useState(false);
   const [learnerToEdit, setLearnerToEdit] = React.useState<User | null>(null);
 
   const api = useAPI();
@@ -712,6 +745,7 @@ export default function Learners() {
         password: '',
         send_welcome_email: true
       });
+      setShowAddPassword(false);
       toast.success("Learner added successfully");
       await mutate(); // Refresh the learners list
     } catch (err: any) {
@@ -793,6 +827,7 @@ export default function Learners() {
         enabled: 1,
         departments: []
       });
+      setShowEditPassword(false);
       setLearnerToEdit(null);
       toast.success("Learner updated successfully");
       await mutate(); // Refresh the learners list
@@ -938,7 +973,24 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Password</label>
-              <Input type="password" value={addForm.password} onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} disabled={addLoading} placeholder="Leave blank to auto-generate" />
+              <div className="relative">
+                <Input 
+                  type={showAddPassword ? "text" : "password"} 
+                  value={addForm.password} 
+                  onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} 
+                  disabled={addLoading} 
+                  placeholder="Leave blank to auto-generate"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAddPassword(!showAddPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  disabled={addLoading}
+                >
+                  {showAddPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="send_welcome_email" checked={addForm.send_welcome_email} onChange={e => setAddForm(f => ({ ...f, send_welcome_email: e.target.checked }))} disabled={addLoading} />
@@ -1001,7 +1053,24 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Password</label>
-              <Input type="password" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} disabled={editLoading} placeholder="Leave blank to keep existing" />
+              <div className="relative">
+                <Input 
+                  type={showEditPassword ? "text" : "password"} 
+                  value={editForm.password} 
+                  onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} 
+                  disabled={editLoading} 
+                  placeholder="Leave blank to keep existing"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditPassword(!showEditPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  disabled={editLoading}
+                >
+                  {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="enabled" checked={editForm.enabled === 1} onChange={e => setEditForm(f => ({ ...f, enabled: e.target.checked ? 1 : 0 }))} disabled={editLoading} />
@@ -1043,6 +1112,8 @@ export default function Learners() {
         onSearchEmailChange={setSearchEmail}
         onSearchStatusChange={setSearchStatus}
         onDepartmentChange={setDepartmentFilter}
+        onClearNameSearch={handleClearNameSearch}
+        onClearEmailSearch={handleClearEmailSearch}
         onExport={handleExport}
       />
 
