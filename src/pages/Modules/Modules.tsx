@@ -5,7 +5,7 @@ import {
     CardTitle,
   } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {  useFrappeGetDocList } from "frappe-react-sdk"
+import {  useFrappeGetDocList, useFrappeAuth } from "frappe-react-sdk"
 import { Link } from "wouter"
 import {
   Pagination,
@@ -84,6 +84,9 @@ function Modules({ itemsPerPage }: ModulesProps) {
     const [isExporting, setIsExporting] = useState(false)
     // Add image error state for all cards
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+
+    // Add authentication check to prevent race condition
+    const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
 
     // Debounced save function for search query
     const saveSearchToStorage = useCallback(
@@ -168,6 +171,18 @@ function Modules({ itemsPerPage }: ModulesProps) {
     useEffect(() => {
         setPage(1)
     }, [searchQuery, selectedDepartment, selectedStatus])
+
+    // Show loading state while authentication is being determined
+    if (isAuthLoading || !currentUser) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-4 text-muted-foreground">Loading modules...</p>
+                </div>
+            </div>
+        );
+    }
 
     const handleExport = async () => {
         try {
