@@ -653,9 +653,9 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
                   {formatTime(timeLeft)}
                 </span>
               )}
-              <Dialog.Close asChild>
+              {/* <Dialog.Close asChild>
                 <Button variant="ghost" size="sm" disabled={updating || adding}>✕</Button>
-              </Dialog.Close>
+              </Dialog.Close> */}
             </div>
             {/* Content */}
             <div className="flex-1 overflow-auto p-4">
@@ -806,9 +806,9 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
                 <div className="text-sm text-muted-foreground">
                   {data?.questions?.filter((q: any) => submitted[q.question]).length || 0} of {data?.questions?.length || 0} questions saved
                 </div>
-                {!isLMSAdmin && (
+                {/* {!isLMSAdmin && (
                   <Button onClick={() => setOpen(false)} disabled={updating || adding}>Close</Button>
-                )}
+                )} */}
               </div>
             )}
           </div>
