@@ -5,7 +5,7 @@ import {
     CardTitle,
   } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {  useFrappeGetDocList } from "frappe-react-sdk"
+import {  useFrappeGetDocList, useFrappeAuth } from "frappe-react-sdk"
 import { Link } from "wouter"
 import {
   Pagination,
@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion"
 import { Download, X } from "lucide-react"
 import { toast } from "sonner"
-import { LMS_API_BASE_URL } from "@/config/routes"
+import { LMS_API_BASE_URL, ROUTES } from "@/config/routes"
 
 // Debounce utility function
 const debounce = (fn: Function, delay: number) => {
@@ -79,11 +79,21 @@ function Modules({ itemsPerPage }: ModulesProps) {
     const [searchQuery, setSearchQuery] = useState(() => {
         return localStorage.getItem('modules_search') || "";
     })
-    const [selectedDepartment, setSelectedDepartment] = useState("all")
-    const [selectedStatus, setSelectedStatus] = useState("all")
+
+
+
+    const [selectedDepartment, setSelectedDepartment] = useState(() => {
+        return localStorage.getItem('modules_department') || "all";
+    })
+    const [selectedStatus, setSelectedStatus] = useState(() => {
+        return localStorage.getItem('modules_status') || "all";
+    })
     const [isExporting, setIsExporting] = useState(false)
     // Add image error state for all cards
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+
+        // Add authentication check to prevent race condition
+    const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
 
     // Debounced save function for search query
     const saveSearchToStorage = useCallback(
@@ -96,6 +106,24 @@ function Modules({ itemsPerPage }: ModulesProps) {
         }, 300),
         []
     );
+
+    // Persist department filter
+    useEffect(() => {
+        if (selectedDepartment && selectedDepartment !== "all") {
+            localStorage.setItem('modules_department', selectedDepartment);
+        } else {
+            localStorage.removeItem('modules_department');
+        }
+    }, [selectedDepartment]);
+
+    // Persist status filter
+    useEffect(() => {
+        if (selectedStatus && selectedStatus !== "all") {
+            localStorage.setItem('modules_status', selectedStatus);
+        } else {
+            localStorage.removeItem('modules_status');
+        }
+    }, [selectedStatus]);
 
     // Handle search query change
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,6 +196,18 @@ function Modules({ itemsPerPage }: ModulesProps) {
     useEffect(() => {
         setPage(1)
     }, [searchQuery, selectedDepartment, selectedStatus])
+
+    // Show loading state while authentication is being determined
+    if (isAuthLoading || !currentUser) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-4 text-muted-foreground">Loading modules...</p>
+                </div>
+            </div>
+        );
+    }
 
     const handleExport = async () => {
         try {
@@ -341,7 +381,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
                                     </CardHeader>
                                 </div>
                                 <CardFooter className="pt-0 pb-4 mt-auto">
-                                    <Link href={`/modules/learner/${module.name}`} className="w-full">
+                                    <Link href={ROUTES.ADMIN_MODULE_DETAIL(module.name)} className="w-full">
                                         <Button 
                                             variant="outline"
                                             className="w-full transition-all duration-200 dark:text-foreground dark:hover:bg-primary dark:hover:text-primary-foreground dark:border-primary/50 hover:scale-[1.02] active:scale-[0.98]"

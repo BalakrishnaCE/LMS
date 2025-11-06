@@ -22,6 +22,8 @@ import { toast } from "sonner";
 interface Content {
     name: string;
     content_type: string;
+    content_reference: string;
+    data?: any; // Content data already fetched by the API
     progress?: "Not Started" | "In Progress" | "Completed";
 }
 
@@ -285,33 +287,46 @@ export default function LearnerModuleDetail() {
     }, [moduleName, userIdentifier, moduleDataLoading, moduleListData, moduleListError]);
     
     
-    // Extract module data only when API call is complete - Simplified logic
+    // Extract module data only when API call is complete - Fixed extraction paths
     let moduleData = null;
     if (moduleListData && !moduleDataLoading) {
         console.log('🔍 EXTRACTION START:', new Date().toISOString());
         console.log('🔍 API Call completed, extracting module data...');
         
         const response = moduleListData as any;
+        console.log('🔍 Full response keys:', Object.keys(response));
+        console.log('🔍 Response.message keys:', response?.message ? Object.keys(response.message) : 'no message');
         
-        // Simplified extraction - try the most common path first
-        if (response?.message?.message?.modules && Array.isArray(response.message.message.modules) && response.message.message.modules.length > 0) {
-            moduleData = response.message.message.modules[0];
-            console.log('✅ Module data extracted via primary path (message.message.modules[0])');
+        // Replace lines 300-322 with this:
+        // Try direct modules path first (unwrapped response)
+        if (response?.modules && Array.isArray(response.modules) && response.modules.length > 0) {
+            moduleData = response.modules[0];
+            console.log('✅ Module data extracted via direct path (modules[0])');
         }
-        // Fallback to direct message.modules
+        // Try message.modules (wrapped by frappe-react-sdk)
         else if (response?.message?.modules && Array.isArray(response.message.modules) && response.message.modules.length > 0) {
             moduleData = response.message.modules[0];
-            console.log('✅ Module data extracted via fallback path (message.modules[0])');
+            console.log('✅ Module data extracted via message path (message.modules[0])');
+        }
+        // Try message.message.modules (double-wrapped response) - NEW FIX
+        else if (response?.message?.message?.modules && Array.isArray(response.message.message.modules) && response.message.message.modules.length > 0) {
+            moduleData = response.message.message.modules[0];
+            console.log('✅ Module data extracted via double-wrapped path (message.message.modules[0])');
         }
         else {
             console.log('❌ Failed to extract module data - no modules found in response');
             console.log('🔍 Response structure:', {
+                hasModules: !!response?.modules,
                 hasMessage: !!response?.message,
-                hasNestedMessage: !!response?.message?.message,
-                hasModules: !!response?.message?.modules,
-                hasNestedModules: !!response?.message?.message?.modules,
-                modulesLength: response?.message?.modules?.length || 0,
-                nestedModulesLength: response?.message?.message?.modules?.length || 0
+                hasMessageModules: !!response?.message?.modules,
+                hasMessageMessageModules: !!response?.message?.message?.modules, // Add this
+                modulesLength: response?.modules?.length || 0,
+                messageModulesLength: response?.message?.modules?.length || 0,
+                messageMessageModulesLength: response?.message?.message?.modules?.length || 0, // Add this
+                topLevelKeys: Object.keys(response || {}),
+                messageKeys: response?.message ? Object.keys(response.message) : [],
+                messageMessageKeys: response?.message?.message ? Object.keys(response.message.message) : [], // Add this
+                fullResponse: JSON.stringify(response).substring(0, 500)
             });
         }
         
@@ -323,6 +338,18 @@ export default function LearnerModuleDetail() {
                 hasLessons: !!moduleData.lessons,
                 lessonsLength: moduleData.lessons?.length || 0
             });
+            
+            // Check if contents have data
+            if (moduleData.lessons?.[0]?.chapters?.[0]?.contents?.[0]) {
+                const firstContent = moduleData.lessons[0].chapters[0].contents[0];
+                console.log('🔍 First content sample:', {
+                    name: firstContent.name,
+                    contentType: firstContent.content_type,
+                    contentReference: firstContent.content_reference,
+                    hasData: !!firstContent.data,
+                    dataKeys: firstContent.data ? Object.keys(firstContent.data) : []
+                });
+            }
         }
     }
 
@@ -543,7 +570,13 @@ export default function LearnerModuleDetail() {
     // Phase 3: Frontend-only locking using calculated completionData
     const buildIsAccessible = (completionData: CompletionData | null, moduleData: Module | null) => {
         if (!moduleData?.lessons?.length) return () => false;
-
+    
+        // Check if module is completed - if so, allow access to everything (especially for review mode)
+        if (moduleData.progress?.status === "Completed" || progress?.status === "Completed") {
+            console.log('🎯 Module is completed - allowing access to all content');
+            return () => true; // Allow access to all lessons and chapters
+        }
+    
         // Use calculated data from getSidebarCompletionData (not empty API arrays)
         const completedLessons = new Set(completionData?.completed_lessons ?? []);
         const completedChapters = new Set(completionData?.completed_chapters ?? []);
@@ -736,6 +769,11 @@ export default function LearnerModuleDetail() {
     };
     // Add this new function after getUnifiedProgress()
     const getCompletionBasedProgress = () => {
+        // Check if module is completed (via progress OR module data) - works in review mode too
+        if (progress?.status === "Completed" || module?.progress?.status === "Completed") {
+            return 100;
+        }
+        
         if (!sidebarCompletionData) return getUnifiedProgress();
         
         const completedChapters = sidebarCompletionData.completed_chapters?.length || 0;
@@ -743,10 +781,16 @@ export default function LearnerModuleDetail() {
         // Calculate total chapters from module data instead of API data
         const totalChapters = module?.lessons?.reduce((total, lesson) => total + lesson.chapters.length, 0) || 0;
         
+        // If all chapters are completed, return 100% (especially important for review mode)
+        if (totalChapters > 0 && completedChapters === totalChapters) {
+            return 100;
+        }
+        
         if (totalChapters === 0) return 0;
         
         const progressPercentage = Math.round((completedChapters / totalChapters) * 100 * 100) / 100;
-        console.log('📊 Using completion-based progress:', progressPercentage, `(${completedChapters}/${totalChapters})`);
+        console.log('📊 Using sidebar completion data progress:', progressPercentage, `(${completedChapters}/${totalChapters})`);
+        
         return progressPercentage;
     };
     // Phase 2: Use unified progress calculation - Single Source of Truth
@@ -1421,14 +1465,37 @@ export default function LearnerModuleDetail() {
                                 {/* Chapter Contents */}
                                 {currentChapter.contents && currentChapter.contents.length > 0 && (
                                     <div className="space-y-6">
-                                        {currentChapter.contents.map((content) => (
-                                            <ContentRenderer
-                                                key={content.name}
-                                                contentType={content.content_type}
-                                                contentReference={content.name}
-                                                moduleId={module.name}
-                                            />
-                                        ))}
+                                        {currentChapter.contents.map((content, idx) => {
+                                            // Debug the actual content structure
+                                            if (idx === 0) {
+                                                console.log('🔍 FIRST CONTENT OBJECT DETAILED INSPECTION:', {
+                                                    content,
+                                                    allKeys: Object.keys(content),
+                                                    hasContent_reference: 'content_reference' in content,
+                                                    content_reference_value: content.content_reference,
+                                                    name: content.name,
+                                                    contentType: content.content_type,
+                                                    hasData: !!content.data
+                                                });
+                                            }
+                                            console.log('📄 Rendering content:', {
+                                                name: content.name,
+                                                contentType: content.content_type,
+                                                contentReference: content.content_reference,
+                                                hasData: !!content.data,
+                                                dataKeys: content.data ? Object.keys(content.data) : []
+                                            });
+                                            return (
+                                                <ContentRenderer
+                                                    key={content.name}
+                                                    contentType={content.content_type}
+                                                    contentReference={content.content_reference || content.name}
+                                                    moduleId={module.name}
+                                                    contentData={content.data}
+                                                    isParentLoading={moduleDataLoading}
+                                                />
+                                            );
+                                        })}
                                     </div>
                                 )}
                                 
@@ -1503,7 +1570,18 @@ export default function LearnerModuleDetail() {
         moduleListError: !!moduleListError
     });
     
-    // More robust module not found handling - only show error after all loading is complete
+    // Show loading animation while processing module data
+    if (!module && moduleListData && !moduleDataLoading && !isLoading && !moduleListError) {
+        console.log('🔄 Processing module data - showing loading animation');
+        return (
+            <div className="flex flex-col items-center justify-center h-full">
+                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                <div className="mt-4 text-muted-foreground">Loading module details...</div>
+            </div>
+        );
+    }
+
+    // Only show "module not found" if we have data but no module after processing
     if (!module && !moduleDataLoading && !isLoading && moduleListData && !moduleListError) {
         console.log('❌ Module not found - showing error screen');
         return (
@@ -1615,7 +1693,7 @@ export default function LearnerModuleDetail() {
                     <div className=" w-80 border-r flex-shrink-0">
                         <ModuleSidebar
                             module={module}
-                            progress={isLMSAdmin ? null : (reviewing ? null : progress)}
+                            progress={isLMSAdmin ? null : progress}
                             started={started || reviewing}
                             overallProgress={getCompletionBasedProgress()} // Show actual progress, not loading state
                             onLessonClick={handleLessonClick}
@@ -1644,8 +1722,10 @@ export default function LearnerModuleDetail() {
                                                 <ContentRenderer
                                             key={content.name}
                                                     contentType={content.content_type}
-                                                    contentReference={content.name}
+                                                    contentReference={content.content_reference || content.name}
                                                     moduleId={module.name}
+                                                    contentData={content.data}
+                                                    isParentLoading={moduleDataLoading}
                                         />
                                     ))}
                                         </div>

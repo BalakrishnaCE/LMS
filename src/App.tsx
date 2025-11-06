@@ -16,6 +16,7 @@ import { LearnerModulePage } from "@/pages/Modules/Learner/ModulePage";
 import Profile from "@/pages/Profile/Profile";
 import NotFound from "@/pages/NotFound";
 import LearnerModuleDetail from "@/pages/Modules/Learner/ModuleDetail";
+import AdminModuleDetail from "@/pages/Modules/Admin/ModuleDetail";
 import ModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
 import ModuleCreationForm from "@/pages/ModuleEditor/edit/ModuleCreationForm";
 import AnalyticsDashboard from "@/pages/Analytics/AnalyticsDashboard";
@@ -46,21 +47,27 @@ function App() {
                   <LearnerDashboard />
                 </Layout>
               )} allowedRoles={["LMS Student"]} />
-              <ProtectedRoute path="/modules" component={() => (
-                <Layout>
-                  <Module />
-                </Layout>
-              )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
-              <ProtectedRoute path="/module/:moduleName" component={() => (
-                <ModuleDetail />
-              )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} />
+              
               <ProtectedRoute path="/modules/learner" component={() => (
                 <Layout>
                   <LearnerModulePage />
                 </Layout>
               )} allowedRoles={["LMS Student"]} />
-              {/* Detailed module view with progress tracking */}
               <ProtectedRoute path="/modules/learner/:moduleName" component={LearnerModuleDetail} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
+
+
+              <ProtectedRoute path="/modules" component={() => (
+                <Layout>
+                  <Module />
+                </Layout>
+              )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
+              <ProtectedRoute path="/modules/:moduleName" component={AdminModuleDetail} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
+              <ProtectedRoute path="/module/:moduleName" component={() => (
+                <ModuleDetail />
+              )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} />
+              
+              {/* Detailed module view with progress tracking */}
+              
               <ProtectedRoute path="/learners" component={() => (
                 <Layout>
                   <Learners />

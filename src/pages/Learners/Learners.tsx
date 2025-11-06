@@ -704,7 +704,7 @@ export default function Learners() {
   async function handleAddLearner(e: React.FormEvent) {
     e.preventDefault();
     setAddError(null);
-    if (!addForm.first_name || !addForm.last_name || !addForm.email || !addForm.departments || addForm.departments.length === 0) {
+    if (!addForm.first_name || !addForm.email || !addForm.departments || addForm.departments.length === 0) {
       setAddError("Please fill all required fields and select at least one department.");
       return;
     }
@@ -773,7 +773,7 @@ export default function Learners() {
   async function handleEditLearner(e: React.FormEvent) {
     e.preventDefault();
     setEditError(null);
-    if (!editForm.first_name || !editForm.last_name || !editForm.email || !editForm.departments || editForm.departments.length === 0 || !learnerToEdit?.name) {
+    if (!editForm.first_name || !editForm.email || !editForm.departments || editForm.departments.length === 0 || !learnerToEdit?.name) {
       setEditError("Please select at least one department.");
       return;
     }
@@ -940,7 +940,7 @@ export default function Learners() {
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} required disabled={addLoading} />
+                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))}  disabled={addLoading} />
               </div>
             </div>
             <div>
@@ -1025,7 +1025,7 @@ export default function Learners() {
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} required disabled={editLoading} />
+                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))}  disabled={editLoading} />
               </div>
             </div>
             <div>

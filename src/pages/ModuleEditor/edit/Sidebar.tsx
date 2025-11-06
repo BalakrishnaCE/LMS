@@ -821,6 +821,16 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     if (!moduleInfo || !editState) return;
     
     try {
+      // Normalize learners data for backend
+      let normalizedLearners: Array<{ user: string }> = [];
+      
+      if (editState.assignment_based === "Manual") {
+        // Filter out empty learners and ensure proper format
+        normalizedLearners = learnersToSave
+          .filter(learner => learner && learner.user && learner.user.trim() !== "")
+          .map(learner => ({ user: learner.user }));
+      }
+
       // Prepare the update data
       const updateData: any = {
         name1: editState.name,
@@ -832,8 +842,8 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         // Send department as simple string
         department: editState.department || "",
         image: editState.image,
-        // Always update learners based on current assignment method
-        learners: editState.assignment_based === "Manual" ? learnersToSave : []
+        // Send properly formatted learners array
+        learners: normalizedLearners
       };
 
       // Only include lessons if they exist in the current module state
@@ -844,6 +854,12 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         }));
         updateData.lessons = formattedLessons;
       }
+
+      console.log("DEBUG: Saving module with data:", {
+        assignment_based: editState.assignment_based,
+        learners: normalizedLearners,
+        learnersCount: normalizedLearners.length
+      });
 
       // Update module info
       await updateDoc("LMS Module", moduleInfo.id, updateData);     

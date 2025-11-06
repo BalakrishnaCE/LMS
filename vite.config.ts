@@ -11,7 +11,14 @@ export default defineConfig({
 		port: 8082,
 		host: '0.0.0.0',
 		proxy: proxyOptions,
-		allowedHosts: ['lms.noveloffice.in', "10.80.4.85"]
+		allowedHosts: ['lms.noveloffice.org'],
+		cors: true,
+		headers: {
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+			'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+			'Access-Control-Allow-Credentials': 'true',
+		},
 	},
 	resolve: {
 		alias: {

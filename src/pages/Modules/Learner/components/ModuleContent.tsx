@@ -56,7 +56,8 @@ export function ModuleContent({
       )}
       <ContentRenderer
         contentType={currentContent.content_type}
-        contentReference={currentContent.name}
+        contentReference={currentContent.content_reference || currentContent.name}
+        contentData={currentContent.data}
       />
       {showNavigation && (
         <motion.div 

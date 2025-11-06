@@ -265,7 +265,8 @@ export default function MainSection({
       console.error('Module ID is required for preview');
       return;
     }
-    const previewUrl = `${BASE_PATH}/modules/learner/${moduleId}`;
+    // Use Admin preview route so Draft modules can be previewed too
+    const previewUrl = `${BASE_PATH}/modules/${moduleId}`;
     window.open(previewUrl, '_blank');
   };
 

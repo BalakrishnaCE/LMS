@@ -8,8 +8,9 @@ export const getFullPath = (path: string) => `${BASE_PATH}${path}`;
 export const getRelativePath = (fullPath: string) => fullPath.replace(BASE_PATH, '');
 
 // LMS API base URL
-// export const LMS_API_BASE_URL =  "http://10.80.4.72";
-export const LMS_API_BASE_URL =  process.env.NODE_ENV === 'production' ? "https://lms.noveloffice.in" : "http://10.80.4.85/";
+// Use relative URL in development (goes through Vite proxy for cookie handling)
+// Use absolute URL in production
+export const LMS_API_BASE_URL = import.meta.env.PROD ? "https://lms.noveloffice.org/" : "";
 
 // Common routes
 export const ROUTES = {
@@ -19,6 +20,7 @@ export const ROUTES = {
   MODULES: '/modules',
   MODULE_DETAIL: (moduleName: string) => `/module/${moduleName}`,
   MODULE_EDIT: (moduleName: string) => `/module/${moduleName}/edit`,
+  ADMIN_MODULE_DETAIL: (moduleName: string) => `/modules/${moduleName}`,
   LEARNER_MODULES: '/modules/learner',
   LEARNER_MODULE_DETAIL: (moduleName: string) => `/modules/learner/${moduleName}`,
   LEARNERS: '/learners',

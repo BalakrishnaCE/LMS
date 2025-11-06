@@ -176,7 +176,7 @@ export default function LearnerDashboard() {
   // useLearnerDashboard returns data under message: [{ module: {...}, progress: {...} }]
   
   // Prioritize get_learner_dashboard (filters for published modules) over useLearnerModuleData
-  let modules = [];
+  let modules: unknown = [];
   let meta = {};
   
   // First try to use get_learner_dashboard (filters for published modules)

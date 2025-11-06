@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useFrappeAuth, useFrappeGetDocList, useFrappePostCall } from 'frappe-react-sdk';
+import { useFrappeAuth, useFrappePostCall } from 'frappe-react-sdk';
 import Lottie from 'lottie-react';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
@@ -21,6 +21,7 @@ interface QuizProps {
   quizReference?: string;
   content?: any;
   contentReference?: string;
+  contentData?: any; // Pre-fetched content data from parent
   moduleId?: string;
   onComplete?: () => void;
   isCompleted?: boolean;
@@ -54,101 +55,18 @@ function AdminQuizPreview({
   quiz: Quiz; 
   onClose: () => void; 
 }) {
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use quiz data directly - no need for additional API calls
+  const questions = quiz.questions || [];
+  
+  console.log('🔍 Admin Preview - Quiz data:', quiz);
+  console.log('🔍 Admin Preview - Questions:', questions);
 
-  // Fetch quiz questions with options using the same API as QuizQuestionsPage
-  useEffect(() => {
-    const fetchQuizWithQuestions = async () => {
-      if (!quiz.name) {
-        console.log('No quiz reference provided');
-        return;
-      }
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        console.log('Fetching quiz with questions for admin preview:', quiz.name);
-        
-        // Use the custom API that handles permissions and includes questions
-        const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.content_access.get_content_with_permissions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            content_type: 'Quiz',
-            content_reference: quiz.name
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch quiz: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Handle different response structures
-        let quizData = null;
-        
-        // Check if it's the custom API response structure
-        if (data.message?.success && data.message?.data) {
-          quizData = data.message.data;
-        }
-        // Check if it's a direct Frappe resource API response
-        else if (data.data && data.data.name) {
-          quizData = data.data;
-        }
-        // Check if it's a nested message structure
-        else if (data.message?.message?.success && data.message?.message?.data) {
-          quizData = data.message.message.data;
-        }
-        // Fallback to direct data
-        else if (data.success && data.data) {
-          quizData = data.data;
-        }
-        
-        if (quizData) {
-          
-          if (quizData.questions && quizData.questions.length > 0) {
-            setQuestions(quizData.questions);
-            console.log('Valid questions loaded for admin preview:', quizData.questions.length);
-          } else {
-            setError('No questions could be loaded');
-          }
-        } else {
-          setError('Invalid response structure or no quiz data found');
-        }
-      } catch (err) {
-        console.error('Error fetching quiz with questions for admin preview:', err);
-        setError('Failed to load questions');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (quiz.name) {
-      fetchQuizWithQuestions();
-    }
-  }, [quiz.name]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
-        <div className="ml-4 text-muted-foreground">Loading questions...</div>
-      </div>
-    );
-  }
-
-  if (error || questions.length === 0) {
+  if (!questions || questions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
-        <div className="text-destructive text-lg font-semibold mb-2">Error loading questions</div>
+        <div className="text-destructive text-lg font-semibold mb-2">No questions available</div>
         <div className="text-muted-foreground text-center mb-4">
-          {error || 'No questions found'}
+          This quiz doesn't have any questions configured.
         </div>
         <Button onClick={onClose} className="mt-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -195,34 +113,51 @@ function QuizDialog({
   quiz, 
   onClose, 
   onComplete,
-  moduleId
+  moduleId,
+  quizReference
 }: { 
   quiz: Quiz; 
   onClose: () => void; 
   onComplete: () => void;
   moduleId?: string;
+  quizReference?: string;
 }) {
+  // Ensure quiz has a name - use quizReference if missing
+  if (!quiz.name && quizReference) {
+    quiz.name = quizReference;
+    console.log('✅ Added missing name field in QuizDialog:', quizReference);
+  }
   const { currentUser } = useFrappeAuth();
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
+  const [maxScore, setMaxScore] = useState(0);
   const [hasAttempted, setHasAttempted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Check for existing quiz progress in DocType
-  const { data: existingProgress } = useFrappeGetDocList(
-    'Quiz Progress',
-    {
-      fields: ['name', 'score', 'max_score'],
-      filters: [
-        ['user', '=', typeof currentUser === 'string' ? currentUser : (currentUser as any)?.name || '']
-      ],
-      limit: 1
-    },
-    {
-      enabled: !!currentUser && !!quiz?.name
-    }
-  );
+  // Check for existing quiz progress in DocType using direct fetch (like completion screen)
+  const [existingProgress, setExistingProgress] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchQuizProgress = async () => {
+      if (!currentUser || !quiz?.name) return;
+      
+      try {
+        const userEmail = typeof currentUser === 'string' ? currentUser : (currentUser as any)?.name || '';
+        const quizRes = await fetch(
+          `${LMS_API_BASE_URL}/api/resource/Quiz Progress?filters=[[\"user\",\"=\",\"${userEmail}\"]]&fields=[\"score\",\"max_score\",\"name\",\"quiz_id\"]`, 
+          { credentials: 'include' }
+        );
+        const data = await quizRes.json();
+        setExistingProgress(data?.data || []);
+      } catch (error) {
+        console.error('Error fetching quiz progress:', error);
+        setExistingProgress([]);
+      }
+    };
+
+    fetchQuizProgress();
+  }, [currentUser, quiz?.name]);
 
   // Create quiz progress
   const { call: updateQuizProgress } = useFrappePostCall('novel_lms.novel_lms.api.quiz_qa_progress.update_quiz_progress');
@@ -230,41 +165,56 @@ function QuizDialog({
   const handleAnswerChange = (questionId: string, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
-
+  // REMOVED: Auto-submit on navigation
+  // Users should only submit via the Submit button
+  // This prevents empty saves that block real attempts
+  // If admins need to reset, they can do it manually in the backend
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Calculate score first
-    let correctAnswers = 0;
+    // Calculate score using question scores (matching backend)
+    let calculatedScore = 0.0;
+    let calculatedMaxScore = 0.0;
+    let correctAnswers = 0; // For display purposes
     let totalQuestions = 0;
     
     if (quiz?.questions) {
       totalQuestions = quiz.questions.length;
       quiz.questions.forEach(question => {
+        const questionScore = question.score || 1.0; // Use question's score
+        calculatedMaxScore += questionScore; // Always add to max_score
+        
         const userAnswer = answers[question.name];
         if (userAnswer && question.options) {
           const selectedOption = question.options.find(opt => opt.option_text === userAnswer);
           if (selectedOption?.correct) {
-            correctAnswers += 1;
+            calculatedScore += questionScore; // Add question's score if correct
+            correctAnswers += 1; // Count for display
           }
         }
       });
     }
     
-    const percentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
-    setScore(percentage);
+    // Calculate percentage
+    const percentage = calculatedMaxScore > 0 ? Math.round((calculatedScore / calculatedMaxScore) * 100) : 0;
+    
+    // Store actual score and max_score in state
+    setScore(calculatedScore);
+    setMaxScore(calculatedMaxScore);
     setSubmitted(true);
     setHasAttempted(true);
     
-    // Save attempt data to localStorage (for internet/browser issues)
+    // Save attempt data to localStorage
     const attemptData = {
-      score: percentage,
+      score: calculatedScore,           // Actual score (e.g., 19)
+      max_score: calculatedMaxScore,     // Max score (e.g., 25)
+      percentage: percentage,            // Calculated percentage (e.g., 76)
       correctAnswers: correctAnswers,
       totalQuestions: totalQuestions,
       timestamp: new Date().toISOString(),
       quizName: quiz?.name,
-      userEmail: currentUser  // Add user identification
+      userEmail: currentUser
     };
     localStorage.setItem(`quiz_attempt_${currentUser}_${quiz?.name}`, JSON.stringify(attemptData));
     
@@ -298,13 +248,40 @@ function QuizDialog({
       }
       
       console.log('Formatted answers for API:', formattedAnswers);
+      console.log('Quiz object:', quiz);
+      console.log('Quiz object keys:', quiz ? Object.keys(quiz) : 'quiz is null');
+      console.log('Quiz name/id:', quiz?.name);
+      console.log('Quiz ID alternatives:', {
+        name: quiz?.name,
+        id: (quiz as any)?.id,
+        quiz_id: (quiz as any)?.quiz_id,
+        _name: (quiz as any)?._name
+      });
+      
+      // Get quiz_id - try multiple possible property names
+      const quizId = quiz?.name || (quiz as any)?.id || (quiz as any)?.quiz_id || (quiz as any)?._name;
+      
+      // Validate quiz_id before sending
+      if (!quizId) {
+        console.error('Quiz ID is missing! Quiz object:', quiz);
+        console.error('Available quiz properties:', quiz ? Object.keys(quiz) : 'null');
+        throw new Error('Quiz ID is required but was not found in quiz object');
+      }
       
       // Call the correct API
-      await updateQuizProgress({
-        quiz_id: quiz?.name,
+      const apiPayload = {
+        quiz_id: quizId,
         answers: formattedAnswers,
         module: moduleId
+      };
+      
+      console.log('Calling API with payload:', { 
+        quiz_id: apiPayload.quiz_id, 
+        answers_count: Object.keys(apiPayload.answers).length,
+        module: apiPayload.module 
       });
+      
+      await updateQuizProgress(apiPayload);
       
       console.log('Quiz progress saved to DocType successfully');
     } catch (error) {
@@ -329,12 +306,17 @@ function QuizDialog({
     if (existingProgress && existingProgress.length > 0 && !hasAttempted) {
       // Filter by quiz name in frontend since we can't filter by quiz field in query
       const progressForThisQuiz = existingProgress.find((progress: any) => 
-        progress.quiz === quiz?.name
+        progress.quiz_id === quiz?.name
       );
       
       if (progressForThisQuiz) {
         // Found in DocType - show previous score
-        setScore(progressForThisQuiz.score || 0);
+        const backendScore = progressForThisQuiz.score || 0;
+        const backendMaxScore = progressForThisQuiz.max_score || 0;
+        
+        // Store actual score and max_score (not percentage)
+        setScore(backendScore);
+        setMaxScore(backendMaxScore);
         setSubmitted(true);
         setHasAttempted(true);
         return;
@@ -350,7 +332,8 @@ function QuizDialog({
         const attemptData = JSON.parse(savedAttempt);
         // Verify this data belongs to current user and is valid
         if (isValidQuizCache(attemptData, currentUser || '')) {
-          setScore(attemptData.score);
+          setScore(attemptData.score || 0);
+          setMaxScore(attemptData.max_score || 0);
           setSubmitted(true);
           setHasAttempted(true);
         } else {
@@ -382,18 +365,35 @@ function QuizDialog({
   }
 
   if (submitted) {
-    // Get correct answers count - prioritize localStorage, then calculate
+    // Get score and max_score - prioritize localStorage, then state, then backend
+    let displayScore = score;
+    let displayMaxScore = maxScore;
     let correctAnswers = 0;
     let totalQuestions = 0;
     
     // Check localStorage first (most reliable for current attempt)
-    const savedAttempt = localStorage.getItem(`quiz_attempt_${quiz?.name}`);
+    const savedAttempt = localStorage.getItem(`quiz_attempt_${currentUser}_${quiz?.name}`);
     if (savedAttempt) {
       const attemptData = JSON.parse(savedAttempt);
+      displayScore = attemptData.score || score;
+      displayMaxScore = attemptData.max_score || maxScore;
       correctAnswers = attemptData.correctAnswers || 0;
       totalQuestions = attemptData.totalQuestions || quiz?.questions?.length || 0;
+    } else if (existingProgress && existingProgress.length > 0) {
+      // Fallback to backend data
+      const progressForThisQuiz = existingProgress.find((progress: any) => 
+        progress.quiz_id === quiz?.name
+      );
+      if (progressForThisQuiz) {
+        displayScore = progressForThisQuiz.score || score;
+        displayMaxScore = progressForThisQuiz.max_score || maxScore;
+        // Calculate correctAnswers from quiz if needed
+        if (quiz?.questions) {
+          totalQuestions = quiz.questions.length;
+        }
+      }
     } else {
-      // Fallback calculation
+      // Fallback calculation from current state
       if (quiz?.questions) {
         totalQuestions = quiz.questions.length;
         quiz.questions.forEach(question => {
@@ -408,7 +408,8 @@ function QuizDialog({
       }
     }
     
-    const percent = score; // score is already the percentage
+    // Calculate percentage from score and max_score
+    const percent = displayMaxScore > 0 ? Math.round((displayScore / displayMaxScore) * 100) : 0;
     const scoreColor = percent >= 70 ? '#10b981' : percent >= 50 ? '#f59e0b' : '#ef4444';
     
     return (
@@ -439,13 +440,16 @@ function QuizDialog({
           </div>
           
           <div className="text-center mb-6">
-            <p className="text-lg">You got {correctAnswers} out of {totalQuestions} questions correct</p>
+            <p className="text-lg">You scored {displayScore} out of {displayMaxScore} points</p>
+            {correctAnswers > 0 && totalQuestions > 0 && (
+              <p className="text-sm text-gray-500 mt-1">({correctAnswers} out of {totalQuestions} questions correct)</p>
+            )}
             <p className="text-sm text-gray-600 mt-2">
               {percent >= 70 ? 'Congratulations! You passed!' : percent >= 50 ? 'Good effort! Try again to improve.' : 'Better luck next time!'}
             </p>
-            {existingProgress && existingProgress.length > 0 && existingProgress.find((progress: any) => progress.quiz === quiz?.name) && (
+            {existingProgress && existingProgress.length > 0 && existingProgress.find((progress: any) => progress.quiz_id === quiz?.name) && (
               <p className="text-xs text-blue-600 mt-2 font-medium">
-                Previous attempt result (from database)
+                
               </p>
             )}
             {isSaving && (
@@ -476,9 +480,7 @@ function QuizDialog({
               Time Limit: {quiz.time_limit_mins} minutes
             </span>
           )}
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            ✕
-          </Button>
+          {/* Close button removed - quiz must be completed */}
         </div>
         
         {/* Content */}
@@ -549,7 +551,8 @@ function QuizDialog({
 export default function Quiz({ 
   quizReference, 
   content, 
-  contentReference, 
+  contentReference,
+  contentData, 
   moduleId: _moduleId,
   onComplete,
   isCompleted: _isCompleted
@@ -568,7 +571,19 @@ export default function Quiz({
   // Function to fetch quiz questions with full data
   const fetchQuizQuestions = async (quizData: any) => {
     try {
-      console.log('Fetching quiz questions for:', quizData.name);
+      // Ensure quizData has a name - use reference if missing
+      const quizId = quizData.name || contentReference || quizReference;
+      if (!quizId) {
+        console.error('Cannot fetch quiz questions: no quiz ID available');
+        return;
+      }
+      
+      // If quizData doesn't have name, set it now
+      if (!quizData.name && quizId) {
+        quizData.name = quizId;
+      }
+      
+      console.log('Fetching quiz questions for:', quizId);
       const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.content_access.get_content_with_permissions`, {
         method: 'POST',
         headers: {
@@ -576,7 +591,7 @@ export default function Quiz({
         },
         body: JSON.stringify({
           content_type: 'Quiz',
-          content_reference: quizData.name
+          content_reference: quizId
         })
       });
       
@@ -603,6 +618,10 @@ export default function Quiz({
       console.log('Processed questions data:', questionsData);
       
       if (questionsData && questionsData.questions) {
+        // Ensure name field exists
+        if (!questionsData.name && quizData.name) {
+          questionsData.name = quizData.name;
+        }
         console.log('Setting quiz with full questions data');
         setQuiz(questionsData);
       } else {
@@ -616,12 +635,58 @@ export default function Quiz({
   };
 
   useEffect(() => {
+    // CRITICAL FIX: If contentData is provided, use it without making API calls
+    if (contentData !== undefined) {
+      console.log('✅ Using pre-fetched contentData from parent');
+      if (contentData === null) {
+        console.log('⚠️ Content not found in backend, hiding component');
+        setQuizLoading(false);
+        return;
+      }
+      
+      // Ensure name field exists - use contentReference or quizReference if name is missing
+      const quizId = contentReference || quizReference;
+      if (!contentData.name && quizId) {
+        contentData.name = quizId;
+        console.log('✅ Added missing name field to contentData:', quizId);
+      }
+      
+      console.log('Content questions structure:', contentData.questions?.[0]);
+      console.log('Has quiz_question field:', !!contentData.questions?.[0]?.quiz_question);
+      console.log('Has question_text field:', !!contentData.questions?.[0]?.question_text);
+      
+      // Check if content has complete question data
+      if (contentData.questions && contentData.questions.length > 0 && contentData.questions[0].quiz_question && !contentData.questions[0].question_text) {
+        console.log('Content has incomplete questions, fetching full data');
+        fetchQuizQuestions(contentData);
+      } else {
+        console.log('Content has complete questions, using directly');
+        setQuiz(contentData);
+      }
+      setQuizLoading(false);
+      return;
+    }
+
     // If content is provided directly, use it instead of fetching
-    if (content && content.name) {
+    if (content) {
+      // Ensure name field exists
+      const quizId = contentReference || quizReference;
+      if (!content.name && quizId) {
+        content.name = quizId;
+        console.log('✅ Added missing name field to content:', quizId);
+      }
+      
+      if (!content.name) {
+        console.error('Content provided but no name field and no reference available');
+        setQuizError(new Error('Quiz name is required but not found'));
+        setQuizLoading(false);
+        return;
+      }
+      
       console.log('Content provided directly:', content);
       console.log('Content questions structure:', content.questions?.[0]);
       console.log('Has quiz_question field:', !!content.questions?.[0]?.quiz_question);
-      console.log('Has question_text field:', !!content.questions?.[0]?.question_text);
+      console.log('Has question_text field:', !!contentData.questions?.[0]?.question_text);
       
       // Check if content has complete question data
       if (content.questions && content.questions.length > 0 && content.questions[0].quiz_question && !content.questions[0].question_text) {
@@ -660,24 +725,49 @@ export default function Quiz({
         
         const data = await response.json();
         
+        // Enhanced logging to diagnose response structure
+        console.log('🔍 RAW API RESPONSE:', JSON.stringify(data, null, 2));
+        console.log('🔍 Response keys:', Object.keys(data));
+        console.log('🔍 Has message:', !!data.message);
+        console.log('🔍 Message keys:', data.message ? Object.keys(data.message) : []);
+        
         // Handle different response structures
         let quizData = null;
         
         // Check if it's the custom API response structure
         if (data.message?.success && data.message?.data) {
           quizData = data.message.data;
+          console.log('✅ Matched structure: data.message.success && data.message.data');
         }
         // Check if it's a direct Frappe resource API response
         else if (data.data && data.data.name) {
           quizData = data.data;
+          console.log('✅ Matched structure: data.data with name');
         }
         // Check if it's a nested message structure
         else if (data.message?.message?.success && data.message?.message?.data) {
           quizData = data.message.message.data;
+          console.log('✅ Matched structure: nested message.message.data');
         }
         // Fallback to direct data
         else if (data.success && data.data) {
           quizData = data.data;
+          console.log('✅ Matched structure: data.success && data.data');
+        }
+        // NEW: Check for direct message.data (admin API structure)
+        else if (data.message && data.message.name && data.message.questions) {
+          quizData = data.message;
+          console.log('✅ Matched structure: direct message with name and questions');
+        }
+        // NEW: Check for wrapped message structure
+        else if (data.message?.data?.name && data.message?.data?.questions) {
+          quizData = data.message.data;
+          console.log('✅ Matched structure: message.data with name and questions');
+        }
+        // NEW: Fallback to message itself if it has quiz properties
+        else if (data.message && typeof data.message === 'object' && data.message.name) {
+          quizData = data.message;
+          console.log('✅ Matched structure: message as object with name');
         }
         
         if (quizData) {
@@ -685,6 +775,12 @@ export default function Quiz({
           console.log('First question structure:', quizData.questions?.[0]);
           console.log('Has quiz_question field:', !!quizData.questions?.[0]?.quiz_question);
           console.log('Has question_text field:', !!quizData.questions?.[0]?.question_text);
+          
+          // Ensure name field exists from reference
+          if (!quizData.name) {
+            quizData.name = ref;
+            console.log('✅ Added missing name field to quizData:', ref);
+          }
           
           // If questions don't have full data (only quiz_question references), fetch them separately
           if (quizData.questions && quizData.questions.length > 0 && quizData.questions[0].quiz_question && !quizData.questions[0].question_text) {
@@ -695,6 +791,9 @@ export default function Quiz({
             setQuiz(quizData);
           }
         } else {
+          console.error('❌ Quiz data validation failed. API response:', data);
+          console.error('❌ None of the expected response structures matched');
+          // Set error immediately instead of checking loading state
           throw new Error('Invalid response structure or no quiz data found');
         }
       } catch (error) {
@@ -706,7 +805,7 @@ export default function Quiz({
     };
 
     fetchQuiz();
-  }, [content?.name, contentReference, quizReference]);
+  }, [content?.name, contentReference, quizReference, contentData]);
 
   // Handle showing instructions
   const handleShowInstructions = useCallback(() => {
@@ -761,7 +860,19 @@ export default function Quiz({
     );
   }
 
-  if (!quiz.is_active) {
+  // For admins: directly display the quiz questions inline (no Start/Instructions UI)
+  // Admins can view inactive quizzes for preview purposes
+  if (isLMSAdmin) {
+    return (
+      <div className="w-full">
+        <AdminQuizPreview quiz={quiz} onClose={() => {}} />
+      </div>
+    );
+  }
+
+  // Only check is_active for non-admin users (learners)
+  // Default to true if is_active is not provided (for backward compatibility)
+  if (quiz.is_active === false) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
         <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
@@ -769,15 +880,6 @@ export default function Quiz({
         <div className="text-muted-foreground text-center mb-4">
           This quiz is currently not active. Please contact your administrator.
         </div>
-      </div>
-    );
-  }
-
-  // For admins: directly display the quiz questions inline (no Start/Instructions UI)
-  if (isLMSAdmin) {
-    return (
-      <div className="w-full">
-        <AdminQuizPreview quiz={quiz} onClose={() => {}} />
       </div>
     );
   }
@@ -810,6 +912,7 @@ export default function Quiz({
           onClose={() => setShowQuiz(false)}
           onComplete={handleQuizComplete}
           moduleId={_moduleId}
+          quizReference={contentReference || quizReference}
         />
       )}
     </>

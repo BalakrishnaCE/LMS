@@ -92,7 +92,6 @@ export default function ModuleDetail() {
         }
     }, [moduleName, location, addToHistory]);
 
-    const api = useAPI();
     const [module, setModule] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
     const [isValidating, setIsValidating] = useState(false);
@@ -109,6 +108,20 @@ export default function ModuleDetail() {
         if (moduleData) {
             // Handle the nested message structure from get_module_with_details API
             const actualData = moduleData.data || moduleData.message || moduleData;
+            
+            // Debug logging to check content structure
+            if (actualData.lessons?.[0]?.chapters?.[0]?.contents?.[0]) {
+                const firstContent = actualData.lessons[0].chapters[0].contents[0];
+                console.log('🔍 ModuleDetail - First content sample:', {
+                    name: firstContent.name,
+                    contentType: firstContent.content_type,
+                    contentReference: firstContent.content_reference,
+                    hasData: !!firstContent.data,
+                    dataKeys: firstContent.data ? Object.keys(firstContent.data) : [],
+                    dataSample: firstContent.data
+                });
+            }
+            
             setModule(actualData);
             setIsValidating(false);
         }
@@ -155,6 +168,20 @@ export default function ModuleDetail() {
         if (module?.lessons && module.lessons.length > 0) {
             const details: Record<string, any> = {};
             module.lessons.forEach((lesson: any) => {
+                // Debug log to check chapter contents structure
+                if (lesson.chapters?.[0]?.contents?.[0]) {
+                    const firstContent = lesson.chapters[0].contents[0];
+                    console.log('🔍 Processing lesson for lessonDetails:', {
+                        lessonName: lesson.name,
+                        chapterCount: lesson.chapters.length,
+                        firstContentName: firstContent.name,
+                        firstContentType: firstContent.content_type,
+                        firstContentRef: firstContent.content_reference,
+                        hasData: !!firstContent.data,
+                        allKeys: Object.keys(firstContent)
+                    });
+                }
+                
                 // Map the API response structure to what the frontend expects
                 details[lesson.name] = {
                     lesson_name: lesson.lesson_name,

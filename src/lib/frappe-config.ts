@@ -2,8 +2,9 @@
  * Configuration for the Frappe backend connection
  */
 export const frappeConfig = {
-  // Replace with actual Frappe server URL for production
-  url: import.meta.env.VITE_FRAPPE_URL || 'https://lms.noveloffice.in',
+  // Use relative URL in development (goes through Vite proxy for cookie handling)
+  // Use absolute URL in production
+  url: import.meta.env.VITE_FRAPPE_URL || (import.meta.env.DEV ? '' : 'https://lms.noveloffice.org'),
   
   // Socket connection for real-time updates (replace port for production)
   socketPort: import.meta.env.VITE_FRAPPE_SOCKET_PORT || 9000,

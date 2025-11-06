@@ -56,20 +56,37 @@ export function ModuleSidebar({
   useEffect(() => {
     if (mode === 'admin' && module?.lessons) {
       setExpandedLessons(new Set(module.lessons.map((lesson: any) => lesson.name)));
-    } else if (mode === 'learner' && progress?.current_lesson) {
-      setExpandedLessons(new Set([progress.current_lesson]));
+    } else if (mode === 'learner') {
+      if (progress?.status === "Completed") {
+        // For completed modules, expand the current lesson from UI state
+        if (currentLessonName) {
+          setExpandedLessons(new Set([currentLessonName]));
+        }
+      } else if (progress?.current_lesson) {
+        // For in-progress modules, use progress.current_lesson
+        setExpandedLessons(new Set([progress.current_lesson]));
+      }
     } else if (mode === 'review' && currentLessonName) {
       setExpandedLessons(new Set([currentLessonName]));
     }
-  }, [progress, module, mode, currentLessonName]);
+  }, [progress, module, mode, currentLessonName, progress?.status]);
 
   useEffect(() => {
-    if ((mode === 'learner' && progress?.current_chapter && chapterRefs.current[progress.current_chapter]) ||
-        (mode === 'review' && currentChapterName && chapterRefs.current[currentChapterName])) {
-      const chapterKey = mode === 'learner' ? progress?.current_chapter : currentChapterName;
-      chapterRefs.current[chapterKey]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (mode === 'learner') {
+      // Handle completed modules - use UI state instead of progress.current_chapter
+      if (progress?.status === "Completed") {
+        const chapterName = currentChapterName;
+        if (chapterName && chapterRefs.current[chapterName]) {
+          chapterRefs.current[chapterName]?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      } else if (progress?.current_chapter && chapterRefs.current[progress.current_chapter]) {
+        // Handle in-progress modules - use progress.current_chapter
+        chapterRefs.current[progress.current_chapter]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    } else if (mode === 'review' && currentChapterName && chapterRefs.current[currentChapterName]) {
+      chapterRefs.current[currentChapterName]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [progress?.current_chapter, currentChapterName, mode]);
+  }, [progress?.current_chapter, currentChapterName, mode, progress?.status]);
 
   const toggleLesson = (lessonName: string) => {
     if (mode === 'admin') {
@@ -87,6 +104,17 @@ export function ModuleSidebar({
 
   // Phase 2: Helper function to check if a lesson is completed using completion data
   const isLessonCompleted = (lesson: any) => {
+    console.log('🔍 isLessonCompleted called:', {
+      lessonName: lesson.name,
+      progressStatus: progress?.status,
+      progressObject: progress
+    });
+    // Check if module is completed - if so, all lessons are completed
+    if (progress?.status === "Completed") {
+      console.log('🎯 Module is completed - all lessons are completed', lesson.name);
+      return true;
+    }
+    
     // Use completion data if available (more reliable)
     if (completionData && completionData.completed_lessons) {
       const isCompleted = completionData.completed_lessons.includes(lesson.name);
@@ -108,6 +136,18 @@ export function ModuleSidebar({
 
   // Phase 2: Helper function to check if a chapter is completed using completion data
   const isChapterCompleted = (chapter: any, lesson: any) => {
+    console.log('🔍 isChapterCompleted called:', {
+      chapterName: chapter.name,
+      lessonName: lesson.name,
+      progressStatus: progress?.status,
+      progressObject: progress
+    });
+    // Check if module is completed - if so, all chapters are completed
+    if (progress?.status === "Completed") {
+      console.log('🎯 Module is completed - all chapters are completed', chapter.name);
+      return true;
+    }
+    
     // Use completion data if available (more reliable)
     if (completionData && completionData.completed_chapters) {
       const isCompleted = completionData.completed_chapters.includes(chapter.name);
@@ -158,7 +198,7 @@ export function ModuleSidebar({
       className="w-full border-r border-border overflow-y-auto bg-card/50 backdrop-blur-sm"
     >
       <div className="p-4 space-y-6">
-        <Link href={ROUTES.LEARNER_MODULES} className="inline-block">
+        <Link href={mode === 'admin' ? ROUTES.MODULES : ROUTES.LEARNER_MODULES} className="inline-block">
           <Button variant="outline" size="sm" className="gap-2 hover:bg-primary hover:text-secondary">
             <ArrowLeft className="h-4 w-4" />
             Back to Modules

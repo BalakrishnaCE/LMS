@@ -49,13 +49,30 @@ function SlideItem({ item }: { item: any }) {
   );
 }
 
-function SlideContent({ slideContentId }: { slideContentId: string }) {
+function SlideContent({ slideContentId, contentData }: { slideContentId: string; contentData?: any }) {
   const [slideContentData, setSlideContentData] = useState<any>(null);
   const [error, setError] = useState<any>(null);
   const [isValidating, setIsValidating] = useState(true);
 
   useEffect(() => {
-    if (!slideContentId) return;
+    // CRITICAL FIX: If contentData is provided, use it without making API calls
+    if (contentData !== undefined) {
+      console.log('✅ Using pre-fetched contentData from parent');
+      if (contentData === null) {
+        console.log('⚠️ Content not found in backend, hiding component');
+        setIsValidating(false);
+        return;
+      }
+      setSlideContentData(contentData);
+      setIsValidating(false);
+      return;
+    }
+
+    if (!slideContentId) {
+      console.log('⚠️ SlideContentId is not provided yet, waiting...');
+      setIsValidating(true);
+      return;
+    }
     
     setIsValidating(true);
     setError(null);
@@ -86,7 +103,7 @@ function SlideContent({ slideContentId }: { slideContentId: string }) {
         setError(e.message || 'Failed to load slide content');
         setIsValidating(false);
       });
-  }, [slideContentId]);
+  }, [slideContentId, contentData]);
 
   if (isValidating) return <div>Loading slides...</div>;
   if (error) return (

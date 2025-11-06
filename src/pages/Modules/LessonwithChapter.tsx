@@ -139,13 +139,12 @@ export function useChapterDoc(chapterName: string) {
   return { data, loading, error };
 }
 
-function ContentRenderer({ contentType, contentReference, moduleId }: { 
+function FetchingContentRenderer({ contentType, contentReference, moduleId }: { 
   contentType: string; 
   contentReference: string; 
   moduleId?: string;
 }) {
   const { data: content, error, isValidating } = useFrappeGetDoc(contentType, contentReference);
-
 
   if (isValidating) return <div>Loading content...</div>;
   if (error) {
@@ -156,6 +155,15 @@ function ContentRenderer({ contentType, contentReference, moduleId }: {
     console.warn('ContentRenderer: No content found for', contentType, contentReference);
     return null;
   }
+  return <ContentDisplay contentType={contentType} content={content} moduleId={moduleId} contentReference={contentReference} />;
+}
+
+function ContentDisplay({ contentType, content, moduleId, contentReference }: { 
+  contentType: string; 
+  content: any;
+  moduleId?: string;
+  contentReference?: string;
+}) {
 
   const renderContent = () => {
     switch (contentType) {
@@ -250,11 +258,11 @@ function ContentRenderer({ contentType, contentReference, moduleId }: {
           </motion.div>
         );
       case "Quiz":
-        return <Quiz quizReference={contentReference} moduleId={moduleId} />;
+        return contentReference ? <Quiz quizReference={contentReference} moduleId={moduleId} /> : null;
       case "Slide Content":
-        return <SlideContent slideContentId={contentReference} />;
+        return contentReference ? <SlideContent slideContentId={contentReference} /> : null;
       case "Question Answer":
-        return <QuestionAnswer questionAnswerId={contentReference} moduleId={moduleId} />;
+        return contentReference ? <QuestionAnswer questionAnswerId={contentReference} moduleId={moduleId} /> : null;
       case "Steps":
         return <StepsContent content={content} />;
       case "Check List":
@@ -298,6 +306,21 @@ function ContentRenderer({ contentType, contentReference, moduleId }: {
       {renderContent()}
     </motion.div>
   );
+}
+
+function ContentRenderer({ contentType, contentReference, moduleId, contentData }: { 
+  contentType: string; 
+  contentReference: string; 
+  moduleId?: string;
+  contentData?: any;
+}) {
+  // If content data is already provided, use it directly without fetching
+  if (contentData) {
+    return <ContentDisplay contentType={contentType} content={contentData} moduleId={moduleId} contentReference={contentReference} />;
+  }
+  
+  // Otherwise, fetch it
+  return <FetchingContentRenderer contentType={contentType} contentReference={contentReference} moduleId={moduleId} />;
 }
 
 export function LessonWithChapters({ onNext, onPrevious, isFirst, isLast, activeChapterId, moduleId, lessonData, onChapterIndexChange }: LessonWithChaptersProps) {
@@ -446,6 +469,21 @@ function ChapterWithContents({ moduleId, chapterData }: { moduleId?: string; cha
   if (error) return <div>Error loading chapter</div>;
   if (!chapter) return null;
 
+  // Log the chapter structure
+  console.log('📖 ChapterWithContents received chapter:', {
+    name: chapter.name,
+    title: chapter.title,
+    contentsCount: chapter.contents?.length || 0,
+    firstContentStructure: chapter.contents?.[0] ? {
+      name: chapter.contents[0].name,
+      contentType: chapter.contents[0].content_type,
+      hasContentReference: !!chapter.contents[0].content_reference,
+      contentReference: chapter.contents[0].content_reference,
+      hasData: !!chapter.contents[0].data,
+      keys: Object.keys(chapter.contents[0])
+    } : null
+  });
+
   // Filter out invalid content and sort properly
   const sortedContents = (chapter.contents || [])
     .filter((content: any) => content && content.content_type && content.content_reference)
@@ -470,21 +508,32 @@ function ChapterWithContents({ moduleId, chapterData }: { moduleId?: string; cha
       {/* Chapter Contents */}
       <div className="space-y-8">
         <AnimatePresence>
-          {sortedContents.map((content: any, index: number) => (
-            <motion.div
-              key={content.content_reference}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="bg-card/30 backdrop-blur-sm border border-border/50 rounded-lg p-6 shadow-sm"
-            >
-              <ContentRenderer
-                contentType={content.content_type}
-                contentReference={content.content_reference}
-                moduleId={moduleId}
-              />
-            </motion.div>
-          ))}
+          {sortedContents.map((content: any, index: number) => {
+            console.log('📄 LessonWithChapters rendering content:', {
+              name: content.name,
+              contentType: content.content_type,
+              contentReference: content.content_reference,
+              hasData: !!content.data,
+              dataKeys: content.data ? Object.keys(content.data) : [],
+              willUsePreFetched: !!content.data
+            });
+            return (
+              <motion.div
+                key={content.content_reference}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="bg-card/30 backdrop-blur-sm border border-border/50 rounded-lg p-6 shadow-sm"
+              >
+                <ContentRenderer
+                  contentType={content.content_type}
+                  contentReference={content.content_reference}
+                  moduleId={moduleId}
+                  contentData={content.data}
+                />
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
     </div>

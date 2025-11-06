@@ -26,6 +26,9 @@ import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLearnerDashboard } from "@/lib/api";
+import { Input } from "@/components/ui/input"
+import { X } from "lucide-react"
 
 interface ModulesProps {
     itemsPerPage?: number;
@@ -47,10 +50,14 @@ const itemVariants = {
 
 export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
     const [page, setPage] = useState(1)
-    const [searchQuery] = useState("")
+    const [searchQuery, setSearchQuery] = useState(() => {
+        return localStorage.getItem('learner_modules_search') || ""
+    })
     const { user } = useUser()
     const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
     const [retryCount, setRetryCount] = useState(0);
+    const [allFetchedModules, setAllFetchedModules] = React.useState<any[]>([]);
+    const [allFetchLoading, setAllFetchLoading] = React.useState(false);
 
     // Note: offset not needed for dashboard API as it returns all modules
 
@@ -61,10 +68,12 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
         user: user?.email,
     });
 
+    // Client-side pagination; no offset needed for API when fetching all
+
     // Fetch modules using the working API (has proper structure generation)
-    const { data, error, isLoading, mutate } = useFrappeGetCall<any>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
+    const { data, error, mutate } = useFrappeGetCall<any>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
         user: user?.email,
-        limit: itemsPerPage,
+        limit: 0,   // fetch all modules once
         offset: 0,
     })
 
@@ -74,6 +83,75 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
     }, {
         enabled: !!user?.email,
     })
+
+    // Batch fetch all learner modules (paginate client-side later)
+    React.useEffect(() => {
+        const u = user?.email?.trim();
+        if (!u) return;
+
+        let cancelled = false;
+        const fetchAll = async () => {
+            try {
+                setAllFetchLoading(true);
+                const pageSize = 200; // adjust if needed
+                let offsetCursor = 0;
+                const acc: any[] = [];
+
+                while (true) {
+                    const url = `${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.module_management.LearnerModuleData?user=${encodeURIComponent(u)}&limit=${pageSize}&offset=${offsetCursor}`;
+                    const res = await fetch(url, { credentials: 'include' });
+                    const json = await res.json();
+                    const list = json?.message?.message?.modules || [];
+                    const meta = json?.message?.message?.meta;
+                    acc.push(...list);
+
+                    const hasMore = !!meta?.pagination?.has_more;
+                    if (!hasMore || list.length === 0) break;
+                    offsetCursor += pageSize;
+                }
+
+                if (!cancelled) setAllFetchedModules(acc);
+            } catch (e) {
+                if (!cancelled) setAllFetchedModules([]);
+            } finally {
+                if (!cancelled) setAllFetchLoading(false);
+            }
+        };
+
+        fetchAll();
+        return () => { cancelled = true; };
+    }, [user?.email]);
+
+    // Persist search to localStorage (debounced)
+    const saveSearchToStorage = React.useMemo(() => {
+        let t: any;
+        return (value: string) => {
+            clearTimeout(t);
+            t = setTimeout(() => {
+                if (value && value.trim()) {
+                    localStorage.setItem('learner_modules_search', value.trim());
+                } else {
+                    localStorage.removeItem('learner_modules_search');
+                }
+            }, 300);
+        };
+    }, []);
+
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        saveSearchToStorage(value);
+    };
+
+    const handleClearSearch = () => {
+        setSearchQuery("");
+        saveSearchToStorage("");
+    };
+
+    // Fetch dashboard data for accurate stats calculation
+    const { data: dashboardData } = useLearnerDashboard(user?.email || "", { 
+        enabled: !!user?.email && user?.email.trim() !== "" 
+    });
 
     // Create progress map from dashboard API (real-time progress data)
     const progressMap = React.useMemo(() => {
@@ -89,27 +167,14 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
         return map;
     }, [progressData]);
 
-    // Transform data to match expected format (working API structure)
+    // Use fully fetched module list; overlay real-time progress
     const modules = React.useMemo(() => {
-        if (!data?.message?.message?.modules) {
-            return [];
-        }
-        const transformedModules = data.message.message.modules.map((module: any) => ({
+        if (!allFetchedModules.length) return [];
+        return allFetchedModules.map((module: any) => ({
             ...module,
-            // Override progress with real-time data from dashboard API
             progress: progressMap[module.name] || module.progress
         }));
-        
-        // Debug logging
-        console.log('Raw API response:', data);
-        console.log('Transformed modules:', transformedModules);
-        if (transformedModules.length > 0) {
-            console.log('First module structure:', transformedModules[0].structure);
-            console.log('First module progress:', transformedModules[0].progress);
-        }
-        
-        return transformedModules;
-    }, [data, progressMap]);
+    }, [allFetchedModules, progressMap]);
     
     // Calculate meta from modules (use API meta or calculate from modules)
     const meta = React.useMemo(() => {
@@ -142,7 +207,22 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
         };
     }, [modules, data]);
     
-    const totalPages = Math.ceil((meta.total_count || 0) / itemsPerPage)
+    // Calculate stats from ALL modules (dashboard data), not just current page
+    const allModules = React.useMemo(() => {
+        const dd: any = dashboardData as any;
+        const raw = Array.isArray(dd?.message)
+            ? dd.message
+            : Array.isArray(dd?.message?.message)
+                ? dd.message.message
+                : []; // fallback
+
+        return raw.map((item: any) => ({
+            ...item.module,
+            progress: item.progress
+        }));
+    }, [dashboardData]);
+    
+    // total pages computed inline where needed using filteredModules.length
 
     // Retry function for failed API calls
     const handleRetry = React.useCallback(() => {
@@ -172,6 +252,11 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
         )
     }, [modules, searchQuery])
 
+    // Reset to page 1 when search changes
+    React.useEffect(() => {
+        setPage(1);
+    }, [searchQuery]);
+
     // Sort modules: ordered modules (order > 0) first by order asc, then unordered (order 0 or undefined) in original order
     const sortedModules = useMemo(() => {
         const ordered = filteredModules.filter((m: any) => m.order && m.order > 0).sort((a: any, b: any) => a.order - b.order);
@@ -179,16 +264,16 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
         return [...ordered, ...unordered];
     }, [filteredModules]);
 
-    // Calculate stats using the same logic as dashboard
-    const completedCount = filteredModules.filter((m: any) => m.progress?.status === "Completed").length;
-    const inProgressCount = filteredModules.filter((m: any) => m.progress?.status === "In Progress").length;
-    const notStartedCount = filteredModules.filter((m: any) => m.progress?.status === "Not Started").length;
+    // Calculate stats using ALL modules from dashboard data
+    const completedCount = allModules.filter((m: any) => m.progress?.status === "Completed").length;
+    const inProgressCount = allModules.filter((m: any) => m.progress?.status === "In Progress").length;
+    const notStartedCount = allModules.filter((m: any) => m.progress?.status === "Not Started").length;
 
-    // Use progress from dashboard API (real-time data)
-    const calculatedAverageProgress = filteredModules.length > 0 
-        ? Math.round(filteredModules.reduce((sum: number, m: any) => {
+    // Use progress from ALL modules (dashboard data)
+    const calculatedAverageProgress = allModules.length > 0 
+        ? Math.round(allModules.reduce((sum: number, m: any) => {
             return sum + Math.round(m.progress?.progress || 0);
-        }, 0) / filteredModules.length)
+        }, 0) / allModules.length)
         : 0;
 
     // Use calculated progress or fallback to meta data
@@ -360,23 +445,23 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                 <div className="flex items-center gap-2">
                                                     <CheckCircle className="w-3 h-3 text-green-500" />
                                                     <span className="text-muted-foreground">Completed:</span>
-                                                    <span className="font-medium text-green-600 dark:text-green-400">{meta.completed_modules || 0} modules</span>
+                                                    <span className="font-medium text-green-600 dark:text-green-400">{completedCount} modules</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                                     <Clock className="w-3 h-3 text-blue-500" />
                                                     <span className="text-muted-foreground">In Progress:</span>
-                                                    <span className="font-medium text-blue-600 dark:text-blue-400">{meta.in_progress_modules || 0} modules</span>
+                                                    <span className="font-medium text-blue-600 dark:text-blue-400">{inProgressCount} modules</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                                     <BookOpen className="w-3 h-3 text-gray-500" />
                                                     <span className="text-muted-foreground">Available:</span>
-                                                    <span className="font-medium text-gray-600 dark:text-gray-400">{meta.not_started_modules || 0} modules</span>
+                                                    <span className="font-medium text-gray-600 dark:text-gray-400">{notStartedCount} modules</span>
                                                 </div>
                                                 <div className="pt-1 border-t border-border">
                                                     <div className="flex items-center gap-2">
                                                         <Target className="w-3 h-3 text-primary" />
                                                         <span className="text-muted-foreground">Total:</span>
-                                                        <span className="font-medium text-foreground">{meta.total || filteredModules.length || 0} modules</span>
+                                                        <span className="font-medium text-foreground">{allModules.length} modules</span>
                                                     </div>
                                 </div>
                             </div>
@@ -389,8 +474,30 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
             </AnimatePresence>
             </div>
 
+            {/* Search bar */}
+            <div className="flex gap-4 p-4 mb-2">
+                <div className="flex-1 relative">
+                    <Input
+                        placeholder="Search modules..."
+                        value={searchQuery}
+                        onChange={handleSearchChange}
+                        className="pr-10"
+                    />
+                    {searchQuery && (
+                        <button
+                            onClick={handleClearSearch}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                            type="button"
+                            aria-label="Clear search"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {/* Loading and Error States */}
-            {(isLoading || progressLoading) && (
+            {(allFetchLoading || progressLoading) && (
                 <div className="flex flex-col items-center justify-center p-8">
                     <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
                     <div className="mt-4 text-muted-foreground">Loading modules and progress...</div>
@@ -417,15 +524,18 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
             )}
 
             {/* Modules Grid */}
-            {!isLoading && !progressLoading && !error && (!data || sortedModules.length === 0) && (
+
+            {/* Empty State */}
+            {!allFetchLoading && !progressLoading && sortedModules.length === 0 && (
                 <div className="flex flex-col items-center justify-center p-8">
                     <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
                     <div className="mt-4 text-muted-foreground text-lg">
-                        {!data ? "Loading modules..." : "No modules found. Try a different search or check back later!"}
+                        No modules found. Try a different search or check back later!
                     </div>
                 </div>
             )}
-            {!isLoading && !progressLoading && !error && data && sortedModules.length > 0 && (
+
+            {!allFetchLoading && !progressLoading && sortedModules.length > 0 && (
                 <motion.div
                     key="grid"
                     variants={containerVariants}
@@ -435,7 +545,11 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                     className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 max-w-7xl mx-auto p-4"
                 >
                     <AnimatePresence>
-                {sortedModules.map((module: any, idx: number) => {
+                {(() => {
+                    const pageStart = (page - 1) * itemsPerPage;
+                    const pageItems = sortedModules.slice(pageStart, pageStart + itemsPerPage);
+                    return pageItems;
+                })().map((module: any, idx: number) => {
                     const status = module.progress?.status || "Not Started";
                     
                     // Use progress from dashboard API (real-time data)
@@ -532,7 +646,19 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                 {/* Image or Letter Avatar */}
                                 {hasImage ? (
                                     <div className="w-full h-44 relative" style={{ marginTop: '2rem' }}>
-                                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`})` }} />
+                                        <img 
+                                            src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`} 
+                                            alt={module.name1 + ' image'} 
+                                            className="object-cover w-full h-full" 
+                                            loading="lazy"
+                                            onError={(e) => {
+                                                // Try alternative URL if first fails
+                                                const currentSrc = e.currentTarget.src;
+                                                if (!currentSrc.includes('lms.noveloffice.in')) {
+                                                    e.currentTarget.src = module.image.startsWith('http') ? module.image : `https://lms.noveloffice.in${module.image}`;
+                                                }
+                                            }}
+                                        />
                                         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/60" />
                                     </div>
                                 ) : (
@@ -636,7 +762,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                         <PaginationItem>
                             <PaginationNext 
                                 onClick={() => setPage(page + 1)}
-                                className={page >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                                className={(page >= Math.max(1, Math.ceil(filteredModules.length / itemsPerPage))) ? 'pointer-events-none opacity-50' : ''}
                                 aria-label="Next page"
                             />
                         </PaginationItem>

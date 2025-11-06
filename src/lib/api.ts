@@ -8,7 +8,7 @@ import { LMS_API_BASE_URL } from "../config/routes";
 
 // API Base URL
 const API_BASE = process.env.NODE_ENV === 'production' 
-  ? "https://lms.noveloffice.in" 
+  ? "https://lms.noveloffice.org" 
   : LMS_API_BASE_URL;
 
 // Types

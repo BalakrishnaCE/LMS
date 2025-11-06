@@ -133,6 +133,7 @@ export default function AnalyticsDashboard() {
   const [showQaDetailsModal, setShowQaDetailsModal] = useState(false);
   const [qaDetailsData, setQaDetailsData] = useState<any>(null);
   const [loadingQaDetails, setLoadingQaDetails] = useState(false);
+  const [qaAllotedMarks, setQaAllotedMarks] = useState<number[]>([]);
   const [showAddScoreModal, setShowAddScoreModal] = useState(false);
   const [scoreValue, setScoreValue] = useState('');
   const [loadingAddScore, setLoadingAddScore] = useState(false);
@@ -1089,6 +1090,76 @@ export default function AnalyticsDashboard() {
     }
   };
 
+  // Initialize per-question allotted marks when QA details load
+  React.useEffect(() => {
+    if (qaDetailsData?.question_answer_responses) {
+      const marks = qaDetailsData.question_answer_responses.map((r: any) => Number(r.alloted_marks ?? r.marks ?? 0));
+      setQaAllotedMarks(marks);
+    } else {
+      setQaAllotedMarks([]);
+    }
+  }, [qaDetailsData]);
+
+  const handleAllotedChange = (index: number, value: string, maxScore: number = 0) => {
+    const num = value === '' ? 0 : Number(value);
+    // Constrain the value between 0 and maxScore (question_score)
+    if (!isNaN(num)) {
+      const constrainedValue = Math.max(0, Math.min(num, maxScore));
+      setQaAllotedMarks(prev => prev.map((v: number, i: number) => (i === index ? constrainedValue : v)));
+    }
+  };
+  
+  const handleSaveAllotedScores = async () => {
+    if (!qaDetailsData) return;
+    
+    // Validate: Check each allotted mark doesn't exceed its question_score
+    if (qaDetailsData.question_answer_responses) {
+      for (let i = 0; i < qaDetailsData.question_answer_responses.length; i++) {
+        const allotted = qaAllotedMarks[i] ?? 0;
+        const questionScore = qaDetailsData.question_answer_responses[i]?.question_score ?? 0;
+        if (allotted > questionScore) {
+          toast.error(`Allotted score (${allotted}) cannot exceed Q. Score (${questionScore}) for question ${i + 1}`);
+          return;
+        }
+      }
+    }
+    
+    // Validate: Check total doesn't exceed max_score
+    const total = qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0);
+    const maxScore = qaDetailsData.max_score ?? 0;
+    if (total > maxScore) {
+      toast.error(`Total score (${total}) cannot exceed maximum score (${maxScore})`);
+      return;
+    }
+    
+    try {
+      const params = new URLSearchParams({
+        name: qaDetailsData.name,
+        user: qaDetailsData.user,
+        qa_id: qaDetailsData.name,
+        score: String(total),
+        response_marks: JSON.stringify(qaAllotedMarks)
+      });
+      const response = await fetch(`${LMS_API_BASE_URL}api/method/novel_lms.novel_lms.api.analytics.updateQAScore?${params.toString()}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await response.json();
+      const isSuccess = data.message?.message?.success || data.message?.success || data.success;
+      if (isSuccess) {
+        fetchQaDetails(qaDetailsData.name);
+        fetchQaAnalytics();
+        toast.success('Scores saved successfully');
+      } else {
+        const errorMsg = data.message?.error || data.message?.message || 'Failed to save scores';
+        toast.error(errorMsg);
+      }
+    } catch (e) {
+      console.error('Save scores error', e);
+      toast.error('Failed to save scores');
+    }
+  };
+
   const exportQaToPDF = async () => {
     if (!qaDetailsData) return;
     
@@ -1129,12 +1200,13 @@ export default function AnalyticsDashboard() {
       const tableData = qaDetailsData.question_answer_responses?.map((qa: any) => [
         (qa.question || 'N/A').replace(/<[^>]*>/g, ''), // Strip HTML tags
         (qa.answer || 'N/A').replace(/<[^>]*>/g, ''), // Strip HTML tags
-        (qa.suggested_answer || 'N/A').replace(/<[^>]*>/g, '') // Strip HTML tags
+        (qa.alloted_marks ?? qa.marks ?? 0).toString(), // Allotted Marks
+        (qa.question_score ?? 0).toString() // Question Score
       ]) || [];
       
       // Add table using autoTable
       autoTable(doc, {
-        head: [['Question', 'Answer', 'Suggested Answer']],
+        head: [['Question', 'Answer', 'Allotted Marks', 'Question Score']],
         body: tableData,
         startY: yPosition,
         styles: { 
@@ -1148,9 +1220,10 @@ export default function AnalyticsDashboard() {
           fontStyle: 'bold'
         },
         columnStyles: {
-          0: { cellWidth: 60, halign: 'left' }, // Question column
-          1: { cellWidth: 60, halign: 'left' }, // Answer column
-          2: { cellWidth: 60, halign: 'left' }  // Suggested Answer column
+          0: { cellWidth: 50, halign: 'left' }, // Question column
+          1: { cellWidth: 50, halign: 'left' }, // Answer column
+          2: { cellWidth: 35, halign: 'center' }, // Allotted Marks column
+          3: { cellWidth: 35, halign: 'center' }  // Question Score column
         },
         didDrawPage: (data: any) => {
           // Add page numbers
@@ -3206,6 +3279,8 @@ export default function AnalyticsDashboard() {
                                   <th className="text-left p-3 font-medium text-sm text-muted-foreground">Question</th>
                                   <th className="text-left p-3 font-medium text-sm text-muted-foreground">Answer</th>
                                   <th className="text-left p-3 font-medium text-sm text-muted-foreground">Suggested Answer</th>
+                                  <th className="text-left p-3 font-medium text-sm text-muted-foreground">Alloted</th>
+                                  <th className="text-left p-3 font-medium text-sm text-muted-foreground">Q. Score</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -3235,6 +3310,17 @@ export default function AnalyticsDashboard() {
                                         {response.suggested_answer?.replace(/<[^>]*>/g, '') || 'N/A'}
                                       </div>
                                     </td>
+                                    <td className="p-3 text-sm w-28">
+                                      <Input
+                                        type="number"
+                                        value={qaAllotedMarks[index] ?? 0}
+                                        onChange={(e) => handleAllotedChange(index, e.target.value, response.question_score ?? 0)}
+                                        className="h-8"
+                                        min={0}
+                                        max={response.question_score ?? 0}
+                                      />
+                                    </td>
+                                    <td className="p-3 text-sm">{response.question_score ?? 0}</td>
                                   </tr>
                                 )) || (
                                   <tr className="border-b hover:bg-muted/30">
@@ -3262,10 +3348,29 @@ export default function AnalyticsDashboard() {
                                         {qaDetailsData.question_answer?.suggested_answer?.replace(/<[^>]*>/g, '') || 'N/A'}
                                       </div>
                                     </td>
+                                    <td className="p-3 text-sm w-28">
+                                      <Input 
+                                        type="number" 
+                                        value={qaAllotedMarks[0] ?? 0} 
+                                        onChange={(e)=>handleAllotedChange(0, e.target.value, qaDetailsData.question_answer?.question_score ?? 0)} 
+                                        className="h-8" 
+                                        min={0}
+                                        max={qaDetailsData.question_answer?.question_score ?? 0}
+                                      />
+                                    </td>
+                                    <td className="p-3 text-sm">{qaDetailsData.question_answer?.question_score ?? 0}</td>
                                   </tr>
                                 )}
+                                <tr className="border-t-2 font-semibold bg-muted/30">
+                                  <td className="p-3 text-sm font-medium" colSpan={3}>Total</td>
+                                  <td className="p-3 text-sm font-medium">{qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0)}</td>
+                                  <td className="p-3 text-sm text-right pr-4">Max: {qaDetailsData.max_score ?? 0}</td>
+                                </tr>
                               </tbody>
                             </table>
+                          </div>
+                          <div className="flex justify-end mt-3">
+                            <Button onClick={handleSaveAllotedScores}>Save Scores</Button>
                           </div>
                         </div>
                       </div>

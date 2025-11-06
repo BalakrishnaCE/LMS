@@ -1,6 +1,4 @@
-import React from "react";
 import { motion } from "framer-motion";
-import { useFrappeGetDoc } from "frappe-react-sdk";
 import { cn } from "@/lib/utils";
 import Quiz from "@/pages/Modules/Contents/Quiz";
 import QuestionAnswer from "@/pages/Modules/Contents/QuestionAnswer";
@@ -81,14 +79,73 @@ interface ContentRendererProps {
   contentType: string;
   contentReference: string;
   moduleId?: string;
+  contentData?: any; // Pre-fetched content data
+  isParentLoading?: boolean; // NEW: Track if parent is still loading
 }
 
-export function ContentRenderer({ contentType, contentReference, moduleId }: ContentRendererProps) {
-  const { data: content, error, isValidating } = useFrappeGetDoc(contentType, contentReference);
+// Dedicated component props interface
+interface DedicatedComponentProps {
+  contentType: string;
+  contentReference: string;
+  moduleId?: string;
+  contentData?: any;
+}
 
-  if (isValidating) return <div>Loading content...</div>;
-  if (error) return <div>Error loading content</div>;
-  if (!content) return null;
+// Component for content types that need API fetching
+function FetchableContent({ 
+  contentType, 
+  content, 
+  error, 
+  isValidating 
+}: { 
+  contentType: string; 
+  content: any; 
+  error: any; 
+  isValidating: boolean;
+}) {
+  console.log('🔹 FetchableContent state:', {
+    contentType,
+    isValidating,
+    hasContent: !!content,
+    hasError: !!error,
+    errorDetails: error
+  });
+  
+  if (isValidating) {
+    console.log('⏳ FetchableContent: Still loading...');
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    console.log('❌ FetchableContent: Error state -', {
+      errorMessage: error?.message,
+      errorStack: error?.stack,
+      errorType: error?.exc_type
+    });
+    
+    // For 404 errors (content not found), hide silently
+    if (error?.exc_type === 'DoesNotExistError' || error?.httpStatus === 404) {
+      console.log('🔇 FetchableContent: Silently ignoring 404 error (content not found)');
+      return null;
+    }
+    
+    return (
+      <div className="text-red-500 p-4 text-center">
+        Content temporarily unavailable
+      </div>
+    );
+  }
+  
+  if (!content) {
+    console.log('⚠️ FetchableContent: No content data');
+    return null;
+  }
+  
+  console.log('✅ FetchableContent: Rendering content');
 
   const renderContent = () => {
     switch (contentType) {
@@ -140,12 +197,6 @@ export function ContentRenderer({ contentType, contentReference, moduleId }: Con
             />
           </motion.div>
         );
-      case "Quiz":
-        return <Quiz quizReference={contentReference} moduleId={moduleId} />;
-      case "Slide Content":
-        return <SlideContent slideContentId={contentReference} />;
-      case "Question Answer":
-        return <QuestionAnswer questionAnswerId={contentReference} moduleId={moduleId} />;
       case "Steps":
         return <StepsContent content={content} />;
       case "Check List":
@@ -185,5 +236,139 @@ export function ContentRenderer({ contentType, contentReference, moduleId }: Con
       {renderContent()}
     </motion.div>
     </div>
+  );
+}
+
+// Separate components to avoid conditional hook usage
+function DedicatedComponentRenderer({ 
+  contentType, 
+  contentReference, 
+  moduleId,
+  contentData
+}: DedicatedComponentProps) {
+  // Debug logging for render tracking
+  console.log('🎨 DedicatedComponentRenderer render:', {
+    contentType,
+    contentReference,
+    hasContentData: !!contentData,
+    timestamp: new Date().toISOString()
+  });
+  
+  switch (contentType) {
+    case "Quiz":
+      return <Quiz quizReference={contentReference} moduleId={moduleId} contentData={contentData} />;
+    case "Question Answer":
+      return <QuestionAnswer questionAnswerId={contentReference} moduleId={moduleId} contentData={contentData} />;
+    case "Slide Content":
+      return <SlideContent slideContentId={contentReference} contentData={contentData} />;
+    default:
+      return <div>Unsupported content type: {contentType}</div>;
+  }
+}
+
+function FetchableComponentRenderer({ 
+  contentType, 
+  contentReference,
+  contentData,
+  isParentLoading
+}: { 
+  contentType: string; 
+  contentReference: string;
+  contentData?: any;
+  isParentLoading?: boolean;
+}) {
+  console.log('🎨 FetchableComponentRenderer render:', {
+    contentType,
+    contentReference,
+    hasContentData: !!contentData,
+    isParentLoading
+  });
+  
+  // CRITICAL FIX: Wait for parent to finish loading before attempting to fetch
+  // If parent is still loading and we don't have contentData yet, show loading state
+  if (isParentLoading && !contentData) {
+    console.log('⏳ Parent still loading, waiting...');
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  // CRITICAL FIX: Never make API calls - only use pre-fetched contentData
+  // If content data is provided, use it directly
+  if (contentData) {
+    console.log('✅ Using pre-fetched content data');
+    return (
+      <FetchableContent 
+        contentType={contentType}
+        content={contentData}
+        error={null}
+        isValidating={false}
+      />
+    );
+  }
+  
+  // If no contentData is provided, it means the backend didn't return it
+  // This could be a missing/deleted content - silently handle it
+  console.log('⚠️ No content data provided for:', contentType, contentReference);
+  return null;
+}
+
+// Main ContentRenderer component
+export function ContentRenderer({ 
+  contentType, 
+  contentReference, 
+  moduleId, 
+  contentData,
+  isParentLoading = false 
+}: ContentRendererProps) {
+  // Content types that have their own components and don't need to be fetched
+  const hasDedicatedComponent = ["Quiz", "Question Answer", "Slide Content"].includes(contentType);
+  
+  console.log('🎨 ContentRenderer render:', {
+    contentType,
+    contentReference,
+    hasDedicatedComponent,
+    hasContentData: !!contentData,
+    isParentLoading
+  });
+  
+  // CRITICAL FIX: Don't render anything if we don't have a contentReference yet
+  if (!contentReference) {
+    console.log('⚠️ ContentRenderer: No contentReference, showing loading state');
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  // CRITICAL FIX: Don't render anything if contentData is null (content doesn't exist in backend)
+  if (contentData === null) {
+    console.log('⚠️ ContentRenderer: contentData is null, content does not exist, hiding component');
+    return null;
+  }
+
+  // For content types with dedicated components, render them without calling useFrappeGetDoc
+  if (hasDedicatedComponent) {
+    return (
+      <DedicatedComponentRenderer 
+        contentType={contentType}
+        contentReference={contentReference}
+        moduleId={moduleId}
+        contentData={contentData}
+      />
+    );
+  }
+
+  // For other content types, fetch and render
+  return (
+    <FetchableComponentRenderer
+      contentType={contentType}
+      contentReference={contentReference}
+      contentData={contentData}
+      isParentLoading={isParentLoading}
+    />
   );
 } 
