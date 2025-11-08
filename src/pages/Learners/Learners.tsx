@@ -457,21 +457,13 @@ export default function Learners() {
     setIsValidating(true);
     setError(null);
     try {
-      // console.log("=== FETCHING LEARNER DATA ===");
-      // console.log("API URL: /api/method/novel_lms.novel_lms.api.departments.get_learners_data");
+      
       
       const response = await api.getLearnersData();
-      // console.log("=== API RESPONSE ===");
-      // console.log("Full response:", response);
-      // console.log("Response type:", typeof response);
-      // console.log("Has message:", !!response.message);
+      
       
       if (response.message) {
-        // console.log("Message keys:", Object.keys(response.message));
-        // console.log("Users count:", response.message.users?.length || 0);
-        // console.log("Users data:", response.message.users);
-        // console.log("Stats:", response.message.users_stats);
-        // console.log("Departments:", response.message.departments?.length || 0);
+        
       }
       
       setAnalyticsData(response);
@@ -528,12 +520,10 @@ export default function Learners() {
   
   // Transform LearnersData to expected format
   const transformedData = React.useMemo(() => {
-    // console.log("=== TRANSFORMING DATA ===");
-    // console.log("Message exists:", !!message);
-    // console.log("Message:", message);
+    
     
     if (!message) {
-      // console.log("No message, returning empty data");
+      
       return { users: [], stats: null };
     }
     
@@ -542,22 +532,13 @@ export default function Learners() {
     const learnerStats = message.learner_analytics || [];
     const stats = message.users_stats || {};
     
-    // console.log("=== RAW DATA ===");
-    // console.log("Users array:", users);
-    // console.log("Users length:", users.length);
-    // console.log("Learner stats:", learnerStats);
-    // console.log("Stats:", stats);
-    // console.log("Message keys:", Object.keys(message));
+    
     
     // Debug: Log if no users found
     if (users.length === 0) {
-      // console.log("❌ NO USERS FOUND - This is the problem!");
-      // console.log("Possible causes:");
-      // console.log("1. No users with LMS roles in the system");
-      // console.log("2. LMS Users single doctype is empty");
-      // console.log("3. API is not returning users data");
+      
     } else {
-      // console.log("✅ Users found:", users.length);
+    
     }
     
     // Transform users to match frontend expectations
@@ -617,15 +598,7 @@ export default function Learners() {
   const users = transformedData.users;
   const stats = transformedData.stats;
   
-  // Log on every update for more accurate debugging (commented out for performance)
-  // React.useEffect(() => {
-  //   console.log('Learner stats (effect):', stats);
-  //   console.log('Learner users (effect):', users);
-  //   console.log('Total users fetched:', users.length);
-  //   if (stats && users && typeof stats.total === 'number' && stats.total !== users.length) {
-  //     console.warn('Mismatch: stats.total does not match users.length', stats.total, users.length);
-  //   }
-  // }, [stats?.total, users?.length]); // Only depend on specific values, not entire objects
+  
   
   const allDepartmentOptions = allDepartmentsData || [];
   const departmentIdToName = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map((dep: any) => [dep.name, dep.department])), [allDepartmentOptions]);

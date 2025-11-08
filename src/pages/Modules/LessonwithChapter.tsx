@@ -469,20 +469,7 @@ function ChapterWithContents({ moduleId, chapterData }: { moduleId?: string; cha
   if (error) return <div>Error loading chapter</div>;
   if (!chapter) return null;
 
-  // Log the chapter structure
-  console.log('📖 ChapterWithContents received chapter:', {
-    name: chapter.name,
-    title: chapter.title,
-    contentsCount: chapter.contents?.length || 0,
-    firstContentStructure: chapter.contents?.[0] ? {
-      name: chapter.contents[0].name,
-      contentType: chapter.contents[0].content_type,
-      hasContentReference: !!chapter.contents[0].content_reference,
-      contentReference: chapter.contents[0].content_reference,
-      hasData: !!chapter.contents[0].data,
-      keys: Object.keys(chapter.contents[0])
-    } : null
-  });
+  
 
   // Filter out invalid content and sort properly
   const sortedContents = (chapter.contents || [])
@@ -509,14 +496,14 @@ function ChapterWithContents({ moduleId, chapterData }: { moduleId?: string; cha
       <div className="space-y-8">
         <AnimatePresence>
           {sortedContents.map((content: any, index: number) => {
-            console.log('📄 LessonWithChapters rendering content:', {
-              name: content.name,
-              contentType: content.content_type,
-              contentReference: content.content_reference,
-              hasData: !!content.data,
-              dataKeys: content.data ? Object.keys(content.data) : [],
-              willUsePreFetched: !!content.data
-            });
+            // console.log('📄 LessonWithChapters rendering content:', {
+            //   name: content.name,
+            //   contentType: content.content_type,
+            //   contentReference: content.content_reference,
+            //   hasData: !!content.data,
+            //   dataKeys: content.data ? Object.keys(content.data) : [],
+            //   willUsePreFetched: !!content.data
+            // });
             return (
               <motion.div
                 key={content.content_reference}

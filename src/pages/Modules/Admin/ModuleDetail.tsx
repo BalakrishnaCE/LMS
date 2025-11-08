@@ -220,23 +220,9 @@ export default function AdminModuleDetail() {
                                         {currentChapter.contents.map((content, idx) => {
                                             // Debug the actual content structure
                                             if (idx === 0) {
-                                                console.log('🔍 FIRST CONTENT OBJECT DETAILED INSPECTION:', {
-                                                    content,
-                                                    allKeys: Object.keys(content),
-                                                    hasContent_reference: 'content_reference' in content,
-                                                    content_reference_value: content.content_reference,
-                                                    name: content.name,
-                                                    contentType: content.content_type,
-                                                    hasData: !!content.data
-                                                });
+                                                
                                             }
-                                            console.log('📄 Rendering content:', {
-                                                name: content.name,
-                                                contentType: content.content_type,
-                                                contentReference: content.content_reference,
-                                                hasData: !!content.data,
-                                                dataKeys: content.data ? Object.keys(content.data) : []
-                                            });
+                                            
                                             return (
                                                 <ContentRenderer
                                                     key={content.name}

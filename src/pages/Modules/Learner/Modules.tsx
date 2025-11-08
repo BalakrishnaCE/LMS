@@ -62,12 +62,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
     // Note: offset not needed for dashboard API as it returns all modules
 
     // Debug logging for user and API parameters
-    console.log('User object:', user);
-    console.log('User email:', user?.email);
-    console.log('API call parameters:', {
-        user: user?.email,
-    });
-
+    
     // Client-side pagination; no offset needed for API when fetching all
 
     // Fetch modules using the working API (has proper structure generation)
@@ -233,8 +228,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
     // Auto-retry on error (max 3 times)
     React.useEffect(() => {
         if (error) {
-            console.log('API Error:', error);
-            console.log('Error details:', JSON.stringify(error, null, 2));
+            
         }
         if (error && retryCount < 3) {
             const timer = setTimeout(() => {

@@ -58,8 +58,8 @@ function AdminQuizPreview({
   // Use quiz data directly - no need for additional API calls
   const questions = quiz.questions || [];
   
-  console.log('🔍 Admin Preview - Quiz data:', quiz);
-  console.log('🔍 Admin Preview - Questions:', questions);
+  // console.log('🔍 Admin Preview - Quiz data:', quiz);
+  // console.log('🔍 Admin Preview - Questions:', questions);
 
   if (!questions || questions.length === 0) {
     return (
@@ -125,7 +125,7 @@ function QuizDialog({
   // Ensure quiz has a name - use quizReference if missing
   if (!quiz.name && quizReference) {
     quiz.name = quizReference;
-    console.log('✅ Added missing name field in QuizDialog:', quizReference);
+    // console.log('✅ Added missing name field in QuizDialog:', quizReference);
   }
   const { currentUser } = useFrappeAuth();
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
@@ -225,19 +225,19 @@ function QuizDialog({
       // Format answers for the API
       const formattedAnswers: { [key: string]: { marked_ans: string; correct_ans: string } } = {};
       
-      console.log('Quiz questions:', quiz?.questions);
-      console.log('User answers:', answers);
+      // console.log('Quiz questions:', quiz?.questions);
+      // console.log('User answers:', answers);
       
       if (quiz?.questions) {
         quiz.questions.forEach(question => {
-          console.log('Processing question:', question.name, 'User answer:', answers[question.name]);
+          // console.log('Processing question:', question.name, 'User answer:', answers[question.name]);
           const userAnswer = answers[question.name];
           if (userAnswer && question.options) {
             const selectedOption = question.options.find(opt => opt.option_text === userAnswer);
             const correctOption = question.options.find(opt => opt.correct);
             
-            console.log('Selected option:', selectedOption);
-            console.log('Correct option:', correctOption);
+            // console.log('Selected option:', selectedOption);
+            // console.log('Correct option:', correctOption);
             
             formattedAnswers[question.name] = {
               marked_ans: userAnswer,
@@ -247,16 +247,16 @@ function QuizDialog({
         });
       }
       
-      console.log('Formatted answers for API:', formattedAnswers);
-      console.log('Quiz object:', quiz);
-      console.log('Quiz object keys:', quiz ? Object.keys(quiz) : 'quiz is null');
-      console.log('Quiz name/id:', quiz?.name);
-      console.log('Quiz ID alternatives:', {
-        name: quiz?.name,
-        id: (quiz as any)?.id,
-        quiz_id: (quiz as any)?.quiz_id,
-        _name: (quiz as any)?._name
-      });
+      // console.log('Formatted answers for API:', formattedAnswers);
+      // console.log('Quiz object:', quiz);
+      // console.log('Quiz object keys:', quiz ? Object.keys(quiz) : 'quiz is null');
+      // console.log('Quiz name/id:', quiz?.name);
+      // console.log('Quiz ID alternatives:', {
+      //   name: quiz?.name,
+      //   id: (quiz as any)?.id,
+      //   quiz_id: (quiz as any)?.quiz_id,
+      //   _name: (quiz as any)?._name
+      // });
       
       // Get quiz_id - try multiple possible property names
       const quizId = quiz?.name || (quiz as any)?.id || (quiz as any)?.quiz_id || (quiz as any)?._name;
@@ -275,15 +275,15 @@ function QuizDialog({
         module: moduleId
       };
       
-      console.log('Calling API with payload:', { 
-        quiz_id: apiPayload.quiz_id, 
-        answers_count: Object.keys(apiPayload.answers).length,
-        module: apiPayload.module 
-      });
+      // console.log('Calling API with payload:', { 
+      //   quiz_id: apiPayload.quiz_id, 
+      //   answers_count: Object.keys(apiPayload.answers).length,
+      //   module: apiPayload.module 
+      // });
       
       await updateQuizProgress(apiPayload);
       
-      console.log('Quiz progress saved to DocType successfully');
+      // console.log('Quiz progress saved to DocType successfully');
     } catch (error) {
       console.error('Failed to save quiz progress to DocType:', error);
       // Still show the score even if saving fails
@@ -298,8 +298,8 @@ function QuizDialog({
   };
 
   // Debug logging
-  console.log('QuizDialog - Quiz data:', quiz);
-  console.log('QuizDialog - Questions:', quiz?.questions);
+  // console.log('QuizDialog - Quiz data:', quiz);
+  // console.log('QuizDialog - Questions:', quiz?.questions);
 
   // Check if quiz has already been attempted - DocType first, then localStorage
   useEffect(() => {
@@ -346,7 +346,7 @@ function QuizDialog({
 
   // Safety checks
   if (!quiz || !quiz.questions || quiz.questions.length === 0) {
-    console.log('QuizDialog - No questions available');
+    // console.log('QuizDialog - No questions available');
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -583,7 +583,7 @@ export default function Quiz({
         quizData.name = quizId;
       }
       
-      console.log('Fetching quiz questions for:', quizId);
+      // console.log('Fetching quiz questions for:', quizId);
       const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.content_access.get_content_with_permissions`, {
         method: 'POST',
         headers: {
@@ -600,7 +600,7 @@ export default function Quiz({
       }
       
       const data = await response.json();
-      console.log('Quiz questions API response:', data);
+      // console.log('Quiz questions API response:', data);
       
       let questionsData = null;
       
@@ -615,17 +615,17 @@ export default function Quiz({
         questionsData = data.data;
       }
       
-      console.log('Processed questions data:', questionsData);
+      // console.log('Processed questions data:', questionsData);
       
       if (questionsData && questionsData.questions) {
         // Ensure name field exists
         if (!questionsData.name && quizData.name) {
           questionsData.name = quizData.name;
         }
-        console.log('Setting quiz with full questions data');
+        // console.log('Setting quiz with full questions data');
         setQuiz(questionsData);
       } else {
-        console.log('No questions data found, using original data');
+        // console.log('No questions data found, using original data');
         setQuiz(quizData); // Fallback to original data
       }
     } catch (error) {
@@ -637,9 +637,9 @@ export default function Quiz({
   useEffect(() => {
     // CRITICAL FIX: If contentData is provided, use it without making API calls
     if (contentData !== undefined) {
-      console.log('✅ Using pre-fetched contentData from parent');
+      // console.log('✅ Using pre-fetched contentData from parent');
       if (contentData === null) {
-        console.log('⚠️ Content not found in backend, hiding component');
+        // console.log('⚠️ Content not found in backend, hiding component');
         setQuizLoading(false);
         return;
       }
@@ -648,19 +648,19 @@ export default function Quiz({
       const quizId = contentReference || quizReference;
       if (!contentData.name && quizId) {
         contentData.name = quizId;
-        console.log('✅ Added missing name field to contentData:', quizId);
+        // console.log('✅ Added missing name field to contentData:', quizId);
       }
       
-      console.log('Content questions structure:', contentData.questions?.[0]);
-      console.log('Has quiz_question field:', !!contentData.questions?.[0]?.quiz_question);
-      console.log('Has question_text field:', !!contentData.questions?.[0]?.question_text);
+      // console.log('Content questions structure:', contentData.questions?.[0]);
+      // console.log('Has quiz_question field:', !!contentData.questions?.[0]?.quiz_question);
+      // console.log('Has question_text field:', !!contentData.questions?.[0]?.question_text);
       
       // Check if content has complete question data
       if (contentData.questions && contentData.questions.length > 0 && contentData.questions[0].quiz_question && !contentData.questions[0].question_text) {
-        console.log('Content has incomplete questions, fetching full data');
+        // console.log('Content has incomplete questions, fetching full data');
         fetchQuizQuestions(contentData);
       } else {
-        console.log('Content has complete questions, using directly');
+        // console.log('Content has complete questions, using directly');
         setQuiz(contentData);
       }
       setQuizLoading(false);
@@ -673,7 +673,7 @@ export default function Quiz({
       const quizId = contentReference || quizReference;
       if (!content.name && quizId) {
         content.name = quizId;
-        console.log('✅ Added missing name field to content:', quizId);
+        // console.log('✅ Added missing name field to content:', quizId);
       }
       
       if (!content.name) {
@@ -683,17 +683,17 @@ export default function Quiz({
         return;
       }
       
-      console.log('Content provided directly:', content);
-      console.log('Content questions structure:', content.questions?.[0]);
-      console.log('Has quiz_question field:', !!content.questions?.[0]?.quiz_question);
-      console.log('Has question_text field:', !!contentData.questions?.[0]?.question_text);
+      // console.log('Content provided directly:', content);
+      // console.log('Content questions structure:', content.questions?.[0]);
+      // console.log('Has quiz_question field:', !!content.questions?.[0]?.quiz_question);
+      // console.log('Has question_text field:', !!contentData.questions?.[0]?.question_text);
       
       // Check if content has complete question data
       if (content.questions && content.questions.length > 0 && content.questions[0].quiz_question && !content.questions[0].question_text) {
-        console.log('Content has incomplete questions, fetching full data');
+        // console.log('Content has incomplete questions, fetching full data');
         fetchQuizQuestions(content);
       } else {
-        console.log('Content has complete questions, using directly');
+        // console.log('Content has complete questions, using directly');
         setQuiz(content);
       }
       setQuizLoading(false);
@@ -726,10 +726,10 @@ export default function Quiz({
         const data = await response.json();
         
         // Enhanced logging to diagnose response structure
-        console.log('🔍 RAW API RESPONSE:', JSON.stringify(data, null, 2));
-        console.log('🔍 Response keys:', Object.keys(data));
-        console.log('🔍 Has message:', !!data.message);
-        console.log('🔍 Message keys:', data.message ? Object.keys(data.message) : []);
+        // console.log('🔍 RAW API RESPONSE:', JSON.stringify(data, null, 2));
+        // console.log('🔍 Response keys:', Object.keys(data));
+        // console.log('🔍 Has message:', !!data.message);
+        // console.log('🔍 Message keys:', data.message ? Object.keys(data.message) : []);
         
         // Handle different response structures
         let quizData = null;
@@ -737,57 +737,57 @@ export default function Quiz({
         // Check if it's the custom API response structure
         if (data.message?.success && data.message?.data) {
           quizData = data.message.data;
-          console.log('✅ Matched structure: data.message.success && data.message.data');
+          // console.log('✅ Matched structure: data.message.success && data.message.data');
         }
         // Check if it's a direct Frappe resource API response
         else if (data.data && data.data.name) {
           quizData = data.data;
-          console.log('✅ Matched structure: data.data with name');
+          // console.log('✅ Matched structure: data.data with name');
         }
         // Check if it's a nested message structure
         else if (data.message?.message?.success && data.message?.message?.data) {
           quizData = data.message.message.data;
-          console.log('✅ Matched structure: nested message.message.data');
+          // console.log('✅ Matched structure: nested message.message.data');
         }
         // Fallback to direct data
         else if (data.success && data.data) {
           quizData = data.data;
-          console.log('✅ Matched structure: data.success && data.data');
+          // console.log('✅ Matched structure: data.success && data.data');
         }
         // NEW: Check for direct message.data (admin API structure)
         else if (data.message && data.message.name && data.message.questions) {
           quizData = data.message;
-          console.log('✅ Matched structure: direct message with name and questions');
+          // console.log('✅ Matched structure: direct message with name and questions');
         }
         // NEW: Check for wrapped message structure
         else if (data.message?.data?.name && data.message?.data?.questions) {
           quizData = data.message.data;
-          console.log('✅ Matched structure: message.data with name and questions');
+          // console.log('✅ Matched structure: message.data with name and questions');
         }
         // NEW: Fallback to message itself if it has quiz properties
         else if (data.message && typeof data.message === 'object' && data.message.name) {
           quizData = data.message;
-          console.log('✅ Matched structure: message as object with name');
+          // console.log('✅ Matched structure: message as object with name');
         }
         
         if (quizData) {
-          console.log('Quiz data received:', quizData);
-          console.log('First question structure:', quizData.questions?.[0]);
-          console.log('Has quiz_question field:', !!quizData.questions?.[0]?.quiz_question);
-          console.log('Has question_text field:', !!quizData.questions?.[0]?.question_text);
+          // console.log('Quiz data received:', quizData);
+          // console.log('First question structure:', quizData.questions?.[0]);
+          // console.log('Has quiz_question field:', !!quizData.questions?.[0]?.quiz_question);
+          // console.log('Has question_text field:', !!quizData.questions?.[0]?.question_text);
           
           // Ensure name field exists from reference
           if (!quizData.name) {
             quizData.name = ref;
-            console.log('✅ Added missing name field to quizData:', ref);
+            // console.log('✅ Added missing name field to quizData:', ref);
           }
           
           // If questions don't have full data (only quiz_question references), fetch them separately
           if (quizData.questions && quizData.questions.length > 0 && quizData.questions[0].quiz_question && !quizData.questions[0].question_text) {
-            console.log('Quiz questions need to be fetched separately - only references found');
+            // console.log('Quiz questions need to be fetched separately - only references found');
             await fetchQuizQuestions(quizData);
           } else {
-            console.log('Quiz data is complete, setting directly');
+            // console.log('Quiz data is complete, setting directly');
             setQuiz(quizData);
           }
         } else {

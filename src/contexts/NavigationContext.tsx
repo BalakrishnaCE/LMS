@@ -40,12 +40,12 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
   const [lastModulePath, setLastModulePath] = useState<string | null>(null);
 
   const addToHistory = useCallback((path: string, moduleName?: string, searchState?: { query: string; department: string; status: string }) => {
-    console.log('🔍 NavigationContext: addToHistory called with:', { path, moduleName, searchState });
+   
     setNavigationHistory(prev => {
       // Avoid adding duplicate consecutive entries
       const lastEntry = prev[prev.length - 1];
       if (lastEntry && lastEntry.path === path && lastEntry.moduleName === moduleName) {
-        console.log('🔍 NavigationContext: Duplicate entry, skipping');
+        
         return prev;
       }
 
@@ -68,7 +68,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
       // Update last module path if this is a module page or modules list
       if (moduleName && (path.includes('/module/') || path.includes('/modules/learner/') || path.includes('/edit/'))) {
         // Store the full path for navigation
-        console.log('🔍 NavigationContext: Setting lastModulePath to:', path);
+       
         setLastModulePath(path);
       }
       
@@ -77,8 +77,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
   }, []);
 
   const getPreviousModulePath = useCallback((currentContext?: 'admin' | 'learner'): string | null => {
-    console.log('🔍 NavigationContext: getPreviousModulePath called with context:', currentContext);
-    console.log('🔍 NavigationContext: lastModulePath:', lastModulePath);
+    
     
     // If no context specified, return the last module path as before
     if (!currentContext) {
@@ -90,31 +89,30 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
       .filter(item => item.context === currentContext && item.moduleName)
       .sort((a, b) => b.timestamp - a.timestamp);
     
-    console.log('🔍 NavigationContext: All relevant paths:', relevantPaths.map(p => p.path));
+    
     
     // Get the second most recent path (skip the current one)
     const previousPath = relevantPaths[1]?.path;
     
-    console.log('🔍 NavigationContext: Found previous path for context:', previousPath);
+    
     return previousPath || null;
   }, [lastModulePath, navigationHistory]);
 
   const getPreviousSearchState = useCallback((currentContext?: 'admin' | 'learner'): { query: string; department: string; status: string } | null => {
-    console.log('🔍 NavigationContext: getPreviousSearchState called with context:', currentContext);
-    console.log('🔍 NavigationContext: Full navigation history:', navigationHistory);
+   
     
     // Find the most recent entry that matches the current context and has search state
     const relevantEntries = navigationHistory
       .filter(item => item.context === currentContext && item.searchState)
       .sort((a, b) => b.timestamp - a.timestamp);
     
-    console.log('🔍 NavigationContext: All relevant entries with search state:', relevantEntries.map(e => ({ path: e.path, searchState: e.searchState, timestamp: e.timestamp })));
+    
     
     // Get the most recent entry that has search state (not necessarily the second most recent)
     // This will be the modules list with search state
     const previousEntry = relevantEntries[0];
     
-    console.log('🔍 NavigationContext: Found previous search state for context:', previousEntry?.searchState);
+    
     return previousEntry?.searchState || null;
   }, [navigationHistory]);
 

@@ -112,14 +112,7 @@ export default function ModuleDetail() {
             // Debug logging to check content structure
             if (actualData.lessons?.[0]?.chapters?.[0]?.contents?.[0]) {
                 const firstContent = actualData.lessons[0].chapters[0].contents[0];
-                console.log('🔍 ModuleDetail - First content sample:', {
-                    name: firstContent.name,
-                    contentType: firstContent.content_type,
-                    contentReference: firstContent.content_reference,
-                    hasData: !!firstContent.data,
-                    dataKeys: firstContent.data ? Object.keys(firstContent.data) : [],
-                    dataSample: firstContent.data
-                });
+                
             }
             
             setModule(actualData);
@@ -171,15 +164,7 @@ export default function ModuleDetail() {
                 // Debug log to check chapter contents structure
                 if (lesson.chapters?.[0]?.contents?.[0]) {
                     const firstContent = lesson.chapters[0].contents[0];
-                    console.log('🔍 Processing lesson for lessonDetails:', {
-                        lessonName: lesson.name,
-                        chapterCount: lesson.chapters.length,
-                        firstContentName: firstContent.name,
-                        firstContentType: firstContent.content_type,
-                        firstContentRef: firstContent.content_reference,
-                        hasData: !!firstContent.data,
-                        allKeys: Object.keys(firstContent)
-                    });
+                   
                 }
                 
                 // Map the API response structure to what the frontend expects

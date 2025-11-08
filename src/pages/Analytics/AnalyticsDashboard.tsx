@@ -149,7 +149,6 @@ export default function AnalyticsDashboard() {
   
   // Debug: Log learnerDetails changes
   React.useEffect(() => {
-    // console.log('learnerDetails state changed:', learnerDetails);
   }, [learnerDetails]);
   const [loadingLearners, setLoadingLearners] = useState(false);
   
@@ -196,17 +195,7 @@ export default function AnalyticsDashboard() {
   // Separate API call for learners data
   const { data: learnersData, isLoading: learnersLoading, error: learnersError } = useFrappeGetCall<any>("novel_lms.novel_lms.api.analytics.get_learners_analytics_data");
   
-  // Debug: Log learners data
-  console.log('🔍 Analytics Learners: API response:', learnersData);
-  console.log('🔍 Analytics Learners: Loading:', learnersLoading);
-  console.log('🔍 Analytics Learners: Error:', learnersError);
-  console.log('🔍 Analytics Learners: Data structure:', {
-    hasMessage: !!learnersData?.message,
-    hasNestedMessage: !!learnersData?.message?.message,
-    hasLearnerAnalytics: !!learnersData?.message?.message?.learner_analytics,
-    learnerCount: learnersData?.message?.message?.learner_analytics?.length || 0
-  });
-
+  
   // Safely extract data with fallbacks - handle double-nested message structure
   const rawData = (analyticsData as any)?.message?.message || (analyticsData as any)?.message || analyticsData || {};
   
@@ -244,7 +233,7 @@ export default function AnalyticsDashboard() {
     // If we have persisted data and the new data has zero values, use persisted data
     if (persistedData && persistedData.overview && 
         (data.overview.total_learners === 0)) {
-      // console.log('Preventing zero values - using persisted data');
+      
       return persistedData;
     }
     
@@ -253,26 +242,7 @@ export default function AnalyticsDashboard() {
   
   const finalDataWithFallback = preventZeroValues(finalData);
   
-  // Debug: Log the data to see what's being loaded
-  // console.log("=== ANALYTICS DATA DEBUG ===");
-  // console.log("Raw Analytics Data:", rawData);
-  // console.log("Raw Data Keys:", Object.keys(rawData || {}));
-  // console.log("Raw Data Overview:", rawData?.overview);
-  // console.log("Raw Data Module Analytics:", rawData?.module_analytics);
-  // console.log("Persisted Data:", persistedData);
-  // console.log("Persisted Data Keys:", Object.keys(persistedData || {}));
-  // console.log("Safe Data (used for rendering):", safeData);
-  // console.log("Safe Data Keys:", Object.keys(safeData || {}));
-  // console.log("Final Data (used for rendering):", finalData);
-  // console.log("Final Data Keys:", Object.keys(finalData || {}));
-  // console.log("Final Data With Fallback:", finalDataWithFallback);
-  // console.log("Final Data With Fallback Keys:", Object.keys(finalDataWithFallback || {}));
-  // console.log("Module Analytics Count:", finalDataWithFallback?.module_analytics?.length || 0);
-  // console.log("Total Modules from Overview:", finalDataWithFallback?.overview?.total_modules || 0);
-  // console.log("Data Loading:", dataLoading);
-  // console.log("Data Initialized:", dataInitialized);
-  // console.log("Active Tab:", activeTab);
-  // console.log("=== END DEBUG ===");
+  
 
   React.useEffect(() => {
     if (!dataLoading) {
@@ -283,14 +253,14 @@ export default function AnalyticsDashboard() {
   // Persist data when successfully loaded
   React.useEffect(() => {
     if (!dataLoading && rawData && validateAnalyticsData(rawData)) {
-      // console.log('Persisting valid analytics data');
+     
       setPersistedData(rawData);
       setDataInitialized(true);
       
       // Also save to localStorage for persistence across page reloads
       try {
         localStorage.setItem('analytics_persisted_data', JSON.stringify(rawData));
-        // console.log('Saved analytics data to localStorage');
+       
       } catch (error) {
         console.error('Error saving to localStorage:', error);
       }
@@ -300,25 +270,18 @@ export default function AnalyticsDashboard() {
   // Force refresh analytics data when tab changes or data is empty
   React.useEffect(() => {
     if (activeTab === 'modules' && !dataLoading && !validateAnalyticsData(finalDataWithFallback)) {
-      // console.log('Force refreshing analytics data due to invalid/empty data');
+      
       mutate();
     }
   }, [activeTab, dataLoading, finalDataWithFallback, mutate]);
 
   // Handle tab switching with data preservation
   React.useEffect(() => {
-    // console.log('Tab switched to:', activeTab);
-    // console.log('Current data state:', {
-    //   hasData: validateAnalyticsData(finalDataWithFallback),
-    //   dataLoading,
-    //   dataInitialized,
-    //   finalDataKeys: Object.keys(finalDataWithFallback || {}),
-    //   persistedDataKeys: Object.keys(persistedData || {})
-    // });
+    
     
     // Only refresh if we're switching to modules and we don't have valid persisted data
     if (activeTab === 'modules' && !dataLoading && !dataInitialized && !validateAnalyticsData(finalDataWithFallback)) {
-      // console.log('Refreshing data for modules tab - no valid persisted data');
+      
       mutate();
     }
   }, [activeTab, dataLoading, dataInitialized, finalData, mutate]);
@@ -434,7 +397,7 @@ export default function AnalyticsDashboard() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      // console.log('=== EXPORT ANALYTICS DATA ===');
+     
       
       // Get current date for filename
       const currentDate = new Date().toISOString().split('T')[0];
@@ -594,11 +557,10 @@ export default function AnalyticsDashboard() {
   };
 
   const handleRefresh = () => {
-    // console.log('=== REFRESH BUTTON CLICKED ===');
+   
     setIsLoading(true);
     
     // Don't clear persisted data immediately - let the API call complete first
-    // console.log('Starting refresh process...');
     
     // Force refresh the analytics data
     mutate();
@@ -613,28 +575,26 @@ export default function AnalyticsDashboard() {
     
     // Set a timeout to clear persisted data only if the new data is valid
     setTimeout(() => {
-      // console.log('Refresh timeout - checking if new data is valid');
+      
       if (validateAnalyticsData(rawData)) {
-        // console.log('New data is valid, clearing old persisted data');
+       
         setPersistedData(null);
         setDataInitialized(false);
         try {
           localStorage.removeItem('analytics_persisted_data');
-          // console.log('Cleared analytics data from localStorage');
+          
         } catch (error) {
           console.error('Error clearing localStorage:', error);
         }
       } else {
-        // console.log('New data is invalid, keeping persisted data');
+      
       }
       setIsLoading(false);
     }, 2000);
   };
 
   const handleModuleClick = (module: any) => {
-    // console.log('DEBUG: Module clicked:', module);
-    // console.log('DEBUG: Module ID:', module.module_id);
-    // console.log('DEBUG: Module name:', module.module_name);
+    
     setSidebarContent({
       type: 'module',
       data: module
@@ -643,7 +603,7 @@ export default function AnalyticsDashboard() {
   };
 
   const handleLearnerClick = async (learner: any) => {
-    console.log('DEBUG: Learner clicked:', learner);
+    
     setSidebarContent({
       type: 'learner',
       data: learner
@@ -665,7 +625,7 @@ export default function AnalyticsDashboard() {
       if (response.ok) {
         const data = await response.json();
         setLearnerSidebarData(data.message.message);
-        console.log('Learner sidebar data:', data.message.message);
+        
       } else {
         console.error('Failed to fetch learner sidebar details');
         setLearnerSidebarData(null);
@@ -695,7 +655,7 @@ export default function AnalyticsDashboard() {
       }
       
       const data = await response.json();
-      // console.log('Quiz Analytics API Response:', data);
+      
       
       if (data.message && data.message.success) {
         const allData = data.message.data.quiz_progress || [];
@@ -727,7 +687,7 @@ export default function AnalyticsDashboard() {
       }
       
       const data = await response.json();
-      // console.log('Q&A Analytics API Response:', data);
+      
       
       if (data.message && data.message.success) {
         const allData = data.message.data.qa_progress || [];
@@ -843,7 +803,7 @@ export default function AnalyticsDashboard() {
       }
       
       const data = await response.json();
-      // console.log('Quiz Details API Response:', data);
+      
       
       if (data.message && data.message.success) {
         setQuizDetailsData(data.message.data);
@@ -966,15 +926,14 @@ export default function AnalyticsDashboard() {
       }
 
       const data = await response.json();
-      // console.log('Q&A Details API Response:', data);
+      
 
       if (data.message?.success) {
         // Add the record ID to the data for score updates
         const detailsWithId = { ...data.message.data, name: qaProgressId };
         setQaDetailsData(detailsWithId);
         setShowQaDetailsModal(true);
-        // console.log('Q&A Details Data:', detailsWithId);
-        // console.log('Modal should be opening now');
+       
       } else {
         console.error('Q&A Details API Error:', data.message?.error);
         toast.error('Failed to fetch Q&A details');
@@ -1236,8 +1195,7 @@ export default function AnalyticsDashboard() {
       
       // Save the PDF
       doc.save(filename);
-      
-      // console.log(`PDF generated: ${filename}`);
+  
       toast.success('Q&A report downloaded successfully!');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1252,26 +1210,13 @@ export default function AnalyticsDashboard() {
      setSelectedStatus(status);
      
      try {
-       // console.log('=== FETCHING LEARNER DETAILS USING MODULE FLOW API ===');
-       // console.log('Sidebar content:', sidebarContent);
-       // console.log('Module data:', sidebarContent.data);
-       // console.log('Status:', status);
+       
        
        // Get module ID from sidebar content
        const moduleId = sidebarContent.data.module_id || sidebarContent.data.name;
        const moduleName = sidebarContent.data.module_name || sidebarContent.data.name1;
        
-       // Debug: Check what data is available
-       // console.log('Raw sidebar data:', sidebarContent.data);
-       // console.log('module_id field:', sidebarContent.data.module_id);
-       // console.log('name field:', sidebarContent.data.name);
-       // console.log('module_name field:', sidebarContent.data.module_name);
-       // console.log('name1 field:', sidebarContent.data.name1);
-       
-       // console.log('Module ID:', moduleId);
-       // console.log('Module Name:', moduleName);
-       // console.log('Full sidebar data:', sidebarContent.data);
-       // console.log('Available fields:', Object.keys(sidebarContent.data));
+      
        
        // Check if module ID or name is valid
        if (!moduleId && !moduleName) {
@@ -1281,16 +1226,11 @@ export default function AnalyticsDashboard() {
          return;
        }
        
-       // console.log('Proceeding with API call...');
-       // console.log('Module ID:', moduleId);
-       // console.log('Module Name:', moduleName);
+      
        
        // Use the original API directly
        let response = await fetch(`${LMS_API_BASE_URL}api/method/novel_lms.novel_lms.api.analytics.get_module_learners?module_id=${encodeURIComponent(moduleId)}&module_name=${encodeURIComponent(moduleName)}`, { credentials: 'include' });
-       // console.log('API Response:', response);
-       // console.log('API Response Status:', response.status);
-       // console.log('API Response OK:', response.ok);
-       // console.log('API Response URL:', response.url);
+       
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -1299,20 +1239,14 @@ export default function AnalyticsDashboard() {
         console.error('Response URL:', response.url);
         
         // If API fails, show empty array (no static data)
-        // console.log('API failed, showing empty array...');
+      
         setAllLearnerDetails([]);
         setLearnerDetails([]);
         return;
       }
       
       const data = await response.json();
-      // console.log('=== FULL API RESPONSE ===');
-      // console.log('Full API Response:', data);
-      // console.log('API Response structure:', Object.keys(data));
-      // console.log('Message structure:', data.message ? Object.keys(data.message) : 'No message');
-      // console.log('Success:', data.message?.success);
-      // console.log('Learners count:', data.message?.learners?.length);
-      // console.log('Learners data:', data.message?.learners);
+      
        
       // Handle double-nested message structure
       let learners = null;
@@ -1324,34 +1258,22 @@ export default function AnalyticsDashboard() {
         learners = data.message.message.learners;
         success = data.message.message.success;
         moduleInfo = data.message.message.module_info;
-        // console.log('=== USING DOUBLE-NESTED MESSAGE STRUCTURE ===');
+        
       }
       // Check for single-nested structure
       else if (data.message && data.message.learners) {
         learners = data.message.learners;
         success = data.message.success;
         moduleInfo = data.message.module_info;
-        // console.log('=== USING SINGLE-NESTED MESSAGE STRUCTURE ===');
+       
       }
       
       if (success && learners && Array.isArray(learners)) {
-        // console.log('=== FETCHED LEARNERS USING MODULE FLOW API ===');
-        // console.log('Total learners:', learners.length);
-        // console.log('Learners data:', learners);
-        // console.log('Module info:', moduleInfo);
         
-        // Debug: Log the raw learner data structure
-        // console.log('=== RAW LEARNER DATA DEBUG ===');
+        
+        
         learners.forEach((_learner: any, _index: number) => {
-          // console.log(`Raw learner ${index}:`, {
-          //   learner: learner.learner,
-          //   status: learner.status,
-          //   progress: learner.progress,
-          //   score: learner.score,
-          //   started_on: learner.started_on,
-          //   completed_on: learner.completed_on,
-          //   all_keys: Object.keys(learner)
-          // });
+          
         });
         
         // Transform the API response to match frontend expectations
@@ -1360,7 +1282,7 @@ export default function AnalyticsDashboard() {
           let normalizedStatus = 'not_started';
           if (learner.status) {
             const statusLower = learner.status.toLowerCase().replace(/\s+/g, '_');
-            // console.log(`Status normalization: "${learner.status}" -> "${statusLower}"`);
+            
             if (statusLower.includes('completed')) {
               normalizedStatus = 'completed';
             } else if (statusLower.includes('progress')) {
@@ -1368,7 +1290,7 @@ export default function AnalyticsDashboard() {
             } else if (statusLower.includes('started')) {
               normalizedStatus = 'not_started';
             }
-            // console.log(`Final normalized status: "${normalizedStatus}"`);
+            
           }
           
           return {
@@ -1392,22 +1314,11 @@ export default function AnalyticsDashboard() {
           };
         });
         
-        // console.log('Transformed learners:', transformedLearners);
+       
         
         // Debug: Log each learner individually
         transformedLearners.forEach((_learner: any, _index: number) => {
-          // console.log(`Transformed learner ${index}:`, {
-          //   name: learner.learner_name,
-          //   email: learner.email,
-          //   status: learner.status,
-          //   progress: learner.progress,
-          //   score: learner.score,
-          //   avg_progress: learner.avg_progress,
-          //   avg_score: learner.avg_score,
-          //   started_on: learner.started_on,
-          //   completed_on: learner.completed_on,
-          //   all_keys: Object.keys(learner)
-          // });
+          
         });
          
          // Filter learners based on status if not 'total'
@@ -1429,17 +1340,12 @@ export default function AnalyticsDashboard() {
            });
          }
          
-         // console.log(`Filtered learners for status '${status}':`, filteredLearners.length);
-         // console.log('Setting learnerDetails to:', filteredLearners);
+        
          
          // Store the original unfiltered data for count calculations
          setAllLearnerDetails(transformedLearners);
          setLearnerDetails(filteredLearners);
       } else {
-        // console.log('No learners found in API response');
-        // console.log('Response structure:', Object.keys(data));
-        // console.log('Error message:', data.message?.error || 'Unknown error');
-        // console.log('Full response data:', data);
         
         // Show error message to user
         if (data.message?.error) {
@@ -2890,21 +2796,21 @@ export default function AnalyticsDashboard() {
                               </tr>
                                ) : learnerDetails.length > 0 ? (
                                  (() => {
-                                   console.log('=== RENDERING LEARNERS ===');
-                                   console.log('learnerDetails length:', learnerDetails.length);
-                                   console.log('learnerDetails:', learnerDetails);
+                                   // console.log('=== RENDERING LEARNERS ===');
+                                   // console.log('learnerDetails length:', learnerDetails.length);
+                                   // console.log('learnerDetails:', learnerDetails);
                                    return learnerDetails.map((learner: any, index: number) => {
                                      // Debug: Log each learner being rendered
-                                     console.log(`Rendering learner ${index}:`, learner);
-                                     console.log(`Learner name: ${learner.learner_name || learner.full_name || 'N/A'}`);
-                                     console.log(`Learner email: ${learner.email || 'N/A'}`);
-                                     console.log(`Learner department: ${learner.department || 'N/A'}`);
-                                     console.log(`Learner status: ${learner.status || 'N/A'}`);
-                                     console.log(`Learner completion_rate: ${learner.completion_rate || 'N/A'}`);
-                                     console.log(`Learner avg_progress: ${learner.avg_progress || 'N/A'}`);
-                                     console.log(`Learner avg_score: ${learner.avg_score || 'N/A'}`);
-                                     console.log(`Learner started_on: ${learner.started_on || 'N/A'}`);
-                                     console.log(`Learner completed_on: ${learner.completed_on || 'N/A'}`);
+                                     // console.log(`Rendering learner ${index}:`, learner);
+                                     // console.log(`Learner name: ${learner.learner_name || learner.full_name || 'N/A'}`);
+                                     // console.log(`Learner email: ${learner.email || 'N/A'}`);
+                                     // console.log(`Learner department: ${learner.department || 'N/A'}`);
+                                     // console.log(`Learner status: ${learner.status || 'N/A'}`);
+                                     // console.log(`Learner completion_rate: ${learner.completion_rate || 'N/A'}`);
+                                     // console.log(`Learner avg_progress: ${learner.avg_progress || 'N/A'}`);
+                                     // console.log(`Learner avg_score: ${learner.avg_score || 'N/A'}`);
+                                     // console.log(`Learner started_on: ${learner.started_on || 'N/A'}`);
+                                     // console.log(`Learner completed_on: ${learner.completed_on || 'N/A'}`);
                                    
                                    return (
                                      <tr key={index} className="border-b hover:bg-muted/50">

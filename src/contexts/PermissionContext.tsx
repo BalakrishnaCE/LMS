@@ -79,7 +79,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
     // Check cache first
     const cached = getCachedPermissions(currentUser);
     if (cached) {
-      console.log('🔍 Using cached permissions for user:', currentUser);
+      
       setUserType(cached.userType);
       setIsLoading(false);
       return;

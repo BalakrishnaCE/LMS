@@ -39,9 +39,9 @@ export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, op
   // Debug: Log module data to understand structure
   React.useEffect(() => {
     if (modules.length > 0) {
-       console.log('=== MODULE DATA DEBUG ===');
+       // console.log('=== MODULE DATA DEBUG ===');
       // console.log('Total modules:', modules.length);
-      modules.forEach((mod: any, index: number) => {
+       modules.forEach((mod: any, index: number) => {
         // console.log(`Module ${index}:`, {
         //   // Direct fields
         //   name: mod.name,

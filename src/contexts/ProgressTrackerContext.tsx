@@ -56,7 +56,7 @@ export function ProgressTrackerProvider({ children }: ProgressTrackerProviderPro
 
     // Set up WebSocket event listeners
     const handleProgressUpdated = (data: ProgressData) => {
-      console.log('Progress updated received in context:', data);
+      
       setProgress(prev => ({
         ...prev,
         [data.moduleId]: {
@@ -151,7 +151,7 @@ export function ProgressTrackerProvider({ children }: ProgressTrackerProviderPro
         }
       }
     } catch (error) {
-      console.error('Failed to fetch initial progress:', error);
+      
     }
   }, [user?.email]);
 

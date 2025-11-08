@@ -12,7 +12,6 @@ import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import AchievementShowcase from "@/components/AchievementShowcase";
 import { useLearnerDashboard, useLearnerModuleData } from "@/lib/api";
-import { useFrappeGetDocList } from "frappe-react-sdk";
 import { calculateProgressStats, calculateModuleProgress } from "@/utils/progressUtils";
 
 
@@ -152,7 +151,7 @@ export default function LearnerDashboard() {
       
       if (data.data) {
         setDashboardAchievements(data.data);
-        console.log('🔍 Dashboard - Direct API achievements:', data.data);
+ 
       }
     } catch (error) {
       console.error('Error fetching achievements:', error);
@@ -165,19 +164,14 @@ export default function LearnerDashboard() {
   React.useEffect(() => {
     fetchAchievements();
   }, [fetchAchievements]);
-  
-  console.log('🔍 Dashboard - dashboardAchievements:', dashboardAchievements);
-  console.log('🔍 Dashboard - achievementsLoading:', achievementsLoading);
-  console.log('🔍 Dashboard - dashboardAchievements type:', typeof dashboardAchievements);
-  console.log('🔍 Dashboard - dashboardAchievements is array?', Array.isArray(dashboardAchievements));
 
   // Extract modules and meta - use both APIs but prioritize useLearnerDashboard
   // useLearnerModuleData returns data directly: { modules: [...], meta: {...} }
   // useLearnerDashboard returns data under message: [{ module: {...}, progress: {...} }]
   
   // Prioritize get_learner_dashboard (filters for published modules) over useLearnerModuleData
-  let modules: unknown = [];
-  let meta = {};
+  let modules: any[] = [];
+  let meta: any = {};
   
   // First try to use get_learner_dashboard (filters for published modules)
   if (DeadlineData?.message && Array.isArray(DeadlineData.message) && DeadlineData.message.length > 0) {
@@ -199,23 +193,21 @@ export default function LearnerDashboard() {
       total_count: modules.length
     };
     
-    console.log('Using get_learner_dashboard (published modules only) - modules count:', modules.length);
+    // console.log('Using get_learner_dashboard (published modules only) - modules count:', modules.length);
   } else if (data?.message?.modules) {
     // Fallback to useLearnerModuleData if get_learner_dashboard fails
     modules = data.message.modules || [];
     meta = data.message.meta || {};
-    console.log('Fallback to useLearnerModuleData - modules count:', modules.length);
+   
   } else if (data?.modules) {
     // Direct structure fallback
     modules = data.modules || [];
     meta = data.meta || {};
-    console.log('Fallback to direct structure - modules count:', modules.length);
+  
   }
   
   // Debug logging
-  console.log('Data from useLearnerModuleData:', data);
-  console.log('DeadlineData from useLearnerDashboard:', DeadlineData);
-  console.log('Final modules count:', modules.length);
+  
   
   // Check if modules have the nested structure (module.module, module.progress)
   if (modules.length > 0 && modules[0].module) {
@@ -291,17 +283,15 @@ export default function LearnerDashboard() {
 
   // Refresh achievements when component mounts or modules change
   React.useEffect(() => {
-    console.log('🔍 Dashboard - Refreshing achievements due to module change');
+    
     fetchAchievements();
   }, [modules.length, fetchAchievements]);
 
   // Map API data to AchievementShowcase props
   let achievements: Achievement[] = [];
-  console.log('🔍 Dashboard - dashboardAchievements in mapping:', dashboardAchievements);
-  console.log('🔍 Dashboard - achievementsLoading in mapping:', achievementsLoading);
   
   if (dashboardAchievements && Array.isArray(dashboardAchievements)) {
-    console.log('🔍 Dashboard - dashboardAchievements is array, length:', dashboardAchievements.length);
+    
     achievements = dashboardAchievements.map((ua: any) => ({
       id: ua.name,
       icon_name: ua.icon_name,
@@ -309,9 +299,9 @@ export default function LearnerDashboard() {
       description: ua.description,
       created_on: ua.created_on,
     }));
-    console.log('🔍 Dashboard - mapped achievements:', achievements);
+    
   } else {
-    console.log('🔍 Dashboard - dashboardAchievements is not array or empty:', dashboardAchievements);
+   
   }
 
   // Loading and error states

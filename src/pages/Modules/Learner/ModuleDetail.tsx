@@ -373,11 +373,7 @@ export default function LearnerModuleDetail() {
         enabled: shouldFetchProgress
     });
 
-    // Debug logging
-    console.log('getLearnerProgress call - user:', userIdentifier, 'module:', moduleName, 'enabled:', shouldFetchProgress);
-    console.log('getLearnerProgress call - user object:', user);
-    console.log('getLearnerProgress call - userLoading:', userLoading);
-    console.log('getLearnerProgress call - started:', started, 'moduleData:', !!moduleData);
+    
     // Post call for updating progress
     const { call: updateProgress, loading: updateLoading } = useFrappePostCall('novel_lms.novel_lms.api.progress_tracking.update_learner_progress');
     
@@ -397,22 +393,21 @@ export default function LearnerModuleDetail() {
                 if (data.completed_lessons !== undefined) {
                     // This is the correct structure from our API
                     setCompletionData(data);
-                    console.log('🔄 Completion data updated from API:', data);
-                    console.log('🔄 Progress will be:', data.overall_progress || 'calculated');
+                    
                 } else {
                     // This might be from a different API call, ignore it
-                    console.log('⚠️ Ignoring completion data with unexpected structure:', data);
+                 
                 }
             }
         } catch (error) {
-            console.error('❌ Error updating completion data:', error);
+            
         }
     }, [completionDataResponse]);
 
     // Phase 2: Force completion data refresh when resuming
     useEffect(() => {
         if (started && userIdentifier && moduleName && !isLMSAdmin) {
-            console.log('🔄 Forcing completion data refresh on resume');
+            
             refetchCompletionData();
         }
     }, [started, userIdentifier, moduleName, isLMSAdmin, refetchCompletionData]);
@@ -420,8 +415,7 @@ export default function LearnerModuleDetail() {
     // Force refresh completion data when module changes (navigation back from dashboard)
     useEffect(() => {
         if (moduleName && userIdentifier && !isLMSAdmin) {
-            console.log('🔄 Module changed, forcing completion data refresh');
-            // Just refetch - don't clear data to avoid 0% flash
+           
             refetchCompletionData();
         }
     }, [moduleName, userIdentifier, isLMSAdmin, refetchCompletionData]);
@@ -429,16 +423,10 @@ export default function LearnerModuleDetail() {
     // Fix resume bug: Set current position based on user's actual progress
     useEffect(() => {
         if (module?.lessons && !isLMSAdmin) {
-            console.log('🎯 Setting resume position from module data:', (module.progress as any)?.current_position);
-            console.log('🎯 Module progress:', {
-                status: module.progress?.status,
-                overall_progress: (module.progress as any)?.overall_progress,
-                current_position: (module.progress as any)?.current_position
-            });
             
             // If module is completed, don't set position - let completion screen show
             if (module.progress?.status === "Completed") {
-                console.log('🎯 Module completed - not setting resume position');
+                
                 return;
             }
             
@@ -457,7 +445,7 @@ export default function LearnerModuleDetail() {
                         chapter => chapter.name === currentChapterName
                     ) ?? 0;
                     
-                    console.log('🎯 Resume position found (module data):', { lessonIdx, chapterIdx, currentChapterName });
+                   
                     setCurrentLessonIdx(lessonIdx);
                     setCurrentChapterIdx(chapterIdx);
                     return;
@@ -467,7 +455,7 @@ export default function LearnerModuleDetail() {
             // PRIORITY 2: Use completion data's in_progress_chapters as fallback
             if (completionData?.in_progress_chapters?.length > 0) {
                 const currentChapterName = completionData.in_progress_chapters[0];
-                console.log('🎯 Using completion data in_progress_chapters:', currentChapterName);
+                
                 
                 // Find the lesson containing this chapter
                 const lessonIdx = module.lessons.findIndex(lesson => 
@@ -489,7 +477,7 @@ export default function LearnerModuleDetail() {
             
             // PRIORITY 3: Use completion data's current_position as final fallback
             if (completionData?.current_position) {
-                console.log('🎯 Using completion data current_position:', completionData.current_position);
+                
                 
                 if (completionData.current_position.type === 'Chapter') {
                     const currentChapterName = completionData.current_position.reference_id;
@@ -513,14 +501,14 @@ export default function LearnerModuleDetail() {
                 }
             }
             
-            console.log('🎯 No resume position found - starting from beginning');
+            
         }
     }, [module?.progress, module?.lessons, completionData, isLMSAdmin]);
 
     // Phase 2: Immediate API call on mount to prevent 0% progress
     useEffect(() => {
         if (userIdentifier && moduleName && !isLMSAdmin) {
-            console.log('🔄 Immediate API call on mount to prevent 0% progress');
+            
             refetchCompletionData();
         }
     }, [userIdentifier, moduleName, isLMSAdmin, refetchCompletionData]);
@@ -528,7 +516,7 @@ export default function LearnerModuleDetail() {
     // Retry completion data API when user becomes available (fixes timing issue)
     useEffect(() => {
         if (userIdentifier && userIdentifier !== '' && moduleName && !userLoading && !completionDataResponse && !completionDataError && !isLMSAdmin) {
-            console.log('🔄 User became available, triggering completion data fetch...', { userIdentifier, moduleName });
+           
             refetchCompletionData();
         }
     }, [userIdentifier, moduleName, userLoading, completionDataResponse, completionDataError, isLMSAdmin, refetchCompletionData]);
@@ -573,7 +561,7 @@ export default function LearnerModuleDetail() {
     
         // Check if module is completed - if so, allow access to everything (especially for review mode)
         if (moduleData.progress?.status === "Completed" || progress?.status === "Completed") {
-            console.log('🎯 Module is completed - allowing access to all content');
+            
             return () => true; // Allow access to all lessons and chapters
         }
     
@@ -662,24 +650,24 @@ export default function LearnerModuleDetail() {
                 // Force refresh completion data to get latest progress
                 refetchCompletionData();
                 
-                console.log('🔄 Chapter started:', chapterName);
+                
             }
         } catch (error) {
-            console.error('❌ Error tracking chapter start:', error);
+            
         }
     };
 
     // Update module data when fetched - Consolidated state setting with Admin priority
     useEffect(() => {
-        console.log('🔄 Module data useEffect triggered:', { moduleData, hasModuleData: !!moduleData, isLMSAdmin });
+        
         if (moduleData && !module) { // Only set if module is not already set to prevent race conditions
-            console.log('✅ Setting module state with data:', moduleData);
+            
             setModule(moduleData);
             
             // For Administrator, immediately set started to true to bypass welcome screen
             if (isLMSAdmin) {
                 setStarted(true);
-                console.log('🔧 Admin mode: Bypassing welcome screen');
+                
             } else if (moduleData.progress?.status === "In Progress" || moduleData.progress?.status === "Completed") {
                 setStarted(true);
                 setProgress(moduleData.progress);
@@ -739,13 +727,13 @@ export default function LearnerModuleDetail() {
         
         // PRIORITY 1: Use module progress data (most reliable when completion data is incomplete)
         if (module?.progress && (module.progress as any)?.overall_progress !== undefined) {
-            console.log('📊 Using module progress data (PRIORITY 1):', (module.progress as any).overall_progress);
+            
             return (module.progress as any).overall_progress;
         }
         
         // PRIORITY 2: Use completion data only if it's valid and not 0
         if (completionData?.overall_progress !== undefined && completionData.overall_progress > 0) {
-            console.log('📊 Using completion data progress (PRIORITY 2):', completionData.overall_progress);
+            
             return completionData.overall_progress;
         }
         
@@ -753,18 +741,18 @@ export default function LearnerModuleDetail() {
         if (completionData?.total_chapters && completionData.total_chapters > 0) {
             const completedCount = completionData.completed_chapters?.length || 0;
             const progressPercentage = Math.round((completedCount / completionData.total_chapters) * 100 * 100) / 100;
-            console.log('📊 Using completionData calculated progress:', progressPercentage, `(${completedCount}/${completionData.total_chapters})`);
+           
             return progressPercentage;
         }
         
         // Final fallback: Use module progress data if available, otherwise 0
         if (module?.progress && (module.progress as any)?.overall_progress !== undefined) {
-            console.log('📊 Using module progress data (final fallback):', (module.progress as any).overall_progress);
+           
             return (module.progress as any).overall_progress;
         }
         
         // If no progress data available, return 0
-        console.log('📊 No progress data available, returning 0');
+       
         return 0;
     };
     // Add this new function after getUnifiedProgress()
@@ -815,12 +803,12 @@ export default function LearnerModuleDetail() {
                 // Try to get current chapter from in_progress_chapters first
                 if (completionData.in_progress_chapters?.length > 0) {
                     currentChapterName = completionData.in_progress_chapters[0];
-                    console.log('🔍 Calculating completed items from in_progress_chapters:', completionData.in_progress_chapters);
+                   
                 }
                 // Fallback to module data current position
                 else if (module?.progress && (module.progress as any)?.current_position?.chapter) {
                     currentChapterName = (module.progress as any).current_position.chapter;
-                    console.log('🔍 Calculating completed items from module current_position:', currentChapterName);
+                    
                 }
                 
                 if (currentChapterName && module?.lessons) {
@@ -882,8 +870,7 @@ export default function LearnerModuleDetail() {
         // Check if module is completed
         if (moduleProgress.status === "Completed") {
             // If module is completed, mark ALL chapters and lessons as completed
-            console.log('🎯 Module is completed - marking all chapters as completed');
-            
+           
             module.lessons.forEach((lesson: any) => {
                 completedLessons.push(lesson.name);
                 lesson.chapters.forEach((chapter: any) => {
@@ -922,13 +909,7 @@ export default function LearnerModuleDetail() {
             });
         }
         
-        console.log('🔍 Sidebar completion data calculated (fallback):', {
-            moduleStatus: moduleProgress.status,
-            completedChapters,
-            completedLessons,
-            inProgressChapters,
-            currentPosition
-        });
+        
         
         return {
             completed_lessons: completedLessons,
@@ -950,13 +931,7 @@ export default function LearnerModuleDetail() {
     const isCompletionDataLoading = !completionDataResponse && !completionDataError && userIdentifier && userIdentifier !== '' && moduleName && !completionData;
     
     // Phase 2: Debug progress calculation
-    console.log('📊 Progress calculation debug:', {
-        overallProgress: overallProgress,
-        completionData: completionData,
-        sidebarCompletionData: sidebarCompletionData,
-        progressStatus: progress?.status,
-        hasCompletionData: !!completionDataResponse
-    });
+    
     
     // Synchronize completion data with module progress for real-time updates
     useEffect(() => {
@@ -983,15 +958,7 @@ export default function LearnerModuleDetail() {
     }, [completionData, module?.progress]);
     
     // Debug sidebar data
-    console.log('🔍 Sidebar data being passed:', {
-        module: module?.name,
-        progress: progress,
-        started: started || reviewing,
-        overallProgress: isCompletionDataLoading ? -1 : overallProgress,
-        currentLessonName: module?.lessons?.[currentLessonIdx]?.name,
-        currentChapterName: module?.lessons?.[currentLessonIdx]?.chapters?.[currentChapterIdx]?.name,
-        completionData: sidebarCompletionData
-    });
+    
 
     // Navigation handlers
     const handlePrevious = async () => {
@@ -1074,8 +1041,7 @@ export default function LearnerModuleDetail() {
         const isCurrentChapterCompleted = completionData?.completed_chapters?.includes(currentChapter.name) || false;
         const isCurrentLessonCompleted = completionData?.completed_lessons?.includes(currentLesson.name) || false;
         
-        console.log('🔄 handleNext - Current chapter completed:', isCurrentChapterCompleted);
-        console.log('🔄 handleNext - Current lesson completed:', isCurrentLessonCompleted);
+        
         
         // If this is the last chapter of the last lesson, check Quiz/QA completion
         const isLastLesson = lessonIdx === module.lessons.length - 1;
@@ -1128,12 +1094,10 @@ export default function LearnerModuleDetail() {
                     
                     if (isCurrentLessonNowCompleted && !newCompletedLessons.includes(currentLesson.name)) {
                         newCompletedLessons.push(currentLesson.name);
-                        console.log('🎉 Lesson completed:', currentLesson.name);
+                        
                     }
                     
-                    console.log('🚀 Optimistic update - Module completed:', currentChapter.name);
-                    console.log('🚀 New progress:', newOverallProgress, `(${newCompletedChapters.length}/${prev?.total_chapters})`);
-                    console.log('🚀 Completed lessons:', newCompletedLessons);
+                    
                     
                     return {
                         ...prev,
@@ -1169,12 +1133,10 @@ export default function LearnerModuleDetail() {
                 
                 if (isCurrentLessonNowCompleted && !newCompletedLessons.includes(currentLesson.name)) {
                     newCompletedLessons.push(currentLesson.name);
-                    console.log('🎉 Lesson completed:', currentLesson.name);
+                    
                 }
                 
-                console.log('🚀 Optimistic update - Chapter completed:', currentChapter.name);
-                console.log('🚀 New progress:', newOverallProgress, `(${newCompletedChapters.length}/${prev?.total_chapters})`);
-                console.log('🚀 Completed lessons:', newCompletedLessons);
+                
                 
                 return {
                     ...prev,
@@ -1185,9 +1147,9 @@ export default function LearnerModuleDetail() {
                 };
             });
             
-            console.log('✅ Updated chapter progress:', currentChapter.name);
+           
         } else {
-            console.log('⏭️ Skipped chapter update - already completed:', currentChapter.name);
+            
         }
         
         // Force refresh completion data to get latest progress
@@ -1252,7 +1214,7 @@ export default function LearnerModuleDetail() {
         
         // Check if lesson is accessible using sidebar completion data
         const isAccessible = sidebarIsAccessible(lessonName);
-        console.log('🔍 Lesson accessibility check:', { lessonName, isAccessible, sidebarCompletionData });
+       
         if (!isAccessible) {
             toast.error("Complete previous lessons to unlock this content");
             return;
@@ -1292,7 +1254,7 @@ export default function LearnerModuleDetail() {
         
         // Check if chapter is accessible using sidebar completion data
         const isAccessible = sidebarIsAccessible(lessonName, chapterName);
-        console.log('🔍 Chapter accessibility check:', { lessonName, chapterName, isAccessible, sidebarCompletionData });
+        
         if (!isAccessible) {
             toast.error("Complete previous chapters to unlock this content");
             return;
@@ -1478,13 +1440,7 @@ export default function LearnerModuleDetail() {
                                                     hasData: !!content.data
                                                 });
                                             }
-                                            console.log('📄 Rendering content:', {
-                                                name: content.name,
-                                                contentType: content.content_type,
-                                                contentReference: content.content_reference,
-                                                hasData: !!content.data,
-                                                dataKeys: content.data ? Object.keys(content.data) : []
-                                            });
+                                            
                                             return (
                                                 <ContentRenderer
                                                     key={content.name}
@@ -1572,7 +1528,7 @@ export default function LearnerModuleDetail() {
     
     // Show loading animation while processing module data
     if (!module && moduleListData && !moduleDataLoading && !isLoading && !moduleListError) {
-        console.log('🔄 Processing module data - showing loading animation');
+        
         return (
             <div className="flex flex-col items-center justify-center h-full">
                 <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
@@ -1583,7 +1539,7 @@ export default function LearnerModuleDetail() {
 
     // Only show "module not found" if we have data but no module after processing
     if (!module && !moduleDataLoading && !isLoading && moduleListData && !moduleListError) {
-        console.log('❌ Module not found - showing error screen');
+       
         return (
             <div className="flex flex-col items-center justify-center h-full">
                 <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
