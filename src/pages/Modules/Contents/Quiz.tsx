@@ -165,10 +165,60 @@ function QuizDialog({
   const handleAnswerChange = (questionId: string, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
-  // REMOVED: Auto-submit on navigation
-  // Users should only submit via the Submit button
-  // This prevents empty saves that block real attempts
-  // If admins need to reset, they can do it manually in the backend
+  // Auto-submit when component unmounts (user navigates away without submitting)
+  useEffect(() => {
+    return () => {
+      if (!submitted && Object.keys(answers).length >= 0) {
+        // Submit quiz with current answers (or empty answers)
+        console.log('⚠️ Auto-submitting quiz due to navigation');
+        
+        // Calculate score with current (or empty) answers
+        let correctAnswers = 0;
+        let totalQuestions = 0;
+        
+        if (quiz?.questions) {
+          totalQuestions = quiz.questions.length;
+          quiz.questions.forEach(question => {
+            const userAnswer = answers[question.name];
+            if (userAnswer && question.options) {
+              const selectedOption = question.options.find(opt => opt.option_text === userAnswer);
+              if (selectedOption?.correct) {
+                correctAnswers += 1;
+              }
+            }
+          });
+        }
+        
+        const percentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+        
+        // Save with current answers
+        try {
+          const formattedAnswers: { [key: string]: { marked_ans: string; correct_ans: string } } = {};
+          
+          if (quiz?.questions) {
+            quiz.questions.forEach(question => {
+              const userAnswer = answers[question.name];
+              if (question.options) {
+                const correctOption = question.options.find(opt => opt.correct);
+                formattedAnswers[question.name] = {
+                  marked_ans: userAnswer || '',
+                  correct_ans: correctOption?.option_text || ''
+                };
+              }
+            });
+          }
+          
+          // Submit to API
+          updateQuizProgress({
+            quiz_id: quiz.name,
+            answers: formattedAnswers
+          });
+        } catch (error) {
+          console.error('Error auto-submitting quiz:', error);
+        }
+      }
+    };
+  }, [submitted, answers, quiz, updateQuizProgress]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

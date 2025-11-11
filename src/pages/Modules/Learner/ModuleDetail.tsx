@@ -60,12 +60,7 @@ interface ApiResponse<T> {
     data: T;
 }
 
-interface ModuleApiResponse {
-    message: {
-        modules: Module[];
-        meta: any;
-    };
-}
+// ModuleApiResponse interface removed - now using direct type checking
 
 
 function getInitialProgress(module: Module): ModuleProgress {
@@ -222,6 +217,12 @@ export default function LearnerModuleDetail() {
     const [reviewing, setReviewing] = useState(false);
     const [quizQAScores, setQuizQAScores] = useState<Array<{title: string, score: number, maxScore: number, type: string}>>([]);
 
+    // Console logging: Component mount
+    console.log('🎯 LearnerModuleDetail mounted:', {
+        moduleName,
+        timestamp: new Date().toISOString()
+    });
+
     // Phase 2: Completion data state management
     const [completionData, setCompletionData] = useState<CompletionData>({
         completed_lessons: [],
@@ -241,16 +242,59 @@ export default function LearnerModuleDetail() {
 
     const userIdentifier = getUserIdentifier();
 
-    // Fetch module data with retry mechanism - only when user and moduleName are available
-    const { data: moduleListData, error: moduleListError, isLoading: moduleDataLoading, mutate: refetchModuleData } = useFrappeGetCall<ModuleApiResponse>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
-        user: userIdentifier, // Use robust user identifier extraction
-        limit: 1,
-        offset: 0,
-        filters: [["name", "=", moduleName]]
-    }, {
-        enabled: !!(userIdentifier && moduleName && !userLoading && userIdentifier !== '') // Only call API when user is loaded and moduleName exists
-    });
+    // Console logging: User state changes
+    useEffect(() => {
+        console.log('👤 User state changed:', {
+            userLoading,
+            userIdentifier,
+            userEmail: user?.email,
+            userName: user?.name,
+            fullUser: user,
+            componentMountCount: 'tracking'
+        });
+    }, [userLoading, userIdentifier, user]);
     
+    // Track API call trigger
+    useEffect(() => {
+        const shouldCallAPI = !!(userIdentifier && moduleName && !userLoading && userIdentifier !== '');
+        console.log('🔌 API call should trigger:', shouldCallAPI, {
+            hasUserIdentifier: !!userIdentifier,
+            hasModuleName: !!moduleName,
+            userLoading,
+            userIdentifierNotEmpty: userIdentifier !== ''
+        });
+    }, [userIdentifier, moduleName, userLoading]);
+
+    // Fetch module data with retry mechanism - only when user and moduleName are available
+    // For admins, use get_module_with_details API; for learners, use LearnerModuleData
+    const { data: moduleListData, error: moduleListError, isLoading: moduleDataLoading, mutate: refetchModuleData } = useFrappeGetCall<any>(
+        isLMSAdmin 
+            ? "novel_lms.novel_lms.api.module_management.get_module_with_details"
+            : "novel_lms.novel_lms.api.module_management.LearnerModuleData",
+        isLMSAdmin
+            ? { module_id: moduleName }
+            : {
+                user: userIdentifier, // Use robust user identifier extraction
+                limit: 1,
+                offset: 0,
+                filters: [["name", "=", moduleName]]
+            },
+        {
+            enabled: !!(userIdentifier && moduleName && !userLoading && userIdentifier !== '') // Only call API when user is loaded and moduleName exists
+        }
+    );
+    
+    // Console logging: API call states
+    useEffect(() => {
+        console.log('📡 API call state:', {
+            enabled: !!(userIdentifier && moduleName && !userLoading && userIdentifier !== ''),
+            moduleDataLoading,
+            hasData: !!moduleListData,
+            hasError: !!moduleListError,
+            errorMessage: moduleListError?.message
+        });
+    }, [moduleDataLoading, moduleListData, moduleListError, userIdentifier, moduleName, userLoading]);
+
     // Simplified retry mechanism - only retry on actual errors, not empty results
     useEffect(() => {
         if (moduleListError && userIdentifier && moduleName) {
@@ -292,16 +336,24 @@ export default function LearnerModuleDetail() {
     if (moduleListData && !moduleDataLoading) {
         console.log('🔍 EXTRACTION START:', new Date().toISOString());
         console.log('🔍 API Call completed, extracting module data...');
+        console.log('🔍 Raw API response keys:', Object.keys(moduleListData || {}));
+        console.log('🔍 Full API response:', JSON.stringify(moduleListData, null, 2));
+        console.log('🔍 isLMSAdmin:', isLMSAdmin);
         
         const response = moduleListData as any;
         console.log('🔍 Full response keys:', Object.keys(response));
         console.log('🔍 Response.message keys:', response?.message ? Object.keys(response.message) : 'no message');
         
-        // Replace lines 300-322 with this:
-        // Try direct modules path first (unwrapped response)
-        if (response?.modules && Array.isArray(response.modules) && response.modules.length > 0) {
-            moduleData = response.modules[0];
-            console.log('✅ Module data extracted via direct path (modules[0])');
+        // For admin users using get_module_with_details API, the response structure is different
+        if (isLMSAdmin && response?.message) {
+            // get_module_with_details returns data directly in message field or message.data
+            moduleData = response.message.data || response.message;
+            console.log('✅ Module data extracted via admin API (get_module_with_details)');
+        }
+        // For learner users using LearnerModuleData API
+        else if (response?.message?.message?.modules && Array.isArray(response.message.message.modules) && response.message.message.modules.length > 0) {
+            moduleData = response.message.message.modules[0];
+            console.log('✅ Module data extracted via learner API (message.message.modules[0])');
         }
         // Try message.modules (wrapped by frappe-react-sdk)
         else if (response?.message?.modules && Array.isArray(response.message.modules) && response.message.modules.length > 0) {
@@ -318,15 +370,12 @@ export default function LearnerModuleDetail() {
             console.log('🔍 Response structure:', {
                 hasModules: !!response?.modules,
                 hasMessage: !!response?.message,
-                hasMessageModules: !!response?.message?.modules,
-                hasMessageMessageModules: !!response?.message?.message?.modules, // Add this
-                modulesLength: response?.modules?.length || 0,
-                messageModulesLength: response?.message?.modules?.length || 0,
-                messageMessageModulesLength: response?.message?.message?.modules?.length || 0, // Add this
-                topLevelKeys: Object.keys(response || {}),
-                messageKeys: response?.message ? Object.keys(response.message) : [],
-                messageMessageKeys: response?.message?.message ? Object.keys(response.message.message) : [], // Add this
-                fullResponse: JSON.stringify(response).substring(0, 500)
+                hasNestedMessage: !!response?.message?.message,
+                hasModules: !!response?.message?.modules,
+                hasNestedModules: !!response?.message?.message?.modules,
+                modulesLength: response?.message?.modules?.length || 0,
+                nestedModulesLength: response?.message?.message?.modules?.length || 0,
+                isLMSAdmin: isLMSAdmin
             });
         }
         
@@ -558,13 +607,13 @@ export default function LearnerModuleDetail() {
     // Phase 3: Frontend-only locking using calculated completionData
     const buildIsAccessible = (completionData: CompletionData | null, moduleData: Module | null) => {
         if (!moduleData?.lessons?.length) return () => false;
-    
-        // Check if module is completed - if so, allow access to everything (especially for review mode)
-        if (moduleData.progress?.status === "Completed" || progress?.status === "Completed") {
-            
+
+        // Check if module is completed - if so, allow access to everything
+        if (moduleData.progress?.status === "Completed") {
+            console.log('🎯 Module is completed - allowing access to all content');
             return () => true; // Allow access to all lessons and chapters
         }
-    
+
         // Use calculated data from getSidebarCompletionData (not empty API arrays)
         const completedLessons = new Set(completionData?.completed_lessons ?? []);
         const completedChapters = new Set(completionData?.completed_chapters ?? []);
@@ -694,25 +743,28 @@ export default function LearnerModuleDetail() {
 
     // Sync UI indices with progress (only when progress has valid current_lesson/chapter)
     useEffect(() => {
-        if (
-            progress &&
-            (module?.lessons?.length ?? 0) > 0 &&
-            progress.current_lesson && // Only run if progress has valid current_lesson
-            progress.current_chapter    // Only run if progress has valid current_chapter
-        ) {
+        if (progress && (module?.lessons?.length ?? 0) > 0) {
+          if (progress.status === "Completed") {
+            // For completed modules, default to first lesson/chapter
+            setCurrentLessonIdx(0);
+            setCurrentChapterIdx(0);
+            console.log('🎯 Module completed - setting to first lesson/chapter');
+          } else if (progress.current_lesson && progress.current_chapter) {
+            // For in-progress modules, use progress data
             let lessonIdx = module?.lessons?.findIndex(l => l.name === progress.current_lesson) ?? 0;
             if (lessonIdx < 0) lessonIdx = 0;
-            const lesson = module?.lessons[lessonIdx];
+            const lesson = module?.lessons?.[lessonIdx];
             let chapterIdx = lesson?.chapters?.length
-                ? lesson.chapters.findIndex(c => c.name === progress.current_chapter)
-                : 0;
+              ? lesson.chapters.findIndex(c => c.name === progress.current_chapter)
+              : 0;
             if (chapterIdx < 0) chapterIdx = 0;
             
             console.log('🔄 Syncing UI indices with progress:', { lessonIdx, chapterIdx, current_lesson: progress.current_lesson, current_chapter: progress.current_chapter });
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
+          }
         }
-    }, [progress, module]);
+      }, [progress, module]);
 
     // Force progress recalculation when completion data changes
     useEffect(() => {
@@ -757,9 +809,9 @@ export default function LearnerModuleDetail() {
     };
     // Add this new function after getUnifiedProgress()
     const getCompletionBasedProgress = () => {
-        // Check if module is completed (via progress OR module data) - works in review mode too
-        if (progress?.status === "Completed" || module?.progress?.status === "Completed") {
-            return 100;
+        // If module is completed, return 100%
+        if (progress?.status === "Completed") {
+          return 100;
         }
         
         if (!sidebarCompletionData) return getUnifiedProgress();
@@ -780,7 +832,7 @@ export default function LearnerModuleDetail() {
         console.log('📊 Using sidebar completion data progress:', progressPercentage, `(${completedChapters}/${totalChapters})`);
         
         return progressPercentage;
-    };
+      };
     // Phase 2: Use unified progress calculation - Single Source of Truth
     const overallProgress = getUnifiedProgress();
     
@@ -1214,12 +1266,19 @@ export default function LearnerModuleDetail() {
         
         // Check if lesson is accessible using sidebar completion data
         const isAccessible = sidebarIsAccessible(lessonName);
-       
+        console.log('🔍 Lesson accessibility check:', { lessonName, isAccessible, sidebarCompletionData });
+        
+        
+        // Skip accessibility check for completed modules
+        if (progress?.status !== "Completed" && !isAccessible) {
+            toast.error("Complete previous lessons to unlock this content");
+            return;
+        }
+
         if (!isAccessible) {
             toast.error("Complete previous lessons to unlock this content");
             return;
         }
-        
         const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
         if (lessonIdx !== -1) {
             setCurrentLessonIdx(lessonIdx);
@@ -1254,6 +1313,13 @@ export default function LearnerModuleDetail() {
         
         // Check if chapter is accessible using sidebar completion data
         const isAccessible = sidebarIsAccessible(lessonName, chapterName);
+        console.log('🔍 Chapter accessibility check:', { lessonName, chapterName, isAccessible, sidebarCompletionData });
+        // Skip accessibility check for completed modules
+        if (progress?.status !== "Completed" && !isAccessible) {
+            toast.error("Complete previous chapters to unlock this content");
+            return;
+        }
+        
         
         if (!isAccessible) {
             toast.error("Complete previous chapters to unlock this content");
@@ -1523,23 +1589,29 @@ export default function LearnerModuleDetail() {
         moduleName: module?.name,
         moduleDataLoading,
         moduleListData: !!moduleListData,
-        moduleListError: !!moduleListError
+        moduleListError: !!moduleListError,
+        isLoading,
+        userLoading
     });
     
-    // Show loading animation while processing module data
-    if (!module && moduleListData && !moduleDataLoading && !isLoading && !moduleListError) {
-        
-        return (
-            <div className="flex flex-col items-center justify-center h-full">
-                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
-                <div className="mt-4 text-muted-foreground">Loading module details...</div>
-            </div>
-        );
-    }
-
-    // Only show "module not found" if we have data but no module after processing
-    if (!module && !moduleDataLoading && !isLoading && moduleListData && !moduleListError) {
-       
+    // More robust module not found handling - only show error after all loading is complete
+    // Check: we have completed loading, have data from API, but no module extracted
+    const hasCompletedLoading = !moduleDataLoading && !isLoading && !userLoading;
+    const hasApiData = !!moduleListData;
+    const hasApiError = !!moduleListError;
+    const apiResponse = moduleListData as any;
+    const canExtractModule = hasApiData && !hasApiError && apiResponse && 
+        (apiResponse?.message?.modules?.length > 0 || apiResponse?.message?.message?.modules?.length > 0);
+    
+    if (!module && hasCompletedLoading && hasApiData && canExtractModule) {
+        console.log('❌ Module not found - API returned data but extraction failed');
+        console.log('🔍 Failed extraction details:', {
+            moduleListDataStructure: moduleListData,
+            hasDirectModules: !!apiResponse?.message?.modules,
+            hasNestedModules: !!apiResponse?.message?.message?.modules,
+            directModulesLength: apiResponse?.message?.modules?.length || 0,
+            nestedModulesLength: apiResponse?.message?.message?.modules?.length || 0
+        });
         return (
             <div className="flex flex-col items-center justify-center h-full">
                 <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />

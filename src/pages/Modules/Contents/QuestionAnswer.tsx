@@ -653,9 +653,9 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
                   {formatTime(timeLeft)}
                 </span>
               )}
-              { <Dialog.Close asChild>
+              {/* <Dialog.Close asChild>
                 <Button variant="ghost" size="sm" disabled={updating || adding}>✕</Button>
-              </Dialog.Close> }
+              </Dialog.Close> */}
             </div>
             {/* Content */}
             <div className="flex-1 overflow-auto p-4">

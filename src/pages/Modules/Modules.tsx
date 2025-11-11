@@ -92,7 +92,11 @@ function Modules({ itemsPerPage }: ModulesProps) {
     // Add image error state for all cards
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
 
+//<<<<<<< HEAD
         // Add authentication check to prevent race condition
+
+    // Add authentication check to prevent race condition
+//>>>>>>> 52e84e52282cb05bc4597d06fccbe0e29fda24a8
     const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
 
     // Debounced save function for search query
