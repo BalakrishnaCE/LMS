@@ -37,8 +37,6 @@ interface ModulesProps {
     itemsPerPage: number;
 }
 
-type FilterOperator = "=" | "!=" | ">" | ">=" | "<" | "<=" | "like";
-type Filter = [string, FilterOperator, string | number];
 
 // Helper function to convert module data to CSV
 function convertToCSV(modules: any[]) {
@@ -92,11 +90,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
     // Add image error state for all cards
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
 
-//<<<<<<< HEAD
-        // Add authentication check to prevent race condition
-
     // Add authentication check to prevent race condition
-//>>>>>>> 52e84e52282cb05bc4597d06fccbe0e29fda24a8
     const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
 
     // Debounced save function for search query
@@ -146,13 +140,14 @@ function Modules({ itemsPerPage }: ModulesProps) {
     const { data: departments } = useFrappeGetDocList("Department", {
         fields: ["name", "department"],
         limit: 100,
-    })
+    });
     
     // Sort departments alphabetically by department name
     const sortedDepartments = departments?.sort((a, b) => 
         (a.department || a.name).localeCompare(b.department || b.name)
     ) || [];
-    const filters: Filter[] = []
+    
+    const filters: any[] = []
     if (selectedDepartment && selectedDepartment !== "all") {
         filters.push(["department", "=", selectedDepartment])
     }
@@ -268,6 +263,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
 
     return (
         <div>
+
             <div className="flex gap-4 p-4 mb-4">
                 <div className="flex-1 relative">
                     <Input
@@ -338,10 +334,37 @@ function Modules({ itemsPerPage }: ModulesProps) {
                     else if (module.status === "Approval Pending") statusDarkColor = "dark:bg-amber-900 dark:text-amber-200";
                     else if (module.status === "Draft") statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
 
+                    // Helper function to get full image URL
+                    const getImageUrl = (path?: string): string => {
+                        if (!path) return '';
+                        const trimmed = path.trim();
+                        if (!trimmed) return '';
+                        
+                        // If already a full URL, return as is
+                        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                            return trimmed;
+                        }
+                        
+                        // Ensure path starts with / if it doesn't already
+                        const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                        
+                        // Determine base URL
+                        // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                        // In development: use http://lms.noveloffice.org
+                        const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                        
+                        return `${cleanBaseUrl}${relativePath}`;
+                    };
+                    
                     // Use imageErrors state for this module
-                    const imageUrl = module.image
-                        ? (module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`)
-                        : null;
+                    const imageUrl = module.image ? getImageUrl(module.image) : null;
+                    
+                    // Debug: Log image URL construction
+                    // if (module.image) {
+                    //     console.log(`Module ${module.name1}: image="${module.image}", imageUrl="${imageUrl}"`);
+                    // }
+                    
                     const hasError = imageErrors[module.name];
 
                     return (
@@ -368,13 +391,18 @@ function Modules({ itemsPerPage }: ModulesProps) {
                                                 alt={module.name1}
                                                 className="w-full h-48 object-cover pb-4"
                                                 style={{ marginTop: '2rem' }}
-                                                onError={() => setImageErrors(prev => ({ ...prev, [module.name]: true }))}
+                                                onError={() => {
+                                                    console.log(`Image failed to load: ${imageUrl}`);
+                                                    setImageErrors(prev => ({ ...prev, [module.name]: true }));
+                                                }}
                                             />
                                         ) : (
                                             <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 pb-4" style={{ marginTop: '2rem' }}>
-                                                <span className="text-6xl font-semibold text-primary/60 dark:text-primary/70">
-                                                    {module.name1?.charAt(0).toUpperCase() || "M"}
-                                                </span>
+                                                <div className="text-center">
+                                                    <div className="text-6xl font-semibold text-primary/60 dark:text-primary/70">
+                                                        {module.name1?.charAt(0).toUpperCase() || "M"}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>

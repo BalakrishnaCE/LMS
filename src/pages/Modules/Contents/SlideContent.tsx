@@ -8,10 +8,27 @@ function SlideItem({ item }: { item: any }) {
   const [imageLoadError, setImageLoadError] = useState(false);
   
   // Normalize URL to handle both relative and full URLs properly
+  // Uses lms.noveloffice.org as base URL in both development and production
   const getImageUrl = (url: string) => {
     if (!url) return '';
-    if (url.startsWith('http')) return url;
-    return `${LMS_API_BASE_URL.replace(/\/$/, '')}${url}`;
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    
+    // If already a full URL, return as is
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    
+    // Ensure path starts with / if it doesn't already
+    const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    
+    // Determine base URL
+    // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+    // In development: use http://lms.noveloffice.org
+    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    
+    return `${cleanBaseUrl}${relativePath}`;
   };
   
   const imageUrl = item.image ? getImageUrl(item.image) : '';
@@ -39,62 +56,93 @@ function SlideItem({ item }: { item: any }) {
           </div>
         )}
         <p>{item.description}</p>
-        {item.url && (
-          <Link href={item.url.startsWith('http') ? item.url : `${LMS_API_BASE_URL}${item.url.startsWith('/') ? item.url.slice(1) : item.url}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-            More
-          </Link>
-        )}
+        {item.url && (() => {
+          // Normalize URL for links - use same logic as getImageUrl
+          const getLinkUrl = (url: string) => {
+            if (!url) return '';
+            const trimmed = url.trim();
+            if (!trimmed) return '';
+            
+            // If already a full URL, return as is
+            if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+              return trimmed;
+            }
+            
+            // Ensure path starts with / if it doesn't already
+            const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+            
+            // Determine base URL
+            const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+            const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+            
+            return `${cleanBaseUrl}${relativePath}`;
+          };
+          
+          const linkUrl = getLinkUrl(item.url);
+          return (
+            <Link href={linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+              More
+            </Link>
+          );
+        })()}
       </div>
     </CarouselItem>
   );
 }
 
-function SlideContent({ slideContentId, contentData }: { slideContentId: string; contentData?: any }) {
+function SlideContent({ slideContentId }: { slideContentId: string }) {
   const [slideContentData, setSlideContentData] = useState<any>(null);
   const [error, setError] = useState<any>(null);
   const [isValidating, setIsValidating] = useState(true);
 
   useEffect(() => {
-    // CRITICAL FIX: If contentData is provided, use it without making API calls
-    if (contentData !== undefined) {
-      console.log('✅ Using pre-fetched contentData from parent');
-      if (contentData === null) {
-        console.log('⚠️ Content not found in backend, hiding component');
-        setIsValidating(false);
-        return;
-      }
-      setSlideContentData(contentData);
-      setIsValidating(false);
-      return;
-    }
-
-    if (!slideContentId) {
-      console.log('⚠️ SlideContentId is not provided yet, waiting...');
-      setIsValidating(true);
-      return;
-    }
+    if (!slideContentId) return;
     
     setIsValidating(true);
     setError(null);
     
-    // Use content access API that works without authentication
-    fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.content_access.get_content_with_permissions?content_type=Slide%20Content&content_reference=${slideContentId}`, {
+    // Use content_access.get_content_with_permissions API (allows guest access and bypasses permissions)
+    // Determine API base URL
+    // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+    // In development: use http://lms.noveloffice.org
+    const apiBaseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const cleanApiBaseUrl = apiBaseUrl.replace(/\/$/, '');
+    const apiUrl = `${cleanApiBaseUrl}/api/method/novel_lms.novel_lms.api.content_access.get_content_with_permissions?content_type=Slide Content&content_reference=${slideContentId}`;
+    
+    console.log('📡 Fetching slide content:', { slideContentId, apiUrl });
+    
+    fetch(apiUrl, {
       method: 'GET',
       credentials: 'include'
     })
-      .then(res => res.json())
       .then(res => {
-        // Handle the response structure from content_access API
-        const responseData = res.message?.message || res.message || res;
+        if (!res.ok) {
+          throw new Error(`Failed to fetch slide content: ${res.status} ${res.statusText}`);
+        }
+        return res.json();
+      })
+      .then(res => {
+        console.log('📦 SlideContent API response:', res);
         
-        if (responseData.success && responseData.data) {
-          setSlideContentData(responseData.data);
+        // Handle the response structure from content_management.get_content API
+        // Response format: { message: { success: true, data: {...}, content_type: "...", message: "..." } }
+        let contentData = null;
+        if (res.message && res.message.message && res.message.message.success === true) {
+          contentData = res.message.message.data;
+        } else if (res.message && res.message.success === true) {
+          contentData = res.message.data;
+        } else if (res.message && res.message.data) {
+          contentData = res.message.data;
+        } else if (res.data) {
+          contentData = res.data;
+        }
+        
+        if (contentData) {
+          setSlideContentData(contentData);
         } else {
-          console.error('SlideContent API Error Response:', responseData);
-          const errorMessage = typeof responseData.message === 'string' 
-            ? responseData.message 
-            : JSON.stringify(responseData.message) || 'Failed to load slide content';
-          throw new Error(errorMessage);
+          const errorMessage = res.message?.message?.message || res.message?.message || res.message || 'Failed to load slide content';
+          console.error('SlideContent API Error - No data found:', JSON.stringify(res, null, 2));
+          throw new Error(errorMessage || 'Slide content data not found in response');
         }
         setIsValidating(false);
       })
@@ -103,7 +151,7 @@ function SlideContent({ slideContentId, contentData }: { slideContentId: string;
         setError(e.message || 'Failed to load slide content');
         setIsValidating(false);
       });
-  }, [slideContentId, contentData]);
+  }, [slideContentId]);
 
   if (isValidating) return <div>Loading slides...</div>;
   if (error) return (

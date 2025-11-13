@@ -70,7 +70,8 @@ export default function ModuleCreationForm() {
         toast.success("Module created successfully");
         setLocation(`/edit/${response.name}`);
       } else {
-        throw new Error("Invalid response from server");
+        console.error("Invalid response from server:", response);
+        throw new Error("Invalid response from server - module name not found");
       }
     } catch (error) {
       toast.error("Failed to create module");

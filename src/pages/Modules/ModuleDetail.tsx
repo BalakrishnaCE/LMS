@@ -8,8 +8,7 @@ import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { useUser } from "@/hooks/use-user"
 import { BASE_PATH } from "@/config/routes"
-import { useAPI } from "../../lib/api"
-import { useFrappeGetCall } from "frappe-react-sdk"
+import { useAPI } from "@/lib/api"
 import { useNavigation, NavigationProvider } from "@/contexts/NavigationContext"
 
 
@@ -92,59 +91,61 @@ export default function ModuleDetail() {
         }
     }, [moduleName, location, addToHistory]);
 
+    const api = useAPI();
     const [module, setModule] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
     const [isValidating, setIsValidating] = useState(false);
 
-    // Use the correct API method for admin module details
-    const { data: moduleData, error: apiError, isLoading } = useFrappeGetCall(
-        'novel_lms.novel_lms.api.module_management.get_module_with_details', 
-        { module_id: moduleName },
-        { enabled: !!moduleName }
-    );
-
     // Handle module data when it loads
     useEffect(() => {
-        if (moduleData) {
-            // Handle the nested message structure from get_module_with_details API
-            const actualData = moduleData.data || moduleData.message || moduleData;
-            
-            // Debug logging to check content structure
-            if (actualData.lessons?.[0]?.chapters?.[0]?.contents?.[0]) {
-                const firstContent = actualData.lessons[0].chapters[0].contents[0];
+        if (!moduleName) return;
+        
+        setIsValidating(true);
+        setError(null);
+        
+        api.getModuleWithDetails({ module_id: moduleName })
+            .then((response: any) => {
+                // Check for API-level errors first
+                if (response.error) {
+                    setError(response.error || "Failed to load module");
+                    setIsValidating(false);
+                    return;
+                }
                 
-            }
-            
-            setModule(actualData);
-            setIsValidating(false);
-        }
-    }, [moduleData]);
-
-    // Handle API errors
-    useEffect(() => {
-        if (apiError) {
-            setError(apiError.message || "Failed to load module");
-            setIsValidating(false);
-        }
-    }, [apiError]);
-
-    // Set loading state
-    useEffect(() => {
-        setIsValidating(isLoading);
-    }, [isLoading]);
+                // Handle the API response structure correctly
+                const moduleData = response.data || response.message || response;
+                if (!moduleData) {
+                    setError("Module data not found");
+                    setIsValidating(false);
+                    return;
+                }
+                setModule(moduleData);
+                setIsValidating(false);
+            })
+            .catch((err: any) => {
+                console.error("Error loading module:", err);
+                setError(err.message || "Failed to load module");
+                setIsValidating(false);
+            });
+    }, [moduleName, api]);
 
     const sortedLessons = useMemo(() => {
+        // Check if module and lessons exist before processing
+        if (!module || !module.lessons || !Array.isArray(module.lessons)) {
+            return [];
+        }
+        
         // Map the API response structure to what the frontend expects
         const mappedLessons = module.lessons.map((lesson: any) => ({
             lesson: lesson.name, // Map 'name' to 'lesson' for compatibility
-            order: lesson.order
+            order: lesson.order || 0
         }));
         
         const sorted = mappedLessons.sort((a: ModuleLesson, b: ModuleLesson) => a.order - b.order);
         return sorted;
     }, [module?.lessons]);
 
-    const currentLesson = sortedLessons[currentLessonIndex];
+    const currentLesson = sortedLessons[currentLessonIndex] || null;
     const isLastLesson = currentLessonIndex === sortedLessons.length - 1;
     const isFirstLesson = currentLessonIndex === 0;
 
@@ -161,12 +162,6 @@ export default function ModuleDetail() {
         if (module?.lessons && module.lessons.length > 0) {
             const details: Record<string, any> = {};
             module.lessons.forEach((lesson: any) => {
-                // Debug log to check chapter contents structure
-                if (lesson.chapters?.[0]?.contents?.[0]) {
-                    const firstContent = lesson.chapters[0].contents[0];
-                   
-                }
-                
                 // Map the API response structure to what the frontend expects
                 details[lesson.name] = {
                     lesson_name: lesson.lesson_name,
@@ -232,9 +227,65 @@ export default function ModuleDetail() {
         setActiveChapter(chapterId, cidx);
     };
 
-    if (error) return <div>Error loading module</div>;
-    if (isValidating) return <div>Loading...</div>;
-    if (!module) return <div>Module not found</div>;
+    if (error) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="text-center space-y-4 p-8">
+                    <div className="text-6xl">⚠️</div>
+                    <h1 className="text-2xl font-bold text-foreground">Something went wrong</h1>
+                    <p className="text-muted-foreground max-w-md">
+                        We're sorry, but something unexpected happened while loading the module. 
+                        Please try refreshing the page.
+                    </p>
+                    <div className="space-x-4">
+                        <Button 
+                            onClick={() => window.location.reload()} 
+                            className="bg-primary hover:bg-primary/90"
+                        >
+                            Refresh Page
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            onClick={() => window.history.back()}
+                        >
+                            Go Back
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    
+    if (isValidating) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="text-center space-y-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-muted-foreground">Loading module...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    if (!module) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="text-center space-y-4 p-8">
+                    <div className="text-6xl">📚</div>
+                    <h1 className="text-2xl font-bold text-foreground">Module not found</h1>
+                    <p className="text-muted-foreground max-w-md">
+                        The module you're looking for doesn't exist or you don't have permission to view it.
+                    </p>
+                    <Button 
+                        variant="outline" 
+                        onClick={() => window.history.back()}
+                    >
+                        Go Back
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     const handleNext = () => {
         if (!isLastLesson) {
@@ -308,7 +359,7 @@ export default function ModuleDetail() {
                             animate={{ y: 0, opacity: 1 }}
                             className="text-xl font-bold"
                         >
-                            {module.name1}
+                            {module?.name1 || module?.name || 'Untitled Module'}
                         </motion.h1>
                         
                         <div className="space-y-2">
@@ -345,13 +396,13 @@ export default function ModuleDetail() {
                                         exit={{ height: 0, opacity: 0 }}
                                         className="overflow-hidden"
                                     >
-                                        <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: module.description || "" }} />
+                                        <div className="prose prose-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: module?.description || "" }} />
                                     </motion.div>
                                 )}
                             </AnimatePresence>
                         </div>
 
-                        {module.has_progress == 1 && (
+                        {module?.has_progress == 1 && (
                             <motion.div 
                                 initial={{ y: 20, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
@@ -365,21 +416,21 @@ export default function ModuleDetail() {
                             </motion.div>
                         )}
 
-                        {module.has_scoring == 1 && (
+                        {module?.has_scoring == 1 && (
                             <motion.div 
                                 initial={{ y: 20, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
                                 className="flex items-center gap-2 text-sm"
                             >
                                 <span className="text-muted-foreground">Total Score:</span>
-                                <span className="font-medium">{module.total_score}</span>
+                                <span className="font-medium">{module?.total_score || 0}</span>
                             </motion.div>
                         )}
                     </div>
 
                     {/* Edit Module Button - Moved to top for better accessibility */}
                     {enableEditing && (
-                        <Link href={`${BASE_PATH}/edit/${module.id}`} className="block">
+                        <Link href={`${BASE_PATH}/edit/${module?.id || module?.name}`} className="block">
                             <Button variant="outline" className="w-full hover:bg-primary/10">
                                 Edit Module
                             </Button>
@@ -465,8 +516,8 @@ export default function ModuleDetail() {
                                 isFirst={isFirstLesson}
                                 isLast={isLastLesson}
                                 activeChapterId={activeChapterId}
-                                moduleId={module.name}
-                                lessonData={lessonDetails[currentLesson.lesson]}
+                                moduleId={module?.name || module?.id}
+                                lessonData={currentLesson ? lessonDetails[currentLesson.lesson] : null}
                                 onChapterIndexChange={(chapterIndex) => {
                                     // Only update if we're not in the middle of a lesson navigation
                                     // This prevents the callback from overriding our manual chapter index setting

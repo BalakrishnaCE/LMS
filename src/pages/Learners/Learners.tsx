@@ -18,7 +18,8 @@ import {
   PaginationPrevious 
 } from "@/components/ui/pagination";
 import { useAPI } from "@/lib/api";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import { useFrappeCreateDoc } from "frappe-react-sdk";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import { useEffect, useRef, useState } from "react";
@@ -37,7 +38,7 @@ interface User {
   last_login?: string;
   user_image?: string;
   roles?: string[];
-  role?: string; // Add role field from backend
+  role?: string;
   // Add fields from learner_analytics
   learner_name?: string;
   modules_enrolled?: number;
@@ -241,7 +242,6 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
         <CardHeader>
           <CardTitle className="text-xl font-semibold text-card-foreground">Learner Distribution</CardTitle>
         </CardHeader>
-
         <CardContent>
           <div
             ref={wrapperRef}
@@ -264,16 +264,14 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
                   {pieData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      data-pie-index={index} // <- important: used by hit-test
+                      data-pie-index={index}
                       fill={entry.fill}
                       stroke={entry.fill}
                       strokeWidth={2}
-                      // keep onMouseEnter to support keyboard/focus interactions if needed
                       onMouseEnter={() => setHoveredSlice({ name: entry.name, value: entry.value })}
                     />
                   ))}
                 </Pie>
-
                 <Legend
                   verticalAlign="bottom"
                   height={36}
@@ -285,7 +283,6 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
                 />
               </PieChart>
             </ResponsiveContainer>
-
             {cursorPos && hoveredSlice && (
               <TooltipDiv top={cursorPos.y} left={cursorPos.x} slice={hoveredSlice} />
             )}
@@ -295,6 +292,8 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
     </div>
   );
 }
+
+
 
 
 
@@ -446,6 +445,13 @@ export default function Learners() {
   });
   const [showEditPassword, setShowEditPassword] = React.useState(false);
   const [learnerToEdit, setLearnerToEdit] = React.useState<User | null>(null);
+
+  // Add Department state
+  const [addDeptOpen, setAddDeptOpen] = React.useState(false);
+  const [addDeptLoading, setAddDeptLoading] = React.useState(false);
+  const [addDeptError, setAddDeptError] = React.useState<string | null>(null);
+  const [departmentName, setDepartmentName] = React.useState('');
+  const { createDoc } = useFrappeCreateDoc();
 
   const api = useAPI();
   const [analyticsData, setAnalyticsData] = React.useState<{ message: any } | null>(null);
@@ -605,12 +611,8 @@ export default function Learners() {
   const departmentNameToId = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map((dep: any) => [dep.department, dep.name])), [allDepartmentOptions]);
 
   const departmentOptions = allDepartmentOptions
-  .map((dep: any) => ({ value: dep.name, label: dep.department || dep.name }))
-  .sort((a, b) => a.label.localeCompare(b.label)); // Sort alphabetically by department name
-  // For edit form: filter out already selected departments
-  //const getFilteredDepartmentOptions = (selectedDepartments: string[]) => {
-  //return departmentOptions.filter(option => !selectedDepartments.includes(option.value));
-  //;
+    .map((dep: any) => ({ value: dep.name, label: dep.department || dep.name }))
+    .sort((a, b) => a.label.localeCompare(b.label)); // Sort alphabetically by department name
   // Filter users based on search criteria with improved logic
   const filteredUsers = React.useMemo(() => {
     if (!users || users.length === 0) return [];
@@ -659,6 +661,7 @@ export default function Learners() {
     setCurrentPage(1);
   }, [searchName, searchEmail, searchStatus, departmentFilter]);
 
+  // Performance logging removed
   // Performance logging removed
 
   const handleExport = () => {
@@ -851,13 +854,6 @@ export default function Learners() {
         .map(deptName => departmentNameToId[deptName] || deptName) // Use ID if mapping exists, otherwise use as-is
         .filter(Boolean);
       
-      // console.log("Edit learner - Department mapping:", {
-      //   learnerName: learner.full_name,
-      //   originalDepartments: allDepartmentNames,
-      //   departmentIds: departmentIds,
-      //   departmentNameToId: departmentNameToId
-      // });
-      
       return departmentIds;
     };
     
@@ -897,7 +893,10 @@ export default function Learners() {
     <div className="w-full max-w-6xl mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Learners</h1>
-        <Button onClick={() => setAddOpen(true)} variant="default">Add Learner</Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setAddDeptOpen(true)} variant="default">Add Department</Button>
+          <Button onClick={() => setAddOpen(true)} variant="default">Add Learner</Button>
+        </div>
       </div>
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
@@ -922,24 +921,19 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
-                             <MultiSelect
-                 options={allDepartmentOptions.map((dep: any) => ({ value: dep.name, label: dep.department || dep.name }))}
-                 selected={addForm.departments}
-                 onSelect={(selected) => setAddForm(f => ({ ...f, departments: selected }))}
-                 placeholder="Select departments"
-                 disabled={addLoading}
-               />
+              <MultiSelect
+                options={allDepartmentOptions.map((dep: any) => ({ value: dep.name, label: dep.department || dep.name }))}
+                selected={addForm.departments}
+                onSelect={(selected) => setAddForm(f => ({ ...f, departments: selected }))}
+                placeholder="Select departments"
+                disabled={addLoading}
+              />
               {addForm.departments && addForm.departments.length === 0 && (
                 <div className="mt-2 text-xs text-destructive">
                   Please select at least one department.
                 </div>
               )}
             </div>
-            {/*addForm.departments && addForm.departments.length > 0 && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                Selected: {addForm.departments.map((depId: string) => departmentIdToName[depId] || depId).join(', ')}
-              </div>
-            )}*/}
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
               <Input value={addForm.mobile_no} onChange={e => setAddForm(f => ({ ...f, mobile_no: e.target.value }))} disabled={addLoading} />
@@ -984,6 +978,65 @@ export default function Learners() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Add Department Dialog */}
+      <Dialog open={addDeptOpen} onOpenChange={setAddDeptOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Department</DialogTitle>
+            <DialogDescription>Create a new department in the system.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            setAddDeptError(null);
+            
+            if (!departmentName || !departmentName.trim()) {
+              setAddDeptError("Department name is required.");
+              return;
+            }
+
+            setAddDeptLoading(true);
+            try {
+              await createDoc("Department", {
+                department: departmentName.trim()
+              });
+              toast.success("Department created successfully");
+              setAddDeptOpen(false);
+              setDepartmentName('');
+              // Refresh the page data to show the new department
+              fetchLearnerData();
+            } catch (error: any) {
+              console.error("Error creating department:", error);
+              const errorMessage = error?.message || error?.exception || "Failed to create department.";
+              setAddDeptError(errorMessage);
+              toast.error("Failed to create department");
+            } finally {
+              setAddDeptLoading(false);
+            }
+          }} className="space-y-4">
+            <div>
+              <label className="block mb-1 font-medium">Department Name<span className="text-red-500">*</span></label>
+              <Input
+                value={departmentName}
+                onChange={(e) => setDepartmentName(e.target.value)}
+                placeholder="Enter department name"
+                required
+              />
+              {addDeptError && (
+                <p className="text-sm text-red-500 mt-1">{addDeptError}</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={addDeptLoading}>
+                {addDeptLoading ? "Adding..." : "Add Department"}
+              </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={addDeptLoading}>Cancel</Button>
+              </DialogClose>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1008,17 +1061,12 @@ export default function Learners() {
             <div>
               <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
               <MultiSelect
-              options={departmentOptions}  // Show ALL departments (not filtered)
-              selected={editForm.departments}  // Pre-select current departments
-              onSelect={(selected) => setEditForm(f => ({ ...f, departments: selected }))}
-              placeholder="Select departments"
-              disabled={editLoading}
+                options={departmentOptions}
+                selected={editForm.departments}
+                onSelect={(selected) => setEditForm(f => ({ ...f, departments: selected }))}
+                placeholder="Select departments"
+                disabled={editLoading}
               />
-                          {/*editForm.departments && editForm.departments.length > 0 && (
-                <div className="mt-2 text-xs text-muted-foreground">
-                  Selected: {editForm.departments.map((depId: string) => departmentIdToName[depId] || depId).join(', ')}
-                </div>
-              )}*/}
             </div>
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
@@ -1070,6 +1118,7 @@ export default function Learners() {
           <strong>Warning:</strong> Learner stats total ({stats.total}) does not match number of users ({users.length}). This may indicate an API limit issue. Try refreshing the page.
         </div>
       )}
+      
       
       
       

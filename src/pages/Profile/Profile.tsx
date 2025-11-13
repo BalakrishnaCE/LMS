@@ -4,19 +4,18 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { useFrappeGetDocList, useFrappeUpdateDoc } from "frappe-react-sdk"
-import { BookOpen, Clock, Award, Calendar, Star, Target, Mail, Phone, MapPin, Flame, Camera } from "lucide-react"
+import { useFrappeUpdateDoc } from "frappe-react-sdk"
+import { BookOpen, Clock, Award, Target, Mail, Phone, MapPin, Camera } from "lucide-react"
 import { toast } from "sonner"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import AchievementShowcase from "@/components/AchievementShowcase";
 import { LMS_API_BASE_URL } from "@/config/routes";
-import { useLearnerModuleData } from "@/lib/api";
+import { useLearnerModuleData, useLearnerDashboard } from "@/lib/api";
 
 // Define Achievement type at the top if not already:
 type Achievement = {
@@ -28,64 +27,197 @@ type Achievement = {
 };
 
 export default function Profile() {
-  const { user, isLoading: userLoading } = useUser();
+  const { user } = useUser();
   const [activeTab, setActiveTab] = React.useState("overview")
   const [isLoading, setIsLoading] = React.useState(true)
   const [isUploading, setIsUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
-  // Fetch module progress using the same hook as dashboard (with built-in deduplication)
-  const { data: learnerData, isLoading: learnerLoading } = useLearnerModuleData(user?.email || "", {
+  // Use user email or name as fallback - API accepts both
+  const userIdentifier = user?.email || user?.name || "";
+  const shouldCallAPI = !!userIdentifier;
+
+  // Fetch module progress using the same approach as dashboard
+  // Prioritize get_learner_dashboard (filters for published modules) over useLearnerModuleData
+  const { data: learnerData, error: learnerError, isLoading: learnerLoading } = useLearnerModuleData(userIdentifier, {
     limit: 100,
     offset: 0,
-  }, { enabled: !userLoading && !!user?.email && user?.email.trim() !== "" });
+  }, { enabled: shouldCallAPI && userIdentifier.trim() !== "" });
   
-  // Debug logging for API response structure
-  console.log('🔍 Profile - API Response:', learnerData);
+  // Also fetch from learner dashboard API as fallback (filters for published modules)
+  const { data: dashboardData, error: dashboardError, isLoading: dashboardLoading } = useLearnerDashboard(
+    userIdentifier, 
+    { enabled: shouldCallAPI && userIdentifier.trim() !== "" }
+  );
+
+  // Extract modules and meta - match dashboard logic to handle different response formats
+  let modules: any[] = [];
+  let meta: any = {};
   
-  // Use correct API response structure (same as dashboard)
-  const modules = learnerData?.message?.modules || [];
-  const meta = learnerData?.message?.meta || {};
-  const totalModules = meta.total_modules || 0;
-  const completedModules = meta.completed_modules || 0;
-  const inProgressModules = meta.in_progress_modules || 0;
-  const averageProgress = meta.average_progress || 0;
+  // First try to use get_learner_dashboard (filters for published modules) - same as dashboard
+  if (dashboardData?.message && Array.isArray(dashboardData.message) && dashboardData.message.length > 0) {
+    // Transform the data to match expected format
+    modules = dashboardData.message.map((item: any) => ({
+      ...item.module,
+      progress: item.progress
+    }));
+    
+    // Calculate meta from modules
+    meta = {
+      total_modules: modules.length,
+      completed_modules: modules.filter((m: any) => m.progress?.status === "Completed").length,
+      in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
+      not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
+      total_count: modules.length
+    };
+  } 
+  // Fallback to useLearnerModuleData
+  else if (learnerData?.message?.modules && Array.isArray(learnerData.message.modules)) {
+    // Response format: { message: { modules: [...], meta: {...} } }
+    modules = learnerData.message.modules || [];
+    meta = learnerData.message.meta || {};
+  } else if (learnerData?.modules && Array.isArray(learnerData.modules)) {
+    // Direct structure: { modules: [...], meta: {...} }
+    modules = learnerData.modules || [];
+    meta = learnerData.meta || {};
+  } else if (learnerData?.message && Array.isArray(learnerData.message)) {
+    // Array format: { message: [{ module: {...}, progress: {...} }] }
+    modules = learnerData.message.map((item: any) => ({
+      ...item.module,
+      progress: item.progress
+    }));
+    // Calculate meta from modules
+    meta = {
+      total_modules: modules.length,
+      completed_modules: modules.filter((m: any) => m.progress?.status === "Completed").length,
+      in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
+      not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
+      total_count: modules.length
+    };
+  }
+  
+  // Check if modules have the nested structure (module.module, module.progress)
+  if (modules.length > 0 && modules[0].module) {
+    modules = modules.map((item: any) => ({
+      ...item.module,
+      progress: item.progress
+    }));
+  }
+
+  // Extract stats from meta
+  const totalModules = meta.total_count || meta.total_modules || modules.length || 0;
+  const completedModules = meta.completed_modules || modules.filter((m: any) => m.progress?.status === "Completed").length || 0;
+  const inProgressModules = meta.in_progress_modules || modules.filter((m: any) => m.progress?.status === "In Progress").length || 0;
+  
+  // Calculate average progress
+  const averageProgress = meta.average_progress || (modules.length > 0 
+    ? Math.round(modules.reduce((sum: number, m: any) => {
+        const progress = m.progress?.overall_progress ?? m.progress?.progress ?? 0;
+        return sum + (typeof progress === 'number' && !isNaN(progress) ? progress : 0);
+      }, 0) / modules.length)
+    : 0);
   
   // Debug logging for extracted data
   console.log('🔍 Profile - Extracted data:', {
+    userIdentifier,
+    hasDashboardData: !!dashboardData,
+    hasLearnerData: !!learnerData,
     modulesCount: modules.length,
     totalModules,
     completedModules,
     inProgressModules,
-    averageProgress
+    averageProgress,
+    meta,
+    modules: modules.map((m: any) => ({ name: m.name1, status: m.progress?.status }))
   });
 
-  // Fetch achievements using User Achievement doctype (like in LearnerDashboard)
-  const { data: userAchievements, isLoading: achievementsLoading } = useFrappeGetDocList(
-    "User Achievement",
-    {
-      fields: [
-        "name",
-        "achievement",
-        "created_on",
-        "user",
-        "achievement.icon_name",
-        "achievement.text",
-        "achievement.description"
-      ],
-      filters: [["user", "=", user?.name || ""]],
-    },
-    { enabled: !!user?.name }
-  );
+  // Fetch achievements using direct API call (same as LearnerDashboard)
+  // This approach works better with child table fields
+  const [profileAchievements, setProfileAchievements] = React.useState<any[]>([]);
+  const [achievementsLoading, setAchievementsLoading] = React.useState(true);
+  
+  // Try both user.name and user.email as the user identifier might vary
+  const userIdentifierForAchievements = user?.name || user?.email || "";
+  
+  const fetchAchievements = React.useCallback(async () => {
+    if (!userIdentifierForAchievements) {
+      setAchievementsLoading(false);
+      return;
+    }
+    
+    try {
+      setAchievementsLoading(true);
+      console.log('🔍 Profile - Fetching achievements for user:', userIdentifierForAchievements);
+      
+      // Try with user.name first
+      let response = await fetch(`${LMS_API_BASE_URL}api/resource/User Achievement?filters=[["user","=","${userIdentifierForAchievements}"]]&fields=["name","achievement","created_on","user","achievement.icon_name","achievement.text","achievement.description"]`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+      
+      let data = await response.json();
+      
+      // If no results with current identifier, try with email if different
+      if ((!data.data || data.data.length === 0) && user?.email && user?.email !== userIdentifierForAchievements) {
+        console.log('🔍 Profile - No achievements found with name, trying email:', user.email);
+        response = await fetch(`${LMS_API_BASE_URL}api/resource/User Achievement?filters=[["user","=","${user.email}"]]&fields=["name","achievement","created_on","user","achievement.icon_name","achievement.text","achievement.description"]`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
+        data = await response.json();
+      }
+      
+      console.log('🔍 Profile - Achievements API response:', {
+        hasData: !!data.data,
+        count: data.data?.length || 0,
+        data: data.data
+      });
+      
+      if (data.data && Array.isArray(data.data)) {
+        setProfileAchievements(data.data);
+      } else {
+        setProfileAchievements([]);
+      }
+    } catch (error) {
+      console.error('❌ Profile - Error fetching achievements:', error);
+      setProfileAchievements([]);
+    } finally {
+      setAchievementsLoading(false);
+    }
+  }, [userIdentifierForAchievements, user?.email]);
+  
+  React.useEffect(() => {
+    fetchAchievements();
+  }, [fetchAchievements]);
+  
+  // Refetch achievements periodically to catch newly created ones
+  React.useEffect(() => {
+    if (userIdentifierForAchievements) {
+      const interval = setInterval(() => {
+        fetchAchievements();
+      }, 5000); // Refetch every 5 seconds
+      return () => clearInterval(interval);
+    }
+  }, [userIdentifierForAchievements, fetchAchievements]);
+  
+  // Map API data to AchievementShowcase props
   let achievements: Achievement[] = [];
-  if (userAchievements && Array.isArray(userAchievements)) {
-    achievements = userAchievements.map((ua: any) => ({
+  if (profileAchievements && Array.isArray(profileAchievements)) {
+    achievements = profileAchievements.map((ua: any) => ({
       id: ua.name,
-      icon_name: ua.icon_name,
-      text: ua.text,
-      description: ua.description,
+      icon_name: ua.icon_name || "",
+      text: ua.text || "",
+      description: ua.description || "",
       created_on: ua.created_on,
     }));
+    
+    console.log('🔍 Profile - Mapped achievements:', achievements);
   }
 
   const { updateDoc } = useFrappeUpdateDoc()

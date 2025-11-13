@@ -1,11 +1,12 @@
 import React, { useRef, useEffect } from "react";
-import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle, Circle, PlayCircle, ArrowLeft, ChevronDown, ChevronUp, BookOpen, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ROUTES } from "@/config/routes";
+import { ROUTES, getFullPath } from "@/config/routes";
+import { Link } from "wouter";
+
 
 interface ModuleSidebarProps {
   module: any;
@@ -17,21 +18,8 @@ interface ModuleSidebarProps {
   currentLessonName?: string;
   currentChapterName?: string;
   mode: 'admin' | 'learner' | 'review';
-  // Phase 2: Completion data for smart icon display
-  completionData?: {
-    completed_lessons: string[];
-    completed_chapters: string[];
-    in_progress_chapters: string[];
-    current_position: {
-      type: string;
-      reference_id: string;
-      start_time: string;
-    } | null;
-    total_lessons: number;
-    total_chapters: number;
-    overall_progress: number;
-  };
-  // Phase 3: Locking mechanism
+  moduleName?: string;
+  completionData?: any;
   isAccessible?: (lessonName: string, chapterName?: string) => boolean;
 }
 
@@ -45,6 +33,7 @@ export function ModuleSidebar({
   currentLessonName,
   currentChapterName,
   mode,
+  moduleName,
   completionData,
   isAccessible
 }: ModuleSidebarProps) {
@@ -102,7 +91,30 @@ export function ModuleSidebar({
     }
   };
 
-  // Phase 2: Helper function to check if a lesson is completed using completion data
+  // Helper function to get completed items from localStorage
+  const getCompletedItems = () => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const stored = localStorage.getItem(`lms_completed_${moduleName}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  };
+
+  // Helper function to save completed items to localStorage
+  const saveCompletedItem = (itemId: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const completed = getCompletedItems();
+      completed.add(itemId);
+      localStorage.setItem(`lms_completed_${moduleName}`, JSON.stringify([...completed]));
+    } catch (error) {
+      console.error('Failed to save completed item:', error);
+    }
+  };
+
+  // Helper function to check if a lesson is completed
   const isLessonCompleted = (lesson: any) => {
     console.log('🔍 isLessonCompleted called:', {
       lessonName: lesson.name,
@@ -128,6 +140,12 @@ export function ModuleSidebar({
     
     // Fallback to old logic
     if (lesson.progress === "Completed") return true;
+    
+    // Check localStorage for persistent completion status
+    const completedItems = getCompletedItems();
+    const lessonId = `lesson_${lesson.name}`;
+    if (completedItems.has(lessonId)) return true;
+    
     if (!lesson.chapters || lesson.chapters.length === 0) return false;
     
     // Check if all chapters in the lesson are completed
@@ -162,6 +180,11 @@ export function ModuleSidebar({
     
     // Fallback to old logic
     if (chapter.progress === "Completed") return true;
+    
+    // Check localStorage for persistent completion status
+    const completedItems = getCompletedItems();
+    const chapterId = `${lesson.name}_${chapter.name}`;
+    if (completedItems.has(chapterId)) return true;
     
     // Check if this chapter is before the current chapter in progress
     if (progress?.current_lesson && progress?.current_chapter) {
@@ -198,12 +221,27 @@ export function ModuleSidebar({
       className="w-full border-r border-border overflow-y-auto bg-card/50 backdrop-blur-sm"
     >
       <div className="p-4 space-y-6">
-        <Link href={mode === 'admin' ? ROUTES.MODULES : ROUTES.LEARNER_MODULES} className="inline-block">
-          <Button variant="outline" size="sm" className="gap-2 hover:bg-primary hover:text-secondary">
+        <div
+          onClick={() => {
+            
+            // Navigate back to modules list
+            if (mode === 'admin') {
+              window.location.href = getFullPath(ROUTES.MODULES);
+            } else {
+              window.location.href = getFullPath(ROUTES.LEARNER_MODULES);
+            }
+          }}
+          style={{ cursor: 'pointer' }}
+        >
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2 hover:bg-primary hover:text-secondary w-full"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back to Modules
           </Button>
-        </Link>
+        </div>
 
         {/* Module Info */}
         <div className="space-y-4">
@@ -221,7 +259,7 @@ export function ModuleSidebar({
               <BookOpen className="h-4 w-4" />
               <span>Admin Preview Mode</span>
               {module?.name && (
-                <Link href={`/edit/${module.name}`}>
+                <Link href={`/edit/${module?.name || module?.id}`}>
                   <Button variant="outline" size="sm" className="gap-2 ml-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2.828 2.828 0 00-4-4l-8 8v3zm0 0v3a2 2 0 002 2h3" /></svg>
                     Edit Module
@@ -289,6 +327,7 @@ export function ModuleSidebar({
               <Progress value={overallProgress === -1 ? 0 : overallProgress} className="h-2" />
             </motion.div>
           )}
+
         </div>
 
         {/* Lesson Navigation */}
@@ -324,10 +363,9 @@ export function ModuleSidebar({
                         : "cursor-pointer"
                     )}
                     onClick={() => {
-                      // Check if lesson is accessible before allowing click
-                      if (mode !== 'admin' && isAccessible && !isAccessible(lesson.name)) {
-                        return; // Don't allow click for locked content
-                      }
+                      // Save to localStorage for persistence
+                      const lessonId = `lesson_${lesson.name}`;
+                      saveCompletedItem(lessonId);
                       onLessonClick?.(lesson.name);
                       toggleLesson(lesson.name);
                     }}
@@ -370,7 +408,7 @@ export function ModuleSidebar({
                       exit={{ height: 0, opacity: 0 }}
                       className="pl-4 pb-2 space-y-1 overflow-hidden"
                     >
-                      {lesson.chapters.map((chapter: any, cidx: number) => {
+                      {lesson.chapters.map((chapter: any) => {
                         let isCurrentChapter = false;
                         if (mode === 'admin') {
                           isCurrentChapter = chapter.name === currentChapterName;
@@ -378,6 +416,17 @@ export function ModuleSidebar({
                           isCurrentChapter = chapter.name === currentChapterName;
                         } else {
                           isCurrentChapter = chapter.name === progress?.current_chapter;
+                        }
+                        
+                        // Debug logging
+                        if (chapter.name === currentChapterName || chapter.name === progress?.current_chapter) {
+                          console.log("Chapter highlighting debug:", {
+                            chapterName: chapter.name,
+                            currentChapterName,
+                            progressCurrentChapter: progress?.current_chapter,
+                            mode,
+                            isCurrentChapter
+                          });
                         }
                         return (
                           <div
@@ -399,10 +448,9 @@ export function ModuleSidebar({
                             )}
                             onClick={(e) => {
                               e.stopPropagation();
-                              // Check if chapter is accessible before allowing click
-                              if (mode !== 'admin' && isAccessible && !isAccessible(lesson.name, chapter.name)) {
-                                return; // Don't allow click for locked content
-                              }
+                              // Save to localStorage for persistence
+                              const chapterId = `${lesson.name}_${chapter.name}`;
+                              saveCompletedItem(chapterId);
                               onChapterClick?.(lesson.name, chapter.name);
                             }}
                           >

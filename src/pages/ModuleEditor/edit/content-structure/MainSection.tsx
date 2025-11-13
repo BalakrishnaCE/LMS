@@ -265,7 +265,7 @@ export default function MainSection({
       console.error('Module ID is required for preview');
       return;
     }
-    // Use Admin preview route so Draft modules can be previewed too
+// Use Admin preview route so Draft modules can be previewed too
     const previewUrl = `${BASE_PATH}/modules/${moduleId}`;
     window.open(previewUrl, '_blank');
   };
@@ -910,6 +910,30 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
     }
   }
 
+  // Helper function to get full media URL from base URL
+  // Uses lms.noveloffice.org as base URL in both development and production
+  const getMediaUrl = (path?: string): string => {
+    if (!path) return '';
+    const trimmed = path.trim();
+    if (!trimmed) return '';
+    
+    // If already a full URL, return as is
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    
+    // Ensure path starts with / if it doesn't already
+    const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    
+    // Determine base URL
+    // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+    // In development: use http://lms.noveloffice.org
+    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    
+    return `${cleanBaseUrl}${relativePath}`;
+  };
+
   // View mode for saved content  
   switch (content.type) {
     case 'Text Content':
@@ -921,28 +945,40 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
         </div>
       );
     case 'Image Content':
-      return (
+            return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
-          {content.attach && <img src={LMS_API_BASE_URL + content.attach} alt={content.title} className="max-h-48 mx-auto rounded" />}
+          {content.attach && (
+            <img 
+              src={getMediaUrl(content.attach)} 
+              alt={content.title || 'Image'} 
+              className="max-h-48 mx-auto rounded object-contain"
+            />
+          )}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
     case 'Video Content':
-      return (
+            return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           {content.video && (
             <div className="relative">
-              <VideoPreview src={LMS_API_BASE_URL + content.video} />
+              <VideoPreview src={getMediaUrl(content.video)} />
             </div>
           )}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
     case 'Audio Content':
-      return (
+            return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           <div className="font-bold mb-2">{content.title}</div>
-          {content.attach && <audio src={LMS_API_BASE_URL + content.attach} controls className="w-full mt-2 rounded" />}
+          {content.attach && (
+            <audio 
+              src={getMediaUrl(content.attach)} 
+              controls 
+              className="w-full mt-2 rounded"
+            />
+          )}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );

@@ -15,6 +15,7 @@ export const LMS_API_BASE_URL = import.meta.env.PROD ? "https://lms.noveloffice.
 // Common routes
 export const ROUTES = {
   HOME: '/',
+  ADMIN_DASHBOARD: '/admin-dashboard',
   LOGIN: '/login',
   LEARNER_DASHBOARD: '/learner-dashboard',
   MODULES: '/modules',
@@ -28,4 +29,8 @@ export const ROUTES = {
   PROJECTS: '/projects',
   PROFILE: '/profile',
   NEW_MODULE: '/module/new',
+  EDIT: '/edit',
+  EDIT_MODULE: (moduleId: string) => `/edit/${moduleId}`,
+  QUIZ: '/quiz',
+  QUIZ_QUESTIONS: '/quiz-questions',
 } as const; 

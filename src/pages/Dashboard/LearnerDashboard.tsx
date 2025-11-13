@@ -772,16 +772,36 @@ export default function LearnerDashboard() {
                                   {module.image ? (
                                     <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 relative">
                                       <img 
-                                        src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`} 
+                                        src={(() => {
+                                          // Helper function to get full image URL
+                                          const getImageUrl = (path: string): string => {
+                                            if (!path) return '';
+                                            const trimmed = path.trim();
+                                            if (!trimmed) return '';
+                                            
+                                            // If already a full URL, return as is
+                                            if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                              return trimmed;
+                                            }
+                                            
+                                            // Ensure path starts with / if it doesn't already
+                                            const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                                            
+                                            // Determine base URL
+                                            // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                                            // In development: use http://lms.noveloffice.org
+                                            const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                            const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                                            
+                                            return `${cleanBaseUrl}${relativePath}`;
+                                          };
+                                          return getImageUrl(module.image);
+                                        })()}
                                         alt={module.name1 + ' image'} 
                                         className="object-cover w-full h-full rounded-r-xl" 
                                         loading="lazy"
-                                        onError={(e) => {
-                                          // Try alternative URL if first fails
-                                          const currentSrc = e.currentTarget.src;
-                                          if (!currentSrc.includes('lms.noveloffice.in')) {
-                                            e.currentTarget.src = module.image.startsWith('http') ? module.image : `https://lms.noveloffice.in${module.image}`;
-                                          }
+                                        onError={() => {
+                                          console.error('Failed to load module image:', module.image);
                                         }}
                                       />
                                     </div>
@@ -952,17 +972,37 @@ export default function LearnerDashboard() {
                                     {module.image ? (
                                       <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 relative">
                                         <img 
-                                          src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`} 
-                                          alt={moduleName + ' image'} 
-                                          className="object-cover w-full h-full rounded-r-xl" 
-                                          loading="lazy"
-                                          onError={(e) => {
-                                            // Try alternative URL if first fails
-                                            const currentSrc = e.currentTarget.src;
-                                            if (!currentSrc.includes('lms.noveloffice.in')) {
-                                              e.currentTarget.src = module.image.startsWith('http') ? module.image : `https://lms.noveloffice.in${module.image}`;
-                                            }
-                                          }}
+                                          src={(() => {
+                                            // Helper function to get full image URL
+                                            const getImageUrl = (path: string): string => {
+                                              if (!path) return '';
+                                              const trimmed = path.trim();
+                                              if (!trimmed) return '';
+                                              
+                                              // If already a full URL, return as is
+                                              if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                                return trimmed;
+                                              }
+                                              
+                                              // Ensure path starts with / if it doesn't already
+                                              const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                                              
+                                              // Determine base URL
+                                              // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                                              // In development: use http://lms.noveloffice.org
+                                              const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                              const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                                              
+                                              return `${cleanBaseUrl}${relativePath}`;
+                                            };
+                                            return getImageUrl(module.image);
+                                          })()}
+                                        alt={moduleName + ' image'} 
+                                        className="object-cover w-full h-full rounded-r-xl" 
+                                        loading="lazy"
+                                        onError={() => {
+                                          console.error('Failed to load module image:', module.image);
+                                        }}
                                         />
                                       </div>
                                     ) : (
@@ -1098,17 +1138,37 @@ export default function LearnerDashboard() {
                                     {module.image ? (
                                       <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 relative">
                                         <img 
-                                          src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`} 
-                                          alt={module.name1 + ' image'} 
-                                          className="object-cover w-full h-full rounded-r-xl" 
-                                          loading="lazy"
-                                          onError={(e) => {
-                                            // Try alternative URL if first fails
-                                            const currentSrc = e.currentTarget.src;
-                                            if (!currentSrc.includes('lms.noveloffice.in')) {
-                                              e.currentTarget.src = module.image.startsWith('http') ? module.image : `https://lms.noveloffice.in${module.image}`;
-                                            }
-                                          }}
+                                          src={(() => {
+                                            // Helper function to get full image URL
+                                            const getImageUrl = (path: string): string => {
+                                              if (!path) return '';
+                                              const trimmed = path.trim();
+                                              if (!trimmed) return '';
+                                              
+                                              // If already a full URL, return as is
+                                              if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                                return trimmed;
+                                              }
+                                              
+                                              // Ensure path starts with / if it doesn't already
+                                              const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                                              
+                                              // Determine base URL
+                                              // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                                              // In development: use http://lms.noveloffice.org
+                                              const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                              const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                                              
+                                              return `${cleanBaseUrl}${relativePath}`;
+                                            };
+                                            return getImageUrl(module.image);
+                                          })()}
+                                        alt={module.name1 + ' image'} 
+                                        className="object-cover w-full h-full rounded-r-xl" 
+                                        loading="lazy"
+                                        onError={() => {
+                                          console.error('Failed to load module image:', module.image);
+                                        }}
                                         />
                                       </div>
                                     ) : (

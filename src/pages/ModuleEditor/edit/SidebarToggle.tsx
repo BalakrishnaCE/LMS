@@ -15,4 +15,4 @@ export default function SidebarToggle({ isOpen, onClick }: { isOpen: boolean; on
       {isOpen ? <ChevronLeft size={22} /> : <ChevronRight size={22} />}
     </motion.button>
   );
-} 
+}

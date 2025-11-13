@@ -50,12 +50,28 @@ export default function ModuleEdit() {
   const { updateDoc } = useFrappeUpdateDoc();
 
   // Use the get_module_with_details endpoint
-  const { data: moduleData, error, isLoading, mutate } = useFrappeGetCall('novel_lms.novel_lms.api.module_management.get_module_with_details', { module_id: moduleId });
+  const { data: moduleData, error, isLoading, mutate } = useFrappeGetCall(
+    'novel_lms.novel_lms.api.module_management.get_module_with_details', 
+    { module_id: moduleId },
+    { enabled: !!moduleId }
+  );
 
   // Normalize chapter contents after module data load
   useEffect(() => {
     function normalizeModule(moduleDataObj: any) {
-      if (!moduleDataObj || !moduleDataObj.lessons) return moduleDataObj;
+      if (!moduleDataObj) {
+        console.warn('ModuleEdit - normalizeModule: moduleDataObj is null or undefined');
+        return null;
+      }
+      
+      // Handle case where lessons might be empty array or undefined
+      if (!moduleDataObj.lessons || !Array.isArray(moduleDataObj.lessons)) {
+        console.warn('ModuleEdit - normalizeModule: lessons is missing or not an array, using empty array');
+        return {
+          ...moduleDataObj,
+          lessons: []
+        };
+      }
       const normalizedModule = {
         ...moduleDataObj,
         lessons: moduleDataObj.lessons.map((lesson: any) => ({
@@ -94,11 +110,29 @@ export default function ModuleEdit() {
     }
 
     if (moduleData) {
-      // Handle both response.data and response.message structures
-      const actualData = moduleData.data || moduleData.message || moduleData;
-      const normalized = normalizeModule(actualData);
-      setModule(normalized);
-      setModuleInfo(normalized);
+      // Handle different response structures from frappe-react-sdk
+      // The API returns data in frappe.response["data"], which frappe-react-sdk wraps
+      let actualData = null;
+      
+      if (moduleData.message) {
+        actualData = moduleData.message;
+      } else if (moduleData.data) {
+        actualData = moduleData.data;
+      } else if (moduleData.lessons) {
+        // Direct response format
+        actualData = moduleData;
+      } else {
+        // Try to find the data in the response
+        actualData = moduleData;
+      }
+      
+      if (actualData) {
+        const normalized = normalizeModule(actualData);
+        setModule(normalized);
+        setModuleInfo(normalized);
+      } else {
+        console.error('ModuleEdit - Could not extract module data from response:', moduleData);
+      }
     }
   }, [moduleData, setModule]);
 
@@ -139,11 +173,23 @@ export default function ModuleEdit() {
   }
 
   if (error) {
-    toast.error("Failed to load module");
+    console.error('ModuleEdit - Error loading module:', error);
+    const errorMessage = error instanceof Error ? error.message : 
+                         typeof error === 'object' && error !== null ? JSON.stringify(error) : 
+                         'Unknown error';
+    toast.error(`Failed to load module: ${errorMessage}`);
     return (
       <div className="flex flex-col items-center justify-center p-8">
         <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
         <div className="mt-4 text-red-500">Error loading module</div>
+        <div className="mt-2 text-sm text-muted-foreground">
+          {errorMessage}
+        </div>
+        {moduleId && (
+          <div className="mt-2 text-xs text-muted-foreground">
+            Module ID: {moduleId}
+          </div>
+        )}
       </div>
     );
   }

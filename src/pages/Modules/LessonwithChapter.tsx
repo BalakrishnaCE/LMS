@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import StepsContent from './Contents/StepsContent';
 import CheckListContent from './Contents/CheckListContent';
 import AccordionContent from './Contents/AccordionContent';
-import { useAPI } from "../../lib/api";
+import { useAPI } from "@/lib/api";
 import { LMS_API_BASE_URL } from "@/config/routes";
 
 // Video player component with fallback for failed loads
@@ -146,6 +146,7 @@ function FetchingContentRenderer({ contentType, contentReference, moduleId }: {
 }) {
   const { data: content, error, isValidating } = useFrappeGetDoc(contentType, contentReference);
 
+
   if (isValidating) return <div>Loading content...</div>;
   if (error) {
     console.error('ContentRenderer error:', error);
@@ -155,15 +156,6 @@ function FetchingContentRenderer({ contentType, contentReference, moduleId }: {
     console.warn('ContentRenderer: No content found for', contentType, contentReference);
     return null;
   }
-  return <ContentDisplay contentType={contentType} content={content} moduleId={moduleId} contentReference={contentReference} />;
-}
-
-function ContentDisplay({ contentType, content, moduleId, contentReference }: { 
-  contentType: string; 
-  content: any;
-  moduleId?: string;
-  contentReference?: string;
-}) {
 
   const renderContent = () => {
     switch (contentType) {
@@ -306,21 +298,6 @@ function ContentDisplay({ contentType, content, moduleId, contentReference }: {
       {renderContent()}
     </motion.div>
   );
-}
-
-function ContentRenderer({ contentType, contentReference, moduleId, contentData }: { 
-  contentType: string; 
-  contentReference: string; 
-  moduleId?: string;
-  contentData?: any;
-}) {
-  // If content data is already provided, use it directly without fetching
-  if (contentData) {
-    return <ContentDisplay contentType={contentType} content={contentData} moduleId={moduleId} contentReference={contentReference} />;
-  }
-  
-  // Otherwise, fetch it
-  return <FetchingContentRenderer contentType={contentType} contentReference={contentReference} moduleId={moduleId} />;
 }
 
 export function LessonWithChapters({ onNext, onPrevious, isFirst, isLast, activeChapterId, moduleId, lessonData, onChapterIndexChange }: LessonWithChaptersProps) {
@@ -469,8 +446,6 @@ function ChapterWithContents({ moduleId, chapterData }: { moduleId?: string; cha
   if (error) return <div>Error loading chapter</div>;
   if (!chapter) return null;
 
-  
-
   // Filter out invalid content and sort properly
   const sortedContents = (chapter.contents || [])
     .filter((content: any) => content && content.content_type && content.content_reference)
@@ -495,32 +470,21 @@ function ChapterWithContents({ moduleId, chapterData }: { moduleId?: string; cha
       {/* Chapter Contents */}
       <div className="space-y-8">
         <AnimatePresence>
-          {sortedContents.map((content: any, index: number) => {
-            // console.log('📄 LessonWithChapters rendering content:', {
-            //   name: content.name,
-            //   contentType: content.content_type,
-            //   contentReference: content.content_reference,
-            //   hasData: !!content.data,
-            //   dataKeys: content.data ? Object.keys(content.data) : [],
-            //   willUsePreFetched: !!content.data
-            // });
-            return (
-              <motion.div
-                key={content.content_reference}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-card/30 backdrop-blur-sm border border-border/50 rounded-lg p-6 shadow-sm"
-              >
-                <ContentRenderer
-                  contentType={content.content_type}
-                  contentReference={content.content_reference}
-                  moduleId={moduleId}
-                  contentData={content.data}
-                />
-              </motion.div>
-            );
-          })}
+          {sortedContents.map((content: any, index: number) => (
+            <motion.div
+              key={content.content_reference}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-card/30 backdrop-blur-sm border border-border/50 rounded-lg p-6 shadow-sm"
+            >
+              <FetchingContentRenderer
+                contentType={content.content_type}
+                contentReference={content.content_reference}
+                moduleId={moduleId}
+              />
+            </motion.div>
+          ))}
         </AnimatePresence>
       </div>
     </div>

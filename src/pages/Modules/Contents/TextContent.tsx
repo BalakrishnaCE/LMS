@@ -30,6 +30,23 @@ export default function TextContent({
     );
   }
 
+  // Check if content body is empty or just whitespace
+  const bodyContent = content.body || content.value || "";
+  const hasContent = bodyContent.trim() !== "" && bodyContent.trim() !== "<p></p>" && bodyContent.trim() !== "<p><br></p>";
+  
+  // Filter out placeholder titles like "txt", "text", etc.
+  const shouldShowTitle = content.title && 
+    !content.title.match(/^chapter-?\d*-text$/i) && 
+    !content.title.match(/^chapter-?\d*-.*text$/i) &&
+    content.title.toLowerCase().trim() !== "txt" &&
+    content.title.toLowerCase().trim() !== "text" &&
+    content.title.trim().length > 2;
+
+  // Don't render if there's no actual content
+  if (!hasContent && !shouldShowTitle) {
+    return null;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -37,14 +54,16 @@ export default function TextContent({
       className="text-content-container"
     >
       <div className="space-y-4">
-        {content.title && !content.title.match(/^chapter-?\d*-text$/i) && !content.title.match(/^chapter-?\d*-.*text$/i) && (
+        {shouldShowTitle && (
           <h2 className="text-2xl font-bold">{content.title}</h2>
         )}
         
-        <div 
-          className="prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground prose-blockquote:text-foreground"
-          dangerouslySetInnerHTML={{ __html: content.body || content.value || "" }}
-        />
+        {hasContent && (
+          <div 
+            className="prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground prose-blockquote:text-foreground"
+            dangerouslySetInnerHTML={{ __html: bodyContent }}
+          />
+        )}
       </div>
     </motion.div>
   );

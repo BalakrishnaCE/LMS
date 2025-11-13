@@ -468,7 +468,7 @@ export class APIService {
       credentials: 'include'
     });
     return response.json();
-  } 
+  }
 
   // Analytics APIs
   async getLMSAnalytics(data?: {

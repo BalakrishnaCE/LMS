@@ -1,5 +1,6 @@
-import { useFrappeAuth, useFrappeGetDoc } from "frappe-react-sdk";
+import { useFrappeAuth } from "frappe-react-sdk";
 import { useEffect, useState } from "react";
+import { useLMSUserPermissions } from "./use-lms-user-permissions";
 
 interface UserRole {
   role: string;
@@ -27,19 +28,20 @@ export function useUser(): UseUserReturn {
   const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
+  const [error] = useState<unknown>(null);
 
-  const { data, error: docError, isValidating } = useFrappeGetDoc(
-    "User",
-    currentUser ?? undefined,
-    {
-      fields: ["name", "full_name", "email", "image", "user_image", "roles"],
-      enabled: !!currentUser, // Only fetch if we have a currentUser
-    }
-  );
+  // Get LMS permissions - only call once when user changes
+  const { 
+    isLMSAdmin, 
+    isLMSStudent, 
+    isLMSContentEditor, 
+    isLoading: permissionsLoading 
+  } = useLMSUserPermissions();
 
 
   useEffect(() => {
+    console.log("useUser hook:", { currentUser, isAuthLoading, permissionsLoading });
+    
     // If auth is still loading, keep loading state
     if (isAuthLoading) {
       setIsLoading(true);
@@ -48,36 +50,32 @@ export function useUser(): UseUserReturn {
 
     // If no current user, clear user data
     if (!currentUser) {
+      console.log("No current user, clearing user data");
       setUser(null);
       setIsLoading(false);
       return;
     }
 
-    // If fetching user data
-    if (isValidating) {
-      setIsLoading(true);
-    }
+    // Create a basic user object from currentUser
+    // This avoids the CORS issue with useFrappeGetDoc
+    const basicUser: UserData = {
+      name: currentUser,
+      full_name: currentUser.includes('@') ? currentUser.split('@')[0] : currentUser, // Handle both email and username
+      email: currentUser,
+      image: "",
+      user_image: "",
+      roles: [] // We'll get roles from useLMSUserPermissions instead
+    };
 
-    // If we have user data
-    if (data) {
-      setUser(data);
-      setIsLoading(false);
-    }
-
-    // If there's an error
-    if (docError) {
-      setError(docError);
-      setIsLoading(false);
-    }
-  }, [currentUser, data, isValidating, docError, isAuthLoading]);
-
-  const isLMSAdmin = user?.roles?.some((role) => role.role === "LMS Admin") ?? false;
-  const isLMSStudent = user?.roles?.some((role) => role.role === "LMS Student") ?? false;
-  const isLMSContentEditor = user?.roles?.some((role) => role.role === "LMS Content Editor") ?? false;
+    console.log("Setting user data:", basicUser);
+    console.log("User email for API calls:", basicUser.email);
+    setUser(basicUser);
+    setIsLoading(false);
+  }, [currentUser, isAuthLoading]);
 
   return {
     user,
-    isLoading: isLoading || isAuthLoading,
+    isLoading: isLoading || isAuthLoading || permissionsLoading,
     error,
     isLMSAdmin,
     isLMSStudent,

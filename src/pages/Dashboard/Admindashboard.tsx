@@ -6,9 +6,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LearnersTable } from "@/pages/Learners/LearnersTable"
 import { useUser } from "@/hooks/use-user"
 import { useFrappeGetCall } from "frappe-react-sdk"
+import { useLMSAnalytics, useLearnersData } from "@/lib/api"
 import { motion, AnimatePresence } from "framer-motion"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface User {
   name: string;
@@ -58,47 +67,22 @@ function Admindashboard() {
     const { user, isLoading: userLoading, error } = useUser();
     const [activeTab, setActiveTab] = useState("module")
     
-    // Pagination state for learners (copied from Analytics dashboard)
-    const [learnerCurrentPage, setLearnerCurrentPage] = useState(1);
-    const [learnerTotalPages, setLearnerTotalPages] = useState(1);
-    const itemsPerPage = 20;
+    // Pagination state for learners
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 20
 
-    // Fetch learners data from LMS Users doctype
-    const { data: analyticsData, error: studentsError, isValidating: studentsLoading } = useFrappeGetCall<any>("novel_lms.novel_lms.api.departments.get_learners_data");
-    const message = analyticsData?.message || {};
+    // Fetch learners data using the learners API
+    const { data: learnersData, isLoading: studentsLoading } = useLearnersData();
+    const message = learnersData?.message || {};
     const users = message.users || [];
     const stats = message.users_stats;
 
-    // Pagination logic for learners (copied from Analytics dashboard)
-    React.useEffect(() => {
-        if (users.length > 0) {
-            setLearnerTotalPages(Math.ceil(users.length / itemsPerPage));
-        }
-    }, [users.length, itemsPerPage]);
-
-    // Get current page data for learners
-    const getCurrentLearnerPageData = () => {
-        const startIndex = (learnerCurrentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        return users.slice(startIndex, endIndex);
-    };
-
-    // Pagination handlers for learners
-    const handleLearnerPageChange = (page: number) => {
-        setLearnerCurrentPage(page);
-    };
-
-    const handleLearnerPrevPage = () => {
-        if (learnerCurrentPage > 1) {
-            setLearnerCurrentPage(learnerCurrentPage - 1);
-        }
-    };
-
-    const handleLearnerNextPage = () => {
-        if (learnerCurrentPage < learnerTotalPages) {
-            setLearnerCurrentPage(learnerCurrentPage + 1);
-        }
-    };
+    
+    // Pagination logic
+    const totalPages = Math.ceil(users.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    const paginatedUsers = users.slice(startIndex, endIndex)
 
     React.useEffect(() => {
         if (user) {
@@ -146,7 +130,7 @@ function Admindashboard() {
                                         <TabsTrigger value="module">Module</TabsTrigger>
                                         <TabsTrigger value="learners">Learners</TabsTrigger>
                                     </TabsList>
-                                    <AnimatePresence mode="wait">
+                                    <AnimatePresence>
                                         <TabsContent value="module" key="module">
                                             <motion.div
                                                 initial={{ opacity: 0, x: -20 }}
@@ -165,17 +149,49 @@ function Admindashboard() {
                                                 transition={{ duration: 0.3 }}
                                             >
                                                 <LearnersTable
-                                                    learners={getCurrentLearnerPageData()}
+                                                    learners={paginatedUsers}
                                                     isLoading={studentsLoading}
                                                     showActions={false}
-                                                    learnerCurrentPage={learnerCurrentPage}
-                                                    learnerTotalPages={learnerTotalPages}
-                                                    itemsPerPage={itemsPerPage}
-                                                    totalLearners={users.length}
-                                                    handleLearnerPageChange={handleLearnerPageChange}
-                                                    handleLearnerPrevPage={handleLearnerPrevPage}
-                                                    handleLearnerNextPage={handleLearnerNextPage}
                                                 />
+                                                
+                                                {/* Pagination */}
+                                                {totalPages > 1 && (
+                                                    <div className="mt-6 flex flex-col items-center gap-4">
+                                                        <div className="text-sm text-muted-foreground">
+                                                            Showing {startIndex + 1} to {Math.min(endIndex, users.length)} of {users.length} learners
+                                                        </div>
+                                                        <Pagination>
+                                                            <PaginationContent>
+                                                                <PaginationItem>
+                                                                    <PaginationPrevious 
+                                                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                                                    />
+                                                                </PaginationItem>
+                                                                
+                                                                {/* Page numbers */}
+                                                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                                                    <PaginationItem key={page}>
+                                                                        <PaginationLink
+                                                                            isActive={currentPage === page}
+                                                                            onClick={() => setCurrentPage(page)}
+                                                                            className="cursor-pointer"
+                                                                        >
+                                                                            {page}
+                                                                        </PaginationLink>
+                                                                    </PaginationItem>
+                                                                ))}
+                                                                
+                                                                <PaginationItem>
+                                                                    <PaginationNext 
+                                                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                                                                    />
+                                                                </PaginationItem>
+                                                            </PaginationContent>
+                                                        </Pagination>
+                                                    </div>
+                                                )}
                                             </motion.div>
                                         </TabsContent>
                                     </AnimatePresence>

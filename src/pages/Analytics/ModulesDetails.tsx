@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -8,19 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Layers, 
-  TrendingUp, 
-  TrendingDown, 
   Award, 
-  Clock, 
   Target,
-  Activity,
-  Calendar,
   Filter,
   Download,
-  CheckCircle,
-  FileText,
-  Eye,
-  Users
+  CheckCircle
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -29,13 +21,9 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
   CartesianGrid,
   LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
+  Line
 } from "recharts";
 import { useFrappeGetCall } from "frappe-react-sdk";
 

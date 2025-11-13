@@ -17,7 +17,31 @@ interface VideoContentEditorProps {
 const VideoContentEditor: React.FC<VideoContentEditorProps> = ({ content, onSave, onCancel }) => {
   const [title, setTitle] = useState(content.title || '');
   const [video, setVideo] = useState(content.video || '');
-  const [preview, setPreview] = useState(content.video || '');
+  
+  // Create preview URL from stored content (handle both relative and full URLs)
+  // Uses lms.noveloffice.org as base URL in both development and production
+  const getPreviewUrl = (url: string) => {
+    if (!url) return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    
+    // If already a full URL, return as is
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    
+    // Ensure path starts with / if it doesn't already
+    const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    
+    // Determine base URL
+    // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+    // In development: use http://lms.noveloffice.org
+    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    
+    return `${cleanBaseUrl}${relativePath}`;
+  };
+  const [preview, setPreview] = useState(getPreviewUrl(content.video || ''));
   const [fileName, setFileName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -28,7 +52,10 @@ const VideoContentEditor: React.FC<VideoContentEditorProps> = ({ content, onSave
         // set loading to true
         setLoading(true);
         const url = await uploadFileToFrappe(file);
-        setPreview(LMS_API_BASE_URL + url);
+        // Create full URL for preview using the same logic
+        const fullUrl = getPreviewUrl(url);
+        setPreview(fullUrl);
+        // Store only the relative path
         setVideo(url);
         setFileName(file.name);
         // set loading to false

@@ -62,40 +62,93 @@ export default function AdminModuleDetail() {
         return currentUser || null;
     }, [currentUser]);
 
-    const { data: moduleListData, error: moduleListError, isLoading: moduleDataLoading } = useFrappeGetCall<ModuleApiResponse>(
-        'novel_lms.novel_lms.api.module_management.LearnerModuleData', {
-        user: userIdentifier,
-        limit: 1,
-        offset: 0,
-        filters: [["name", "=", moduleName]]
+    // Use get_module_with_details API for admin users instead of LearnerModuleData
+    const { data: moduleDataResponse, error: moduleListError, isLoading: moduleDataLoading } = useFrappeGetCall<any>(
+        'novel_lms.novel_lms.api.module_management.get_module_with_details', {
+        module_id: moduleName
     }, {
-        enabled: !!(userIdentifier && moduleName)
+        enabled: !!moduleName
     });
 
+    // Reset module state when moduleName changes
     useEffect(() => {
-        if (moduleListData && !moduleDataLoading && !module) {
-            const response = moduleListData as any;
+        setModule(null);
+        setCurrentLessonIdx(0);
+        setCurrentChapterIdx(0);
+        setIsLoading(true);
+    }, [moduleName]);
+
+    useEffect(() => {
+        if (moduleDataResponse && !moduleDataLoading) {
+            const response = moduleDataResponse as any;
             let moduleData = null;
             
-            if (response?.message?.message?.modules && Array.isArray(response.message.message.modules) && response.message.message.modules.length > 0) {
-                moduleData = response.message.message.modules[0];
-            } else if (response?.message?.modules && Array.isArray(response.message.modules) && response.message.modules.length > 0) {
-                moduleData = response.message.modules[0];
-            } else if (response?.modules && Array.isArray(response.modules) && response.modules.length > 0) {
-                moduleData = response.modules[0];
+            // Handle get_module_with_details response format
+            // The API returns data in frappe.response["data"], which frappe-react-sdk wraps
+            // Try multiple response paths
+            let data = null;
+            if (response?.message) {
+                data = response.message;
+            } else if (response?.data) {
+                data = response.data;
+            } else if (response?.lessons) {
+                data = response;
+            }
+            
+            // Process data if it exists - the API should return the correct module based on module_id parameter
+            // But verify it matches the requested moduleName for safety
+            if (data) {
+                if (data.lessons && Array.isArray(data.lessons)) {
+                    // Transform the response to match the expected Module interface
+                    moduleData = {
+                        name: data.id || moduleName,
+                        name1: data.name || '',
+                        description: data.description || '',
+                        lessons: data.lessons.map((lesson: any) => ({
+                            name: lesson.id || lesson.name,
+                            lesson_name: lesson.lesson_name || lesson.name || lesson.title || '',
+                            chapters: (lesson.chapters || []).map((chapter: any) => ({
+                                name: chapter.id || chapter.name,
+                                title: chapter.title || chapter.name || '',
+                                contents: (chapter.contents || []).map((content: any) => ({
+                                    name: content.id || content.name || content.content_reference,
+                                    content_type: content.content_type || content.type,
+                                    content_reference: content.content_reference || content.id || content.name,
+                                    data: content.data || content
+                                }))
+                            }))
+                        })),
+                        image: data.image
+                    };
+                }
             }
             
             if (moduleData) {
+                console.log('AdminModuleDetail - Successfully parsed module data:', moduleData);
                 setModule(moduleData);
+                setIsLoading(false);
+            } else {
+                console.error('AdminModuleDetail - Could not parse module data. Response structure:', {
+                    response,
+                    hasMessage: !!response?.message,
+                    hasData: !!response?.data,
+                    hasLessons: !!response?.lessons,
+                    messageLessons: response?.message?.lessons,
+                    dataLessons: response?.data?.lessons,
+                    moduleName,
+                    dataId: data?.id,
+                    dataName: data?.name
+                });
+                setIsLoading(false);
             }
         }
-    }, [moduleListData, moduleDataLoading, module]);
+    }, [moduleDataResponse, moduleDataLoading, moduleName]);
 
     useEffect(() => {
-        if (moduleListData || moduleListError) {
+        if (moduleDataResponse || moduleListError) {
             setIsLoading(false);
         }
-    }, [moduleListData, moduleListError]);
+    }, [moduleDataResponse, moduleListError]);
 
     // --- ADMIN: UI-only navigation, no progress, no welcome, no completion ---
     // Admin detail page logic
@@ -230,7 +283,6 @@ export default function AdminModuleDetail() {
                                                     contentReference={content.content_reference || content.name}
                                                     moduleId={module.name}
                                                     contentData={content.data}
-                                                    isParentLoading={moduleDataLoading}
                                                 />
                                             );
                                         })}

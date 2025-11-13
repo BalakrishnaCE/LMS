@@ -14,21 +14,25 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination"
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useUser } from "@/hooks/use-user"
+import { useNavigation } from "@/contexts/NavigationContext"
 import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
 import { Progress } from "@/components/ui/progress"
-import { useFrappeGetCall } from "frappe-react-sdk"
-import { CheckCircle, Clock, ChevronDown, ChevronUp, Calendar, AlertTriangle, BookOpen, Target } from 'lucide-react';
+import { Input } from "@/components/ui/input"
+import { useLearnerModuleData, useLearnerDashboard } from "@/lib/api"
+import { CheckCircle, Clock, ChevronDown, ChevronUp, Calendar, AlertTriangle, BookOpen, Target, X } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import Lottie from 'lottie-react';
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useLearnerDashboard } from "@/lib/api";
-import { Input } from "@/components/ui/input"
-import { X } from "lucide-react"
 
 interface ModulesProps {
     itemsPerPage?: number;
@@ -48,195 +52,167 @@ const itemVariants = {
     visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
 }
 
-export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
+export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
     const [page, setPage] = useState(1)
     const [searchQuery, setSearchQuery] = useState(() => {
         return localStorage.getItem('learner_modules_search') || ""
     })
     const { user } = useUser()
+    const { addToHistory, getPreviousSearchState } = useNavigation()
     const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
     const [retryCount, setRetryCount] = useState(0);
-    const [allFetchedModules, setAllFetchedModules] = React.useState<any[]>([]);
-    const [allFetchLoading, setAllFetchLoading] = React.useState(false);
+    const offset = (page - 1) * itemsPerPage
 
-    // Note: offset not needed for dashboard API as it returns all modules
+    const handleRetry = () => {
+        setRetryCount(prev => prev + 1);
+        // Force re-fetch by updating a dependency or using a key
+        window.location.reload();
+    };
 
-    // Debug logging for user and API parameters
+    // Restore search state from navigation history when component mounts
+    useEffect(() => {
+        const previousSearchState = getPreviousSearchState('learner');
+        if (previousSearchState) {
+            setSearchQuery(previousSearchState.query);
+        }
+    }, [getPreviousSearchState]);
+
+    // Track search state changes in navigation history (only when there's actual search activity)
+    useEffect(() => {
+        // Only track if there's a search query
+        const hasSearchQuery = searchQuery && searchQuery.trim().length > 0;
+        
+        if (hasSearchQuery) {
+            // Add a longer delay to ensure we capture the complete search query
+            const timeoutId = setTimeout(() => {
+                addToHistory('/modules/learner', 'Modules List', {
+                    query: searchQuery,
+                    department: 'all', // Learner modules don't have department filter
+                    status: 'all'      // Learner modules don't have status filter
+                });
+            }, 1500); // 1500ms delay to wait for user to finish typing
+            
+            return () => clearTimeout(timeoutId);
+        }
+    }, [searchQuery, addToHistory]);
+
+
+    // Fetch modules with optimized learner API using new API service
+    // Use user email or name as fallback - API accepts both
+    const userIdentifier = user?.email || user?.name || "";
+    const shouldCallAPI = !!userIdentifier;
     
-    // Client-side pagination; no offset needed for API when fetching all
-
-    // Fetch modules using the working API (has proper structure generation)
-    const { data, error, mutate } = useFrappeGetCall<any>("novel_lms.novel_lms.api.module_management.LearnerModuleData", {
-        user: user?.email,
-        limit: 0,   // fetch all modules once
-        offset: 0,
+    // Debug logging
+    useEffect(() => {
+        console.log('🔍 LearnerModules - User state:', {
+            user,
+            userEmail: user?.email,
+            userName: user?.name,
+            userIdentifier,
+            shouldCallAPI
+        });
+    }, [user, userIdentifier, shouldCallAPI]);
+    
+    const { data, error, isLoading: apiLoading } = useLearnerModuleData(userIdentifier, {
+        limit: itemsPerPage,
+        offset,
+    }, { 
+        enabled: shouldCallAPI && userIdentifier.trim() !== ""
     })
-
-    // Fetch progress data separately from dashboard API (real-time, no cache)
-    const { data: progressData, isLoading: progressLoading } = useFrappeGetCall<any>("novel_lms.novel_lms.api.progress_tracking.get_learner_dashboard", {
-        user: user?.email,
-    }, {
-        enabled: !!user?.email,
-    })
-
-    // Batch fetch all learner modules (paginate client-side later)
-    React.useEffect(() => {
-        const u = user?.email?.trim();
-        if (!u) return;
-
-        let cancelled = false;
-        const fetchAll = async () => {
-            try {
-                setAllFetchLoading(true);
-                const pageSize = 200; // adjust if needed
-                let offsetCursor = 0;
-                const acc: any[] = [];
-
-                while (true) {
-                    const url = `${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.module_management.LearnerModuleData?user=${encodeURIComponent(u)}&limit=${pageSize}&offset=${offsetCursor}`;
-                    const res = await fetch(url, { credentials: 'include' });
-                    const json = await res.json();
-                    const list = json?.message?.message?.modules || [];
-                    const meta = json?.message?.message?.meta;
-                    acc.push(...list);
-
-                    const hasMore = !!meta?.pagination?.has_more;
-                    if (!hasMore || list.length === 0) break;
-                    offsetCursor += pageSize;
-                }
-
-                if (!cancelled) setAllFetchedModules(acc);
-            } catch (e) {
-                if (!cancelled) setAllFetchedModules([]);
-            } finally {
-                if (!cancelled) setAllFetchLoading(false);
-            }
-        };
-
-        fetchAll();
-        return () => { cancelled = true; };
-    }, [user?.email]);
-
-    // Persist search to localStorage (debounced)
-    const saveSearchToStorage = React.useMemo(() => {
-        let t: any;
-        return (value: string) => {
-            clearTimeout(t);
-            t = setTimeout(() => {
-                if (value && value.trim()) {
-                    localStorage.setItem('learner_modules_search', value.trim());
-                } else {
-                    localStorage.removeItem('learner_modules_search');
-                }
-            }, 300);
-        };
-    }, []);
-
-    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        setSearchQuery(value);
-        saveSearchToStorage(value);
-    };
-
-    const handleClearSearch = () => {
-        setSearchQuery("");
-        saveSearchToStorage("");
-    };
-
-    // Fetch dashboard data for accurate stats calculation
-    const { data: dashboardData } = useLearnerDashboard(user?.email || "", { 
-        enabled: !!user?.email && user?.email.trim() !== "" 
-    });
-
-    // Create progress map from dashboard API (real-time progress data)
-    const progressMap = React.useMemo(() => {
-        const map: { [key: string]: any } = {};
-        if (progressData?.message && Array.isArray(progressData.message)) {
-            progressData.message.forEach((item: any) => {
-                if (item.module && item.progress) {
-                    map[item.module.name] = item.progress;
-                }
+    
+    // Also fetch from learner dashboard API as fallback (filters for published modules)
+    const { data: dashboardData, error: dashboardError, isLoading: dashboardLoading } = useLearnerDashboard(
+        userIdentifier, 
+        { enabled: shouldCallAPI && userIdentifier.trim() !== "" }
+    )
+    
+    // Debug API response
+    useEffect(() => {
+        if (data) {
+            console.log('🔍 LearnerModules - API Response:', {
+                hasData: !!data,
+                dataKeys: Object.keys(data || {}),
+                hasMessage: !!data?.message,
+                hasMessageModules: !!data?.message?.modules,
+                hasDirectModules: !!data?.modules,
+                modulesCount: data?.modules?.length || data?.message?.modules?.length || 0,
+                modules: data?.modules || data?.message?.modules,
+                meta: data?.meta || data?.message?.meta,
+                error: data?.error
             });
         }
-        console.log('Progress map from dashboard:', map);
-        return map;
-    }, [progressData]);
-
-    // Use fully fetched module list; overlay real-time progress
-    const modules = React.useMemo(() => {
-        if (!allFetchedModules.length) return [];
-        return allFetchedModules.map((module: any) => ({
-            ...module,
-            progress: progressMap[module.name] || module.progress
-        }));
-    }, [allFetchedModules, progressMap]);
+        if (error) {
+            console.error('❌ LearnerModules - API Error:', error);
+        }
+    }, [data, error]);
     
-    // Calculate meta from modules (use API meta or calculate from modules)
-    const meta = React.useMemo(() => {
-        // Use API meta if available, otherwise calculate from modules
-        if (data?.message?.message?.meta) {
-            return data.message.message.meta;
-        }
+    // Extract modules and meta - match dashboard logic to handle different response formats
+    // Prioritize get_learner_dashboard (filters for published modules) over useLearnerModuleData
+    let modules: any[] = [];
+    let meta: any = {};
+    
+    // First try to use get_learner_dashboard (filters for published modules) - same as dashboard
+    if (dashboardData?.message && Array.isArray(dashboardData.message) && dashboardData.message.length > 0) {
+        // Transform the data to match expected format
+        modules = dashboardData.message.map((item: any) => ({
+            ...item.module,
+            progress: item.progress
+        }));
         
-        if (!modules || modules.length === 0) {
-            return {
-                total_modules: 0,
-                completed_modules: 0,
-                in_progress_modules: 0,
-                not_started_modules: 0,
-                average_progress: 0,
-                total_count: 0,
-                total: 0
-            };
-        }
-        
-        return {
+        // Calculate meta from modules
+        meta = {
             total_modules: modules.length,
             completed_modules: modules.filter((m: any) => m.progress?.status === "Completed").length,
             in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
             not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
-            average_progress: modules.length > 0 ? 
-                Math.round(modules.reduce((sum: number, m: any) => sum + Math.round(m.progress?.progress || 0), 0) / modules.length) : 0,
-            total_count: modules.length,
-            total: modules.length
+            total_count: modules.length
         };
-    }, [modules, data]);
-    
-    // Calculate stats from ALL modules (dashboard data), not just current page
-    const allModules = React.useMemo(() => {
-        const dd: any = dashboardData as any;
-        const raw = Array.isArray(dd?.message)
-            ? dd.message
-            : Array.isArray(dd?.message?.message)
-                ? dd.message.message
-                : []; // fallback
-
-        return raw.map((item: any) => ({
+    } 
+    // Fallback to useLearnerModuleData
+    else if (data?.message?.modules && Array.isArray(data.message.modules)) {
+        // Response format: { message: { modules: [...], meta: {...} } }
+        modules = data.message.modules || [];
+        meta = data.message.meta || {};
+    } else if (data?.modules && Array.isArray(data.modules)) {
+        // Direct structure: { modules: [...], meta: {...} }
+        modules = data.modules || [];
+        meta = data.meta || {};
+    } else if (data?.message && Array.isArray(data.message)) {
+        // Array format: { message: [{ module: {...}, progress: {...} }] }
+        modules = data.message.map((item: any) => ({
             ...item.module,
             progress: item.progress
         }));
-    }, [dashboardData]);
+        // Calculate meta from modules
+        meta = {
+            total_modules: modules.length,
+            completed_modules: modules.filter((m: any) => m.progress?.status === "Completed").length,
+            in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
+            not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
+            total_count: modules.length
+        };
+    }
     
-    // total pages computed inline where needed using filteredModules.length
+    // Check if modules have the nested structure (module.module, module.progress)
+    if (modules.length > 0 && modules[0].module) {
+        modules = modules.map((item: any) => ({
+            ...item.module,
+            progress: item.progress
+        }));
+    }
+    const totalPages = Math.ceil((meta.total_count || 0) / itemsPerPage)
 
-    // Retry function for failed API calls
-    const handleRetry = React.useCallback(() => {
-        setRetryCount(prev => prev + 1);
-        mutate();
-    }, [mutate]);
+    // Handle search query change
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchQuery(e.target.value);
+        localStorage.setItem('learner_modules_search', e.target.value);
+    };
 
-    // Auto-retry on error (max 3 times)
-    React.useEffect(() => {
-        if (error) {
-            
-        }
-        if (error && retryCount < 3) {
-            const timer = setTimeout(() => {
-                handleRetry();
-            }, 1000 * (retryCount + 1)); // Exponential backoff
-            return () => clearTimeout(timer);
-        }
-    }, [error, retryCount, handleRetry]);
+    // Handle clear search
+    const handleClearSearch = () => {
+        setSearchQuery("");
+        localStorage.removeItem('learner_modules_search');
+    };
 
     // Client-side search (optional: can be moved to backend if needed)
     const filteredModules = useMemo(() => {
@@ -258,219 +234,237 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
         return [...ordered, ...unordered];
     }, [filteredModules]);
 
-    // Calculate stats using ALL modules from dashboard data
-    const completedCount = allModules.filter((m: any) => m.progress?.status === "Completed").length;
-    const inProgressCount = allModules.filter((m: any) => m.progress?.status === "In Progress").length;
-    const notStartedCount = allModules.filter((m: any) => m.progress?.status === "Not Started").length;
-
-    // Use progress from ALL modules (dashboard data)
-    const calculatedAverageProgress = allModules.length > 0 
-        ? Math.round(allModules.reduce((sum: number, m: any) => {
-            return sum + Math.round(m.progress?.progress || 0);
-        }, 0) / allModules.length)
+    // Calculate stats using production pattern
+    const completedCount = filteredModules.filter((m: any) => m.progress?.status === "Completed").length;
+    const inProgressCount = filteredModules.filter((m: any) => m.progress?.status === "In Progress").length;
+    const notStartedCount = filteredModules.filter((m: any) => m.progress?.status === "Not Started").length;
+    const calculatedAverageProgress = filteredModules.length > 0 
+        ? Math.round(filteredModules.reduce((sum: number, m: any) => {
+            let progress = m.progress?.overall_progress ?? m.progress?.progress ?? 0;
+            
+            // If overall_progress is 0 but there are completion details, calculate progress
+            if (progress === 0 && m.progress?.completion_details) {
+                const { chapters_completed, total_lesson_chapter_items, contents_completed, total_content_items } = m.progress.completion_details;
+                
+                // Try chapter-based progress first
+                if (total_lesson_chapter_items > 0) {
+                    progress = Math.round((chapters_completed / total_lesson_chapter_items) * 100);
+                }
+                // Fallback to content-based progress if chapter progress is still 0
+                else if (total_content_items > 0) {
+                    progress = Math.round((contents_completed / total_content_items) * 100);
+                }
+            }
+            
+            return sum + (typeof progress === 'number' && !isNaN(progress) ? progress : 0);
+        }, 0) / filteredModules.length)
         : 0;
-
+    
     // Use calculated progress or fallback to meta data
     const averageProgress = calculatedAverageProgress || meta.average_progress || 0;
-
+    
 
 
     return (
         <div className="space-y-6">
-            <div className="space-y-6">
-                <AnimatePresence>
+
+            <AnimatePresence>
                 <motion.div
                     key="stats"
                         initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.3 }}
-                        className="bg-gradient-to-r from-card to-card/80 border border-border rounded-xl p-6 shadow-lg backdrop-blur-sm"
-                    >
-                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                            {/* Title and Description */}
-                            <div className="space-y-2">
-                                <motion.h1 
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5 }}
-                                    className="text-3xl font-bold text-foreground"
-                                >
-                                    Available Modules
-                                </motion.h1>
-                                <motion.p 
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ duration: 0.5, delay: 0.1 }}
-                                    className="text-muted-foreground"
-                                >
-                                    Browse and enroll in modules to start your learning journey
-                                </motion.p>
-                            </div>
-                            
-                            {/* Enhanced Animated Stats */}
-                            <div className="flex flex-wrap items-center gap-4 lg:gap-6">
-                                {/* Completed Modules */}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-gradient-to-r from-card to-card/80 border border-border rounded-xl p-6 shadow-lg backdrop-blur-sm"
+                >
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                        {/* Title and Description */}
+                        <div className="space-y-2">
+                            <motion.h1 
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="text-3xl font-bold text-foreground"
+                            >
+                                Available Modules
+                            </motion.h1>
+                            <motion.p 
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.5, delay: 0.1 }}
+                                className="text-muted-foreground"
+                            >
+                                Browse and enroll in modules to start your learning journey
+                            </motion.p>
+                        </div>
+                        
+                        {/* Enhanced Animated Stats */}
+                        <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+                            {/* Completed Modules */}
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.2 }}
+                                className="flex items-center gap-3 bg-green-50 dark:bg-green-950/30 px-4 py-2 rounded-lg border border-green-200 dark:border-green-800"
+                            >
                                 <motion.div 
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.4, delay: 0.2 }}
-                                    className="flex items-center gap-3 bg-green-50 dark:bg-green-950/30 px-4 py-2 rounded-lg border border-green-200 dark:border-green-800"
+                                    className="w-4 h-4 flex items-center justify-center"
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                                 >
-                                    <motion.div 
-                                        className="w-4 h-4 flex items-center justify-center"
-                                        animate={{ scale: [1, 1.2, 1] }}
-                                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                                    >
-                                        <CheckCircle className="w-4 h-4 text-green-500" />
-                                    </motion.div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                                            {completedCount}
-                                        </span>
-                                        <span className="text-xs text-green-600 dark:text-green-500">Completed</span>
-                                    </div>
+                                    <CheckCircle className="w-4 h-4 text-green-500" />
                                 </motion.div>
-
-                                {/* In Progress Modules */}
-                                <motion.div 
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.4, delay: 0.3 }}
-                                    className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950/30 px-4 py-2 rounded-lg border border-blue-200 dark:border-blue-800"
-                                >
-                                    <motion.div 
-                                        className="w-4 h-4 flex items-center justify-center"
-                                        animate={{ scale: [1, 1.2, 1] }}
-                                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                                    >
-                                        <Clock className="w-4 h-4 text-blue-500" />
-                                    </motion.div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
-                                            {inProgressCount}
-                                        </span>
-                                        <span className="text-xs text-blue-600 dark:text-blue-500">In Progress</span>
-                                    </div>
-                                </motion.div>
-
-                                {/* Available Modules */}
-                                <motion.div 
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.4, delay: 0.4 }}
-                                    className="flex items-center gap-3 bg-gray-50 dark:bg-gray-950/30 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-800"
-                                >
-                                    <motion.div 
-                                        className="w-4 h-4 flex items-center justify-center"
-                                        animate={{ scale: [1, 1.2, 1] }}
-                                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                                    >
-                                        <BookOpen className="w-4 h-4 text-gray-500" />
-                                    </motion.div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-400">
-                                            {notStartedCount}
-                                        </span>
-                                        <span className="text-xs text-gray-600 dark:text-gray-500">Available</span>
-                                    </div>
-                                </motion.div>
-
-                                {/* Average Progress */}
-                                <motion.div 
-                                    initial={{ opacity: 0, scale: 0.8 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.4, delay: 0.5 }}
-                                    className="flex items-center gap-3 bg-primary/10 dark:bg-primary/20 px-4 py-2 rounded-lg border border-primary/20 dark:border-primary/30"
-                                >
-                                    <motion.div 
-                                        className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"
-                                        animate={{ rotate: [0, 360] }}
-                                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                                    >
-                                        <Target className="w-4 h-4 text-primary-foreground" />
-                                    </motion.div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-semibold text-primary">
-                                            {Math.round(averageProgress)}%
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                                        {completedCount}
                                     </span>
-                                        <span className="text-xs text-primary/70">Avg Progress</span>
-                                    </div>
+                                    <span className="text-xs text-green-600 dark:text-green-500">Completed</span>
+                                </div>
+                            </motion.div>
+
+                            {/* In Progress Modules */}
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.3 }}
+                                className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950/30 px-4 py-2 rounded-lg border border-blue-200 dark:border-blue-800"
+                            >
+                                <motion.div 
+                                    className="w-4 h-4 flex items-center justify-center"
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                                >
+                                    <Clock className="w-4 h-4 text-blue-500" />
                                 </motion.div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+                                        {inProgressCount}
+                                    </span>
+                                    <span className="text-xs text-blue-600 dark:text-blue-500">In Progress</span>
                                 </div>
-                        </div>
+                            </motion.div>
 
-                        {/* Enhanced Progress Bar for Overall Completion */}
-                        <motion.div 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5, delay: 0.6 }}
-                            className="mt-4"
-                        >
-                            <div className="flex justify-between items-center text-xs text-muted-foreground mb-3">
-                                <span className="font-medium">Overall Progress</span>
-                                <span className="font-semibold text-foreground">
-                                    {averageProgress}% Complete
-                                </span>
-                            </div>
-                            
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className="w-full bg-gray-200/60 dark:bg-gray-700/60 rounded-xl h-3 overflow-hidden shadow-inner border border-gray-300/20 dark:border-gray-600/20 cursor-pointer transition-all duration-200 hover:shadow-md">
-                                            <motion.div 
-                                                className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-xl relative shadow-lg"
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${averageProgress}%` }}
-                                                transition={{ duration: 1.2, delay: 0.8, ease: "easeOut" }}
-                                                style={{
-                                                    boxShadow: '0 0 20px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
-                                                }}
-                                            >
-                                                {/* Subtle shine effect */}
-                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-xl" />
-                                            </motion.div>
-                                        </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="bg-card border border-border shadow-lg">
-                                        <div className="space-y-2 p-2">
-                                            <div className="text-sm font-semibold text-foreground">Progress Breakdown</div>
-                                            <div className="space-y-1 text-xs">
-                                <div className="flex items-center gap-2">
-                                                    <CheckCircle className="w-3 h-3 text-green-500" />
-                                                    <span className="text-muted-foreground">Completed:</span>
-                                                    <span className="font-medium text-green-600 dark:text-green-400">{completedCount} modules</span>
+                            {/* Available Modules */}
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.4 }}
+                                className="flex items-center gap-3 bg-gray-50 dark:bg-gray-950/30 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-800"
+                            >
+                                <motion.div 
+                                    className="w-4 h-4 flex items-center justify-center"
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                                >
+                                    <BookOpen className="w-4 h-4 text-gray-500" />
+                                </motion.div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-400">
+                                        {notStartedCount}
+                                    </span>
+                                    <span className="text-xs text-gray-600 dark:text-gray-500">Available</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                                    <Clock className="w-3 h-3 text-blue-500" />
-                                                    <span className="text-muted-foreground">In Progress:</span>
-                                                    <span className="font-medium text-blue-600 dark:text-blue-400">{inProgressCount} modules</span>
+                            </motion.div>
+
+                            {/* Average Progress */}
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.5 }}
+                                className="flex items-center gap-3 bg-primary/10 dark:bg-primary/20 px-4 py-2 rounded-lg border border-primary/20 dark:border-primary/30"
+                            >
+                                <motion.div 
+                                    className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"
+                                    animate={{ rotate: [0, 360] }}
+                                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                >
+                                    <Target className="w-4 h-4 text-primary-foreground" />
+                                </motion.div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-primary">
+                                        {Math.round(averageProgress)}%
+                                    </span>
+                                    <span className="text-xs text-primary/70">Avg Progress</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                                    <BookOpen className="w-3 h-3 text-gray-500" />
-                                                    <span className="text-muted-foreground">Available:</span>
-                                                    <span className="font-medium text-gray-600 dark:text-gray-400">{notStartedCount} modules</span>
+                            </motion.div>
+                        </div>
+                    </div>
+
+                    {/* Enhanced Progress Bar for Overall Completion */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.6 }}
+                        className="mt-4"
+                    >
+                        <div className="flex justify-between items-center text-xs text-muted-foreground mb-3">
+                            <span className="font-medium">Overall Progress</span>
+                            <span className="font-semibold text-foreground">
+                                {averageProgress}% Complete
+                            </span>
+                        </div>
+                        
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className="w-full bg-gray-200/60 dark:bg-gray-700/60 rounded-xl h-3 overflow-hidden shadow-inner border border-gray-300/20 dark:border-gray-600/20 cursor-pointer transition-all duration-200 hover:shadow-md">
+                                        <motion.div 
+                                            className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-xl relative shadow-lg"
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${averageProgress}%` }}
+                                            transition={{ duration: 1.2, delay: 0.8, ease: "easeOut" }}
+                                            style={{
+                                                boxShadow: '0 0 20px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)'
+                                            }}
+                                        >
+                                            {/* Subtle shine effect */}
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-xl" />
+                                        </motion.div>
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="bg-card border border-border shadow-lg">
+                                    <div className="space-y-2 p-2">
+                                        <div className="text-sm font-semibold text-foreground">Progress Breakdown</div>
+                                        <div className="space-y-1 text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                                <span className="text-muted-foreground">Completed:</span>
+                                                <span className="font-medium text-green-600 dark:text-green-400">{meta.completed_modules || 0} modules</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Clock className="w-3 h-3 text-blue-500" />
+                                                <span className="text-muted-foreground">In Progress:</span>
+                                                <span className="font-medium text-blue-600 dark:text-blue-400">{meta.in_progress_modules || 0} modules</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <BookOpen className="w-3 h-3 text-gray-500" />
+                                                <span className="text-muted-foreground">Available:</span>
+                                                <span className="font-medium text-gray-600 dark:text-gray-400">{meta.not_started_modules || 0} modules</span>
+                                            </div>
+                                            <div className="pt-1 border-t border-border">
+                                                <div className="flex items-center gap-2">
+                                                    <Target className="w-3 h-3 text-primary" />
+                                                    <span className="text-muted-foreground">Total:</span>
+                                                    <span className="font-medium text-foreground">{meta.total || filteredModules.length || 0} modules</span>
                                                 </div>
-                                                <div className="pt-1 border-t border-border">
-                                                    <div className="flex items-center gap-2">
-                                                        <Target className="w-3 h-3 text-primary" />
-                                                        <span className="text-muted-foreground">Total:</span>
-                                                        <span className="font-medium text-foreground">{allModules.length} modules</span>
-                                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </motion.div>
                 </motion.div>
-                </motion.div>
-            </AnimatePresence>
-            </div>
 
-            {/* Search bar */}
-            <div className="flex gap-4 p-4 mb-2">
-                <div className="flex-1 relative">
+                <motion.div
+                    key="search"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.4, delay: 0.1 }}
+                    className="flex gap-4 p-4"
+                >
+                <div className="flex-1">
                     <Input
                         placeholder="Search modules..."
                         value={searchQuery}
@@ -488,19 +482,25 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                         </button>
                     )}
                 </div>
-            </div>
+                </motion.div>
+            </AnimatePresence>
 
             {/* Loading and Error States */}
-            {(allFetchLoading || progressLoading) && (
+            {(apiLoading || dashboardLoading) && (
                 <div className="flex flex-col items-center justify-center p-8">
                     <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
                     <div className="mt-4 text-muted-foreground">Loading modules and progress...</div>
                 </div>
             )}
-            {error && (
+            {(error || dashboardError || data?.error) && (
                 <div className="flex flex-col items-center justify-center p-8">
                     <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
                     <div className="mt-4 text-red-500">Error loading modules.</div>
+                    {(error?.message || data?.error) && (
+                        <div className="mt-2 text-sm text-muted-foreground max-w-md text-center">
+                            {error?.message || data?.error || "Unknown error occurred"}
+                        </div>
+                    )}
                     {retryCount < 3 && (
                         <button 
                             onClick={handleRetry}
@@ -518,18 +518,17 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
             )}
 
             {/* Modules Grid */}
-
-            {/* Empty State */}
-            {!allFetchLoading && !progressLoading && sortedModules.length === 0 && (
+            {!apiLoading && !dashboardLoading && !error && !dashboardError && !data?.error && sortedModules.length === 0 && (
                 <div className="flex flex-col items-center justify-center p-8">
                     <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
                     <div className="mt-4 text-muted-foreground text-lg">
-                        No modules found. Try a different search or check back later!
+                        {searchQuery 
+                            ? `No modules found matching "${searchQuery}". Try a different search.`
+                            : "No modules found. You may not be assigned to any modules yet. Please contact your administrator."}
                     </div>
                 </div>
             )}
-
-            {!allFetchLoading && !progressLoading && sortedModules.length > 0 && (
+            {!apiLoading && !dashboardLoading && !error && !dashboardError && sortedModules.length > 0 && (
                 <motion.div
                     key="grid"
                     variants={containerVariants}
@@ -546,15 +545,48 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                 })().map((module: any, idx: number) => {
                     const status = module.progress?.status || "Not Started";
                     
-                    // Use progress from dashboard API (real-time data)
-                    const progress = Math.round(module.progress?.progress || 0);
+                    // Debug the module progress data structure
+                    console.log(`Module ${module.name1} progress data:`, module.progress);
+                    console.log(`Module ${module.name1} completion_details:`, module.progress?.completion_details);
+                    
+                    // Use the progress value from the API, with fallback to completion details
+                    let progress = module.progress?.overall_progress ?? module.progress?.progress ?? 0;
+                    console.log(`Module ${module.name1} initial progress:`, progress);
+                    
+                    // If overall_progress is 0 but there are completion details, calculate progress
+                    if (progress === 0 && module.progress?.completion_details) {
+                        const { chapters_completed, total_lesson_chapter_items, contents_completed, total_content_items } = module.progress.completion_details;
+                        
+                        // Try chapter-based progress first
+                        if (total_lesson_chapter_items > 0) {
+                            progress = Math.round((chapters_completed / total_lesson_chapter_items) * 100);
+                            console.log(`Module ${module.name1}: Calculated progress from chapters: ${progress}% (${chapters_completed}/${total_lesson_chapter_items} chapters)`);
+                        }
+                        // Fallback to content-based progress if chapter progress is still 0
+                        else if (total_content_items > 0) {
+                            progress = Math.round((contents_completed / total_content_items) * 100);
+                            console.log(`Module ${module.name1}: Calculated progress from contents: ${progress}% (${contents_completed}/${total_content_items} contents)`);
+                        }
+                    }
+                    
+                    // Ensure progress is a number and within valid range, and round it
+                    if (typeof progress !== 'number' || isNaN(progress)) {
+                        progress = 0;
+                    } else {
+                        // Round progress to nearest integer
+                        progress = Math.round(progress);
+                    }
+                    
+                    // If status is "Completed" but progress is less than 100, use the actual progress
+                    // This fixes the issue where completed modules show their actual progress instead of 100%
+                    if (status === "Completed" && progress < 100) {
+                        // Keep the actual progress value (e.g., 74%)
+                        console.log(`Module ${module.name1} is completed but shows ${progress}% progress`);
+                    }
                     
                     const isCompleted = status === "Completed";
                     const isInProgress = status === "In Progress";
                     const isNotStarted = status === "Not Started";
-                    let buttonText = "Start";
-                    if (isInProgress) buttonText = "Continue";
-                    if (isCompleted) buttonText = "Completed";
                     const hasImage = !!module.image;
 
                     // Locking logic
@@ -584,16 +616,6 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                     else if (isInProgress) statusDarkColor = "dark:bg-blue-900 dark:text-blue-200";
                     else if (isNotStarted) statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
 
-                    // Utility: robustly check if module has Quiz/QA
-                    const hasQuizQA = (
-                        (module.contents && module.contents.length > 0 && module.contents.some((c: any) => c.content_type === "Quiz" || c.content_type === "Question Answer")) ||
-                        (module.structure && module.structure.lessons && module.structure.lessons.some((lesson: any) =>
-                            lesson.chapters && lesson.chapters.some((chapter: any) => {
-                                const ct = chapter.content_types || {};
-                                return (ct["Quiz"] > 0 || ct["Question Answer"] > 0);
-                            })
-                        ))
-                    );
 
                     // Enhanced status/date logic
                     const completedOn = module.progress?.completed_on ? new Date(module.progress.completed_on) : null;
@@ -613,7 +635,7 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
 
                     return (
                         <motion.div
-                            key={module.name}
+                            key={module.name || `module-${idx}`}
                             variants={itemVariants}
                             initial="hidden"
                             animate="visible"
@@ -641,15 +663,43 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                 {hasImage ? (
                                     <div className="w-full h-44 relative" style={{ marginTop: '2rem' }}>
                                         <img 
-                                            src={module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`} 
-                                            alt={module.name1 + ' image'} 
-                                            className="object-cover w-full h-full" 
-                                            loading="lazy"
+                                            src={(() => {
+                                                // Helper function to get full image URL
+                                                const getImageUrl = (path: string): string => {
+                                                    if (!path) return '';
+                                                    const trimmed = path.trim();
+                                                    if (!trimmed) return '';
+                                                    
+                                                    // If already a full URL, return as is
+                                                    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                                        return trimmed;
+                                                    }
+                                                    
+                                                    // Ensure path starts with / if it doesn't already
+                                                    const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                                                    
+                                                    // Determine base URL
+                                                    // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                                                    // In development: use http://lms.noveloffice.org
+                                                    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                                    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                                                    
+                                                    return `${cleanBaseUrl}${relativePath}`;
+                                                };
+                                                return getImageUrl(module.image);
+                                            })()}
+                                            alt={module.name1 + ' image'}
+                                            className="absolute inset-0 w-full h-full object-cover"
                                             onError={(e) => {
-                                                // Try alternative URL if first fails
-                                                const currentSrc = e.currentTarget.src;
-                                                if (!currentSrc.includes('lms.noveloffice.in')) {
-                                                    e.currentTarget.src = module.image.startsWith('http') ? module.image : `https://lms.noveloffice.in${module.image}`;
+                                                // If image fails to load, hide it and show fallback
+                                                e.currentTarget.style.display = 'none';
+                                                const parent = e.currentTarget.parentElement;
+                                                if (parent) {
+                                                    parent.innerHTML = `
+                                                            <div class="w-full h-44 flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/20 dark:from-primary/20 dark:to-primary/30">
+                                                                <span class="text-6xl font-semibold text-primary/60 dark:text-primary/70">${module.name1?.charAt(0).toUpperCase()}</span>
+                                                            </div>
+                                                        `;
                                                 }
                                             }}
                                         />
@@ -669,13 +719,13 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                             {module.name1}
                                         </CardTitle>
                                     </CardHeader>
-                                    {/* Progress Bar and Percentage */}
+                                    {/* Progress Bar and Percentage - Production Pattern */}
                                     <div className="px-6 pb-2">
-                                        <div className="flex justify-between items-center text-xs mb-1">
+                                        <div className="flex flex-col space-y-1 text-xs">
                                             <span className="text-muted-foreground">Progress</span>
-                                            <span className="font-semibold text-base">{Number(progress ?? 0)}%</span>
+                                            <span className="font-semibold text-base">{progress}%</span>
                                         </div>
-                                        <Progress value={Number(progress ?? 0)} className="h-3" aria-label={`Progress: ${Number(progress ?? 0)}%`} />
+                                        <Progress value={progress} className="h-2" aria-label={`Progress: ${progress}%`} />
                                     </div>
                                     {/* Expandable Summary Section */}
                                     <div className="px-6 pb-2">
@@ -722,10 +772,25 @@ export function LearnerModules({ itemsPerPage = 20 }: ModulesProps) {
                                                         dark:hover:bg-primary/80 dark:hover:shadow-lg hover:text-white
                                                         focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
                                                         ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                                    aria-label={(isCompleted && hasQuizQA ? 'Check Final Score' : buttonText) + ' ' + module.name1}
+                                                    aria-label={isCompleted ? 'Completed' : isInProgress ? 'Resume' : 'Start' + ' ' + module.name1}
                                                     disabled={isLocked}
                                                 >
-                                                    {isCompleted && hasQuizQA ? 'Check Final Score' : buttonText}
+                                                    {isCompleted ? (
+                                                        <>
+                                                            <CheckCircle className="h-5 w-5" />
+                                                            Completed
+                                                        </>
+                                                    ) : isInProgress ? (
+                                                        <>
+                                                            <Clock className="h-5 w-5" />
+                                                            Resume
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <BookOpen className="h-5 w-5" />
+                                                            Start
+                                                        </>
+                                                    )}
                                                 </Button>
                                             </Link>
                                         </div>

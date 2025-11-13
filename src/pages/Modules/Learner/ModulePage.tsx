@@ -1,9 +1,24 @@
 import { LearnerModules } from "./Modules"
 import LearnerModuleDetail from "./ModuleDetail"
-import { Route, Switch, useLocation} from "wouter"
+import { Route, Switch, useLocation } from "wouter"
+import { useNavigation } from "@/contexts/NavigationContext"
+import { useEffect } from "react"
 
 export function LearnerModulePage() {
-    const [pathname] = useLocation();
+    const [location] = useLocation();
+    const { addToHistory } = useNavigation();
+
+    // Track navigation history when on modules list
+    useEffect(() => {
+        if (location === '/modules/learner') {
+            addToHistory(location, 'Modules List', {
+                query: '',
+                department: 'all',
+                status: 'all'
+            });
+        }
+    }, [location, addToHistory]);
+
     return (
         <div className="p-4">
             <Switch>
@@ -17,7 +32,7 @@ export function LearnerModulePage() {
                             Browse and enroll in modules to start your learning journey.
                         </p>
                     </div>
-                    <LearnerModules key={pathname} itemsPerPage={20} />
+                    <LearnerModules key={location} itemsPerPage={20} />
                 </Route>
             </Switch>
         </div>

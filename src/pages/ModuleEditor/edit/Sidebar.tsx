@@ -272,9 +272,38 @@ function SettingsDialog({
                     <Label>Module Image</Label>
                     {editState?.image && (
                       <img
-                        src={editState.image.startsWith('http') ? editState.image : `${LMS_API_BASE_URL}${editState.image}`}
+                        src={(() => {
+                          // Helper function to get full image URL
+                          const getImageUrl = (path: string): string => {
+                            if (!path) return '';
+                            const trimmed = path.trim();
+                            if (!trimmed) return '';
+                            
+                            // If already a full URL, return as is
+                            if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                              return trimmed;
+                            }
+                            
+                            // Ensure path starts with / if it doesn't already
+                            const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                            
+                            // Determine base URL
+                            // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                            // In development: use http://lms.noveloffice.org
+                            const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                            const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                            
+                            return `${cleanBaseUrl}${relativePath}`;
+                          };
+                          return getImageUrl(editState.image);
+                        })()}
                         alt="Module"
                         className="mb-2 max-h-32 rounded"
+                        onError={(e) => {
+                          console.error('Failed to load module image:', editState.image);
+                          // Hide broken image
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                     )}
                     <Input
@@ -1122,7 +1151,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                   setLocation('/modules');
                 }}
               >
-                <ArrowLeftIcon className="w-4 h-4" /> Back to Modules
+                <ArrowLeftIcon className="w-4 h-4" /> Back to Module
               </Button>
 
               <AnimatePresence mode="wait">
@@ -1153,9 +1182,38 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                       <Label>Module Image</Label>
                       {moduleInfo?.image && (
                         <img
-                          src={moduleInfo.image.startsWith('http') ? moduleInfo.image : `${LMS_API_BASE_URL}${moduleInfo.image}`}
+                          src={(() => {
+                            // Helper function to get full image URL
+                            const getImageUrl = (path: string): string => {
+                              if (!path) return '';
+                              const trimmed = path.trim();
+                              if (!trimmed) return '';
+                              
+                              // If already a full URL, return as is
+                              if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                return trimmed;
+                              }
+                              
+                              // Ensure path starts with / if it doesn't already
+                              const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                              
+                              // Determine base URL
+                              // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                              // In development: use http://lms.noveloffice.org
+                              const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                              const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                              
+                              return `${cleanBaseUrl}${relativePath}`;
+                            };
+                            return getImageUrl(moduleInfo.image);
+                          })()}
                           alt="Module"
                           className="mb-2 max-h-32 rounded"
+                          onError={(e) => {
+                            console.error('Failed to load module image:', moduleInfo.image);
+                            // Hide broken image
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
                       )}
                     </div>

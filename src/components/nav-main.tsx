@@ -10,8 +10,7 @@ import {
 } from "@/components/ui/sidebar"
 import { navigate } from "wouter/use-browser-location"
 import { useUser } from "@/hooks/use-user"
-import { getRelativePath, getFullPath } from "@/config/routes"
-import { BASE_PATH } from "@/config/routes"
+import { getRelativePath, getFullPath, BASE_PATH, ROUTES } from "@/config/routes"
 
 export function NavMain({
   items,
@@ -28,6 +27,9 @@ export function NavMain({
 
   // Get the current path without the base path
   const currentPath = getRelativePath(location);
+  
+  // Special handling for admin dashboard - if we're on /admin-dashboard, highlight Dashboard
+  const isAdminDashboard = currentPath === ROUTES.ADMIN_DASHBOARD || currentPath === ROUTES.HOME;
 
   return (
     <SidebarGroup>
@@ -57,7 +59,8 @@ export function NavMain({
 
         <SidebarMenu>
           {items.map((item) => {
-            const isActive = currentPath === item.url;
+            // Special case: if we're on admin dashboard and this is the Dashboard item, make it active
+            const isActive = (isAdminDashboard && item.url === ROUTES.HOME) || currentPath === item.url;
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton

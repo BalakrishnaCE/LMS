@@ -21,7 +21,7 @@ interface User {
   last_login?: string;
   user_image?: string;
   roles?: string[];
-  role?: string; // Add role field from backend
+  role?: string;
   // Add fields from learner_analytics
   learner_name?: string;
   modules_enrolled?: number;
@@ -108,26 +108,25 @@ export function LearnersTable({
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
-            {/*<TableHead>Role</TableHead>*/}
             <TableHead>Departments</TableHead>
             <TableHead>Status</TableHead>
             {showActions && <TableHead>Edit</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody className="text-secondary-foreground">
-        {isLoading ? (
-  <TableRow>
-    <TableCell colSpan={showActions ? 5 : 4} className="text-center">
-      <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
-      <div className="mt-2 text-muted-foreground">Loading learners...</div>
-    </TableCell>
-  </TableRow>
-) : learners.length === 0 ? (
-  <TableRow>
-    <TableCell colSpan={showActions ? 5 : 4} className="text-center py-8">
-      <div className="text-muted-foreground">No learners found matching your criteria</div>
-    </TableCell>
-  </TableRow>
+          {isLoading ? (
+            <TableRow>
+              <TableCell colSpan={showActions ? 5 : 4} className="text-center">
+                <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
+                <div className="mt-2 text-muted-foreground">Loading learners...</div>
+              </TableCell>
+            </TableRow>
+          ) : learners.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={showActions ? 5 : 4} className="text-center py-8">
+                <div className="text-muted-foreground">No learners found matching your criteria</div>
+              </TableCell>
+            </TableRow>
           ) : (
             <AnimatePresence mode="popLayout">
               {learners.map((learner) => (
@@ -145,6 +144,7 @@ export function LearnersTable({
                 >
                   <TableCell className="group-hover:text-primary transition-colors duration-200">{learner.full_name}</TableCell>
                   <TableCell className="group-hover:text-primary transition-colors duration-200">{learner.email}</TableCell>
+                  
                   
                   <TableCell>
                     <div className="flex flex-wrap gap-1">

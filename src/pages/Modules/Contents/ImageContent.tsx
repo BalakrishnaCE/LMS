@@ -25,10 +25,27 @@ export default function ImageContent({
   console.log('ImageContent - Content data:', content);
 
   // Normalize URL to handle both relative and full URLs
+  // Uses lms.noveloffice.org as base URL in both development and production
   const getImageUrl = (url: string) => {
     if (!url) return '';
-    if (url.startsWith('http')) return url;
-    return `${LMS_API_BASE_URL.replace(/\/$/, '')}${url}`;
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    
+    // If already a full URL, return as is
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    
+    // Ensure path starts with / if it doesn't already
+    const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    
+    // Determine base URL
+    // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+    // In development: use http://lms.noveloffice.org
+    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    
+    return `${cleanBaseUrl}${relativePath}`;
   };
 
   const handleImageLoad = () => {

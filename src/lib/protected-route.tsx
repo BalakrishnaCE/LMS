@@ -3,6 +3,7 @@ import { Redirect, Route } from "wouter";
 import { useFrappeAuth } from "frappe-react-sdk";
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
+import { ROUTES } from "@/config/routes";
 
 interface ProtectedRouteProps {
   path: string;
@@ -33,13 +34,22 @@ export function ProtectedRoute({
   if (!currentUser || !user) {
     return (
       <Route path={path}>
-        <Redirect to="/login" />
+        <Redirect to={ROUTES.LOGIN} />
       </Route>
     );
   }
 
   // Check role-based access
   if (allowedRoles.length > 0) {
+    console.log("Protected route check:", {
+      path,
+      allowedRoles,
+      isLMSAdmin,
+      isLMSStudent,
+      isLMSContentEditor,
+      currentUser
+    });
+    
     const hasAccess = allowedRoles.some(role => {
       switch (role) {
         case "LMS Admin":
@@ -52,6 +62,8 @@ export function ProtectedRoute({
           return false;
       }
     });
+    
+    console.log("Access check result:", { hasAccess, allowedRoles });
 
     if (!hasAccess) {
       // Redirect based on role

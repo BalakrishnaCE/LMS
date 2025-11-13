@@ -65,16 +65,48 @@ export function LoginForm({
     if (!loginTriggered || !currentUser) return;
     setUserLoading(true);
     setUserError(null);
-    // Fetch user doc using useFrappeGetDoc
+    setUserLoadingError(null);
+    // Fetch user doc using direct fetch
     const fetchUser = async () => {
       try {
-        // Use direct fetch for user doc
-        // add with credentials true 
-        const res = await fetch(`${LMS_API_BASE_URL}/api/resource/User/${currentUser}`, {
-          credentials: "include"
+        // Determine API base URL
+        // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+        // In development: use relative path so Vite proxy handles it, or http://lms.noveloffice.org
+        const apiBaseUrl = LMS_API_BASE_URL || '';
+        const cleanApiBaseUrl = apiBaseUrl.replace(/\/$/, '');
+        const apiUrl = cleanApiBaseUrl 
+          ? `${cleanApiBaseUrl}/api/resource/User/${currentUser}`
+          : `/api/resource/User/${currentUser}`;
+        
+        console.log('📡 Fetching user data:', { currentUser, apiUrl });
+        
+        const res = await fetch(apiUrl, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json',
+          }
         });
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('❌ Failed to fetch user:', {
+            status: res.status,
+            statusText: res.statusText,
+            url: apiUrl,
+            errorText
+          });
+          throw new Error(`Failed to fetch user: ${res.status} ${res.statusText}`);
+        }
+        
         const userDoc = await res.json();
+        console.log('📦 User data response:', userDoc);
+        
         const userData = userDoc.data || userDoc;
+        if (!userData) {
+          throw new Error('User data not found in response');
+        }
+        
         setUser(userData);
         // Set role flags
         const roles = (userData.roles || []) as Array<{ role: string }>;
@@ -82,8 +114,12 @@ export function LoginForm({
         setIsLMSStudent(roles.some((role: { role: string }) => role.role === "LMS Student"));
         setIsLMSContentEditor(roles.some((role: { role: string }) => role.role === "LMS Content Editor"));
         setUserLoading(false);
+        setUserLoadingError(null);
       } catch (err: any) {
-        setUserError(err?.message || "Failed to fetch user data");
+        console.error('❌ Error fetching user:', err);
+        const errorMessage = err?.message || "Failed to fetch user data";
+        setUserError(errorMessage);
+        setUserLoadingError(errorMessage);
         setUserLoading(false);
       }
     };
@@ -221,7 +257,9 @@ export function LoginForm({
                 className="flex flex-col items-center justify-center mt-2"
               >
                 <Lottie animationData={errorAnimation} loop style={{ width: 80, height: 80 }} />
-                <div className="text-red-500 text-sm text-center mt-2">{loginError.message || "Login error"}</div>
+                <div className="text-red-500 text-sm text-center mt-2">
+                  {loginError?.message || "Login failed. Please check your credentials and try again."}
+                </div>
               </motion.div>
             )}
           </form>
