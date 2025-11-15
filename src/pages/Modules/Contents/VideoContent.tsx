@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
+import { useRef, useEffect } from 'react';
 import { LMS_API_BASE_URL } from '@/config/routes';
+import { useMediaManager } from '@/contexts/MediaManagerContext';
 
 interface VideoContentProps {
   content: any;
@@ -12,12 +14,31 @@ interface VideoContentProps {
 
 export default function VideoContent({
   content,
-  contentReference: _contentReference,
+  contentReference,
   moduleId: _moduleId,
   onProgressUpdate: _onProgressUpdate,
   onComplete,
   isCompleted: _isCompleted
 }: VideoContentProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const { registerMedia, unregisterMedia, pauseAllExcept } = useMediaManager();
+  const mediaId = `video-${contentReference}`;
+
+  // Register/unregister video element
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (videoElement) {
+      registerMedia(mediaId, videoElement);
+    }
+    return () => {
+      unregisterMedia(mediaId);
+    };
+  }, [mediaId, registerMedia, unregisterMedia]);
+
+  // Pause other media when this video starts playing
+  const handlePlay = () => {
+    pauseAllExcept(mediaId);
+  };
   
   // Debug logging
   console.log('VideoContent - Content data:', content);
@@ -80,10 +101,12 @@ export default function VideoContent({
     >
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
         <video
+          ref={videoRef}
           src={getVideoUrl(content.video)}
           controls
           className="w-full h-full"
           onEnded={handleEnded}
+          onPlay={handlePlay}
         />
       </div>
       

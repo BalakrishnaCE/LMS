@@ -1,15 +1,38 @@
 import { motion } from 'framer-motion';
+import { useRef, useEffect } from 'react';
 import { LMS_API_BASE_URL } from '@/config/routes';
+import { useMediaManager } from '@/contexts/MediaManagerContext';
 
 interface AudioContentProps {
   content: any;
+  contentReference?: string;
   onComplete?: () => void;
 }
 
 export default function AudioContent({
   content,
+  contentReference = '',
   onComplete
 }: AudioContentProps) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const { registerMedia, unregisterMedia, pauseAllExcept } = useMediaManager();
+  const mediaId = `audio-${contentReference || content?.attach || 'default'}`;
+
+  // Register/unregister audio element
+  useEffect(() => {
+    const audioElement = audioRef.current;
+    if (audioElement) {
+      registerMedia(mediaId, audioElement);
+    }
+    return () => {
+      unregisterMedia(mediaId);
+    };
+  }, [mediaId, registerMedia, unregisterMedia]);
+
+  // Pause other media when this audio starts playing
+  const handlePlay = () => {
+    pauseAllExcept(mediaId);
+  };
   // Normalize URL to handle both relative and full URLs
   // Uses lms.noveloffice.org as base URL in both development and production
   const getAudioUrl = (url: string) => {
@@ -71,10 +94,12 @@ export default function AudioContent({
         
         <div className="relative bg-gray-50 rounded-lg p-6">
           <audio
+            ref={audioRef}
             src={getAudioUrl(content.attach)}
             controls
             className="w-full"
             onEnded={handleEnded}
+            onPlay={handlePlay}
           />
         </div>
         

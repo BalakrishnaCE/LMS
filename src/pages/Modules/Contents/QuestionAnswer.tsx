@@ -670,7 +670,10 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
                     transition={{ duration: 0.4 }}
                     className="flex flex-col items-center justify-center min-h-[60vh] w-full px-2"
                   >
-                    <div className="bg-background max-w-md w-full mx-auto rounded-2xl shadow-2xl flex flex-col items-center justify-center p-8 gap-8">
+                    <div className="bg-background max-w-md w-full mx-auto rounded-2xl shadow-2xl flex flex-col items-center justify-center p-8 gap-8 relative">
+                      <Dialog.Close asChild>
+                        <Button variant="ghost" size="sm" className="absolute top-4 right-4 z-10">✕</Button>
+                      </Dialog.Close>
                       <motion.div
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}

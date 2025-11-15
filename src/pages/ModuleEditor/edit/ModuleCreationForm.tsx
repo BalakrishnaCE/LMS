@@ -28,8 +28,9 @@ export default function ModuleCreationForm() {
   const [duration, setDuration] = useState("");
   const [assignmentBased, setAssignmentBased] = useState("Everyone");
   const [departmentSelected, setDepartmentSelected] = useState("");
-  const [, setImageFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [order, setOrder] = useState(1);
 
@@ -82,6 +83,14 @@ export default function ModuleCreationForm() {
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Create local preview immediately
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    
     setImageFile(file);
     setUploading(true);
     try {
@@ -93,6 +102,7 @@ export default function ModuleCreationForm() {
       toast.error("Failed to upload image");
       setImageFile(null);
       setImageUrl("");
+      setImagePreview("");
     } finally {
       setUploading(false);
     }
@@ -198,12 +208,18 @@ export default function ModuleCreationForm() {
             disabled={uploading}
           />
           {uploading && <div className="text-sm text-muted-foreground">Uploading...</div>}
-          {imageUrl && (
-            <img 
-              src={imageUrl.startsWith('http') ? imageUrl : `${LMS_API_BASE_URL.replace(/\/$/, '')}${imageUrl}`} 
-              alt="Module" 
-              className="mt-2 max-h-32 rounded" 
-            />
+          {(imagePreview || imageUrl) && (
+            <div className="mt-2">
+              <img 
+                src={imagePreview || (imageUrl.startsWith('http') ? imageUrl : `${LMS_API_BASE_URL.replace(/\/$/, '')}${imageUrl}`)} 
+                alt="Module preview" 
+                className="max-h-48 max-w-full rounded border border-border object-contain" 
+                onError={(e) => {
+                  console.error('Failed to load module image:', imagePreview || imageUrl);
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
           )}
         </div>
 

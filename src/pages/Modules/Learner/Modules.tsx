@@ -61,6 +61,7 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
     const { addToHistory, getPreviousSearchState } = useNavigation()
     const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
     const [retryCount, setRetryCount] = useState(0);
+    const [modulesWithQuizQA, setModulesWithQuizQA] = useState<Set<string>>(new Set());
     const offset = (page - 1) * itemsPerPage
 
     const handleRetry = () => {
@@ -226,6 +227,55 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
     React.useEffect(() => {
         setPage(1);
     }, [searchQuery]);
+
+    // Check which completed modules have quiz/QA content
+    useEffect(() => {
+        const checkModulesWithQuizQA = async () => {
+            if (!user?.name || modules.length === 0) return;
+
+            const completedModules = modules.filter((m: any) => m.progress?.status === "Completed");
+            if (completedModules.length === 0) return;
+
+            try {
+                // Fetch all quiz progress for the user
+                const quizRes = await fetch(
+                    `${LMS_API_BASE_URL}/api/resource/Quiz Progress?filters=[[\"user\",\"=\",\"${user.name}\"]]&fields=[\"module\"]`,
+                    { credentials: 'include' }
+                );
+                const quizProgressList = (await quizRes.json())?.data || [];
+
+                // Fetch all QA progress for the user
+                const qaRes = await fetch(
+                    `${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[[\"user\",\"=\",\"${user.name}\"]]&fields=[\"module\"]`,
+                    { credentials: 'include' }
+                );
+                const qaProgressList = (await qaRes.json())?.data || [];
+
+                // Create a set of module IDs that have quiz/QA progress
+                const modulesWithContent = new Set<string>();
+                
+                // Add modules that have quiz progress
+                quizProgressList.forEach((qp: any) => {
+                    if (qp.module) {
+                        modulesWithContent.add(qp.module);
+                    }
+                });
+
+                // Add modules that have QA progress
+                qaProgressList.forEach((qap: any) => {
+                    if (qap.module) {
+                        modulesWithContent.add(qap.module);
+                    }
+                });
+
+                setModulesWithQuizQA(modulesWithContent);
+            } catch (error) {
+                console.error('Error checking modules with quiz/QA:', error);
+            }
+        };
+
+        checkModulesWithQuizQA();
+    }, [modules, user?.name]);
 
     // Sort modules: ordered modules (order > 0) first by order asc, then unordered (order 0 or undefined) in original order
     const sortedModules = useMemo(() => {
@@ -776,10 +826,11 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                                     disabled={isLocked}
                                                 >
                                                     {isCompleted ? (
-                                                        <>
-                                                            <CheckCircle className="h-5 w-5" />
-                                                            Completed
-                                                        </>
+                                                        modulesWithQuizQA.has(module.name) ? (
+                                                            <>Check Final Score</>
+                                                        ) : (
+                                                            <>Completed</>
+                                                        )
                                                     ) : isInProgress ? (
                                                         <>
                                                             <Clock className="h-5 w-5" />

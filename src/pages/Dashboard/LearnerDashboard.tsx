@@ -819,10 +819,10 @@ export default function LearnerDashboard() {
                                           <p className="text-sm text-muted-foreground truncate">{module.description?.replace(/<[^>]+>/g, '')}</p>
                                           <div className="flex items-center justify-between">
                                             <span className="text-muted-foreground">Progress</span>
-                                            <span className="font-semibold text-base">{progress}%</span>
+                                            <span className="font-semibold text-base">{Math.round(progress)}%</span>
                                           </div>
                                         </div>
-                                        <Progress value={progress} className="h-2" aria-label={`Progress: ${progress}%`} />
+                                        <Progress value={progress} className="h-2" aria-label={`Progress: ${Math.round(progress)}%`} />
                                       {/* {startDate && <span className="text-xs text-muted-foreground mt-1">Started: {startDate.toLocaleDateString()}</span>} */}
                                       {/* {duration && <span className="text-xs text-muted-foreground mt-1">Duration: {duration} days</span>} */}
                                       <span className="text-xs text-muted-foreground mt-1">
@@ -1185,10 +1185,10 @@ export default function LearnerDashboard() {
                                           <p className="text-sm text-muted-foreground truncate">{module.description?.replace(/<[^>]+>/g, '')}</p>
                                           <div className="flex items-center justify-between">
                                             <span className="text-muted-foreground">Progress</span>
-                                            <span className="font-semibold text-base">{progress}%</span>
+                                            <span className="font-semibold text-base">{Math.round(progress)}%</span>
                                           </div>
                                         </div>
-                                        <Progress value={progress} className="h-2" aria-label={`Progress: ${progress}%`} />
+                                        <Progress value={progress} className="h-2" aria-label={`Progress: ${Math.round(progress)}%`} />
                                         {module.progress?.status === "Completed" && module.progress?.completed_on && (
                                           <span className="text-xs text-green-700 dark:text-green-400 mt-1">Completed on {new Date(module.progress.completed_on).toLocaleDateString()}</span>
                                         )}

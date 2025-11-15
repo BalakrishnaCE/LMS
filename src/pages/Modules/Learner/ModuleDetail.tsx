@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "wouter";
 import { useUser } from "@/hooks/use-user";
 import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
-import { useLearnerCompletionData, CompletionData } from "@/lib/api";
+import { useLearnerCompletionData, CompletionData, useLearnerDashboard } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar";
 import { CompletionScreen } from "@/pages/Modules/Learner/components/CompletionScreen";
@@ -572,6 +572,13 @@ export default function ModuleDetail() {
         { enabled: !!(userIdentifier && userIdentifier !== '' && moduleName && !userLoading) } // Only enabled when user is properly loaded
     );
 
+    // Fetch dashboard data ONLY for sidebar progress - isolated to this component
+    // This doesn't affect the main dashboard page (Modules.tsx) which has its own dashboard API call
+    const { data: dashboardData, error: dashboardError, mutate: refetchDashboard } = useLearnerDashboard(
+        userIdentifier || '',
+        { enabled: !!(userIdentifier && userIdentifier !== '' && !userLoading && !isLMSAdmin) }
+    );
+
     // Phase 2: Update completion data when fetched - Proper State Management
     useEffect(() => {
         try {
@@ -976,12 +983,27 @@ export default function ModuleDetail() {
         return 0;
     };
     // Add this new function after getUnifiedProgress()
+    // Use dashboard API progress for sidebar - this is isolated to sidebar only
     const getCompletionBasedProgress = () => {
         // If module is completed, return 100%
         if (progress?.status === "Completed") {
-          return 100;
+            return 100;
         }
         
+        // PRIORITY 1: Use dashboard API progress (most dynamic and accurate from Progress Tracker)
+        // This is ONLY used for sidebar progress, doesn't affect main dashboard
+        if (dashboardData?.message && Array.isArray(dashboardData.message) && moduleName) {
+            const moduleProgress = dashboardData.message.find(
+                (item: any) => item.module?.name === moduleName || item.progress?.module === moduleName
+            );
+            // Dashboard API returns progress in item.progress.progress
+            if (moduleProgress?.progress?.progress !== undefined && moduleProgress.progress.progress !== null) {
+                console.log('📊 Using dashboard API progress for sidebar:', moduleProgress.progress.progress);
+                return moduleProgress.progress.progress;
+            }
+        }
+        
+        // PRIORITY 2: Fallback to completion data calculation
         if (!sidebarCompletionData) return getUnifiedProgress();
         
         const completedChapters = sidebarCompletionData.completed_chapters?.length || 0;
@@ -997,10 +1019,10 @@ export default function ModuleDetail() {
         if (totalChapters === 0) return 0;
         
         const progressPercentage = Math.round((completedChapters / totalChapters) * 100 * 100) / 100;
-        console.log('📊 Using sidebar completion data progress:', progressPercentage, `(${completedChapters}/${totalChapters})`);
+        console.log('📊 Using sidebar completion data progress (fallback):', progressPercentage, `(${completedChapters}/${totalChapters})`);
         
         return progressPercentage;
-      };
+    };
     // Phase 2: Use unified progress calculation - Single Source of Truth
     const overallProgress = getUnifiedProgress();
     
@@ -1144,6 +1166,18 @@ export default function ModuleDetail() {
     
     const sidebarCompletionData = getSidebarCompletionData();
     
+    // Make sidebar progress reactive to dashboard data changes
+    // This is isolated to sidebar only and doesn't affect main dashboard
+    const sidebarProgress = useMemo(() => {
+        return getCompletionBasedProgress();
+    }, [
+        dashboardData?.message, // Dashboard API data changes - key for dynamic updates
+        moduleName, // Current module
+        progress?.status, // Progress status changes
+        sidebarCompletionData?.completed_chapters?.length, // Completed chapters count changes
+        module?.lessons // Module structure changes
+    ]);
+    
     // Create the sidebar isAccessible function using sidebar completion data
     const sidebarIsAccessible = buildIsAccessible(sidebarCompletionData || null, module);
     
@@ -1176,6 +1210,18 @@ export default function ModuleDetail() {
             // The getSidebarCompletionData function will be called again with updated completionData
         }
     }, [completionData, module?.progress]);
+    
+    // Refetch dashboard data when progress updates to keep sidebar progress in sync
+    // This is isolated to this component and doesn't affect main dashboard
+    useEffect(() => {
+        if (progress?.status && userIdentifier && !isLMSAdmin) {
+            // Small delay to ensure backend has processed the update
+            const timeoutId = setTimeout(() => {
+                refetchDashboard();
+            }, 500);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [progress?.status, userIdentifier, isLMSAdmin, refetchDashboard]);
     
     // Debug sidebar data
     
@@ -1232,6 +1278,8 @@ export default function ModuleDetail() {
             
             // Force refresh completion data to get latest progress
             refetchCompletionData();
+            // Refetch dashboard data to update sidebar progress (isolated to this component)
+            refetchDashboard();
         }
     };
 
@@ -1369,6 +1417,38 @@ export default function ModuleDetail() {
             status: "Completed"
         });
         
+        // Optimistically update completionData for immediate sidebar icon updates
+        // This ensures the completed chapter shows checkmark icon and is unlocked immediately
+        setCompletionData(prev => {
+            const newCompletedChapters = [...(prev?.completed_chapters || [])];
+            // Add current chapter to completed if not already there
+            if (!newCompletedChapters.includes(currentChapter.name)) {
+                newCompletedChapters.push(currentChapter.name);
+            }
+            
+            // Remove from in_progress if it was there
+            const newInProgressChapters = (prev?.in_progress_chapters || []).filter(ch => ch !== currentChapter.name);
+            
+            // Check if current lesson is now completed
+            const isCurrentLessonNowCompleted = isLessonCompletedByChapters(currentLesson.name, newCompletedChapters);
+            const newCompletedLessons = [...(prev?.completed_lessons || [])];
+            
+            if (isCurrentLessonNowCompleted && !newCompletedLessons.includes(currentLesson.name)) {
+                newCompletedLessons.push(currentLesson.name);
+            }
+            
+            // Calculate overall progress
+            const newOverallProgress = prev?.total_chapters ? Math.round((newCompletedChapters.length / prev.total_chapters) * 100 * 100) / 100 : 0;
+            
+            return {
+                ...prev,
+                completed_chapters: newCompletedChapters,
+                completed_lessons: newCompletedLessons,
+                in_progress_chapters: newInProgressChapters,
+                overall_progress: newOverallProgress
+            };
+        });
+        
         // Update local module state immediately for responsive UI
         const updatedModule = { ...module };
         if (updatedModule.lessons[lessonIdx]?.chapters[chapterIdx]) {
@@ -1399,6 +1479,29 @@ export default function ModuleDetail() {
             chapterIdx += 1;
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
+            
+            const nextChapter = currentLesson.chapters[chapterIdx];
+            
+            // Optimistically update completionData to reflect new current chapter position
+            setCompletionData(prev => {
+                const newInProgressChapters = [...(prev?.in_progress_chapters || [])];
+                const completedChapters = new Set(prev?.completed_chapters || []);
+                
+                // Add next chapter to in_progress if not already there and not completed
+                if (nextChapter && !newInProgressChapters.includes(nextChapter.name) && !completedChapters.has(nextChapter.name)) {
+                    newInProgressChapters.unshift(nextChapter.name);
+                }
+                
+                return {
+                    ...prev,
+                    in_progress_chapters: newInProgressChapters,
+                    current_position: {
+                        type: 'Chapter',
+                        reference_id: nextChapter.name,
+                        start_time: new Date().toISOString()
+                    }
+                };
+            });
             
             // Update progress for next chapter
             await updateProgress({
@@ -1444,6 +1547,29 @@ export default function ModuleDetail() {
             chapterIdx = 0;
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
+            
+            const nextChapter = module.lessons[lessonIdx].chapters[chapterIdx];
+            
+            // Optimistically update completionData to reflect new current chapter position
+            setCompletionData(prev => {
+                const newInProgressChapters = [...(prev?.in_progress_chapters || [])];
+                const completedChapters = new Set(prev?.completed_chapters || []);
+                
+                // Add next chapter to in_progress if not already there and not completed
+                if (nextChapter && !newInProgressChapters.includes(nextChapter.name) && !completedChapters.has(nextChapter.name)) {
+                    newInProgressChapters.unshift(nextChapter.name);
+                }
+                
+                return {
+                    ...prev,
+                    in_progress_chapters: newInProgressChapters,
+                    current_position: {
+                        type: 'Chapter',
+                        reference_id: nextChapter.name,
+                        start_time: new Date().toISOString()
+                    }
+                };
+            });
             
             // Update progress for next lesson's first chapter
             await updateProgress({
@@ -1599,6 +1725,8 @@ export default function ModuleDetail() {
             
             // Force refresh completion data to get latest progress
             refetchCompletionData();
+            // Refetch dashboard data to update sidebar progress (isolated to this component)
+            refetchDashboard();
         }
     };
 
@@ -1678,11 +1806,31 @@ export default function ModuleDetail() {
                 </div>
             );
         }
-        if (!module) {
+        // Don't show "Module not found" if we have moduleData extracted but module state hasn't been set yet
+        // This prevents the flash of "Module not found" during the brief moment between extraction and state update
+        if (!module && !moduleData) {
             return (
                 <div className="flex flex-col items-center justify-center h-full">
                     <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
                     <div className="mt-4 text-muted-foreground">Module not found</div>
+                </div>
+            );
+        }
+        // If we have moduleData but module state isn't set yet, show loading to prevent flash
+        if (!module && moduleData) {
+            return (
+                <div className="flex flex-col items-center justify-center h-full">
+                    <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                    <div className="mt-4 text-muted-foreground">Loading module details...</div>
+                </div>
+            );
+        }
+        // TypeScript guard: module should be set at this point, but add check for safety
+        if (!module) {
+            return (
+                <div className="flex flex-col items-center justify-center h-full">
+                    <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                    <div className="mt-4 text-muted-foreground">Loading module details...</div>
                 </div>
             );
         }
@@ -1741,9 +1889,9 @@ export default function ModuleDetail() {
             setCurrentChapterIdx(chapterIdx);
         };
         return (
-            <div className="flex min-h-screen bg-muted gap-6 w-full">
-                {/* Sidebar on the left */}
-                <div className="w-80 border-r flex-shrink-0">
+            <div className="flex h-screen bg-muted gap-6 w-full overflow-hidden">
+                {/* Sidebar on the left - Fixed and scrollable */}
+                <div className="w-80 border-r flex-shrink-0 h-full overflow-y-auto">
                     <ModuleSidebar
                         module={module}
                         progress={null} // no progress for admin
@@ -1758,8 +1906,8 @@ export default function ModuleDetail() {
                         isAccessible={() => true} // admin can access everything
                     />
                 </div>
-                {/* Main Content */}
-                <div className="flex-1 flex justify-center items-start p-8">
+                {/* Main Content - Scrollable */}
+                <div className="flex-1 flex justify-center items-start p-8 overflow-y-auto h-full">
                     <div className="w-full rounded-xl shadow p-8 bg-card">
                         {currentLesson && currentChapter && module && (
                             <div className="space-y-8">
@@ -1889,7 +2037,18 @@ export default function ModuleDetail() {
     const canExtractModule = hasApiData && !hasApiError && apiResponse && 
         (apiResponse?.message?.modules?.length > 0 || apiResponse?.message?.message?.modules?.length > 0);
     
-    if (!module && hasCompletedLoading && hasApiData && canExtractModule) {
+    // Don't show "Module not found" if we have moduleData extracted but module state hasn't been set yet
+    // This prevents the flash of "Module not found" during the brief moment between extraction and state update
+    if (!module && moduleData) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full">
+                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+                <div className="mt-4 text-muted-foreground">Loading module details...</div>
+            </div>
+        );
+    }
+    
+    if (!module && hasCompletedLoading && hasApiData && canExtractModule && !moduleData) {
         console.log('❌ Module not found - API returned data but extraction failed');
         console.log('🔍 Failed extraction details:', {
             moduleListDataStructure: moduleListData,
@@ -1907,7 +2066,7 @@ export default function ModuleDetail() {
     }
     
     // Final loading state check - if we still don't have module data and we're not loading, show loading
-    if (!module && !moduleDataLoading && !isLoading && !moduleListData && !moduleListError) {
+    if (!module && !moduleDataLoading && !isLoading && !moduleListData && !moduleListError && !moduleData) {
         return (
             <div className="flex flex-col items-center justify-center h-full">
                 <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
@@ -2034,14 +2193,14 @@ export default function ModuleDetail() {
                     </div>
                 </motion.div>
             ) : (
-                <div className="flex min-h-screen bg-muted gap-6 w-full">
-                    {/* Sidebar on the left */}
-                    <div className=" w-80 border-r flex-shrink-0">
+                <div className="flex h-screen bg-muted gap-6 w-full overflow-hidden">
+                    {/* Sidebar on the left - Fixed and scrollable */}
+                    <div className="w-80 border-r flex-shrink-0 h-full overflow-y-auto">
                         <ModuleSidebar
                             module={module}
-                            progress={isLMSAdmin ? null : (reviewing ? null : (savedProgress || progress))}
+                            progress={isLMSAdmin ? null : (reviewing ? (savedProgress || progress) : (savedProgress || progress))}
                             started={started || reviewing}
-                            overallProgress={overallProgress}
+                            overallProgress={sidebarProgress}
                             onLessonClick={handleLessonClick}
                             onChapterClick={handleChapterClick}
                             currentLessonName={module?.lessons?.[currentLessonIdx]?.name}
@@ -2051,10 +2210,59 @@ export default function ModuleDetail() {
                             isAccessible={isLMSAdmin ? () => true : sidebarIsAccessible} // admin can access everything, learners use locking
                         />
                     </div>
-                    {/* Main Content */}
-                    <div className="flex-1 flex justify-center items-start p-8">
-                        <div className="w-full  rounded-xl shadow p-8">
-                            {(started || reviewing) && currentLesson && currentChapter && module && (
+                    {/* Main Content - Scrollable */}
+                    <div className="flex-1 flex justify-center items-start p-8 overflow-y-auto h-full">
+                        <div className="w-full rounded-xl shadow p-8">
+                            {/* Show loading state when module data is loading or when module is loaded but lesson/chapter data is not ready */}
+                            {(() => {
+                                // Check if module is still loading
+                                const isModuleLoading = moduleDataLoading || !module;
+                                
+                                // Check if we're in started/reviewing state but don't have lesson/chapter data yet
+                                const needsContent = (started || reviewing) && module;
+                                const hasContent = currentLesson && currentChapter && module?.lessons && module.lessons.length > 0;
+                                const isContentLoading = needsContent && !hasContent;
+                                
+                                // Also check if module exists but lessons array is empty or not yet populated
+                                const hasEmptyLessons = module && (!module.lessons || module.lessons.length === 0);
+                                
+                                // Show loading if module is loading OR if we need content but don't have it OR if lessons are empty
+                                const shouldShowLoading = isModuleLoading || isContentLoading || (needsContent && hasEmptyLessons);
+                                
+                                // Debug logging (remove in production if needed)
+                                if (shouldShowLoading) {
+                                    console.log('Showing loading state:', {
+                                        isModuleLoading,
+                                        isContentLoading,
+                                        hasEmptyLessons,
+                                        started,
+                                        reviewing,
+                                        hasModule: !!module,
+                                        hasCurrentLesson: !!currentLesson,
+                                        hasCurrentChapter: !!currentChapter,
+                                        lessonsCount: module?.lessons?.length || 0
+                                    });
+                                }
+                                
+                                if (shouldShowLoading) {
+                                    return (
+                                        <div className="flex flex-col items-center justify-center py-16 min-h-[400px] w-full">
+                                            <Lottie 
+                                                animationData={loadingAnimation} 
+                                                loop 
+                                                style={{ width: 120, height: 120 }} 
+                                            />
+                                            <div className="mt-4 text-muted-foreground text-center">
+                                                {isModuleLoading ? 'Loading module details...' : 'Loading lesson content...'}
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+                            
+                            {/* Show content when all data is ready */}
+                            {!moduleDataLoading && (started || reviewing) && currentLesson && currentChapter && module && (
                                 <div className="space-y-8">
                                     {/* Lesson and Chapter Header */}
                                     <div>
@@ -2083,7 +2291,7 @@ export default function ModuleDetail() {
                                         });
                                         return null;
                                     })()}
-                                    {currentChapter.contents && currentChapter.contents.length > 0 && (
+                                    {currentChapter.contents && currentChapter.contents.length > 0 ? (
                                         <div className="space-y-6">
                                             {currentChapter.contents.map((content) => (
                                                 <ContentRenderer
@@ -2100,6 +2308,10 @@ export default function ModuleDetail() {
                                                     }}
                                                 />
                                             ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 text-muted-foreground">
+                                            No content available for this chapter.
                                         </div>
                                     )}
                                     {/* Navigation */}
@@ -2136,6 +2348,13 @@ export default function ModuleDetail() {
                                             <ArrowRight className="h-4 w-4" />
                                         </Button>
                                     </div>
+                                </div>
+                            )}
+                            
+                            {/* Show message when module is loaded but not started */}
+                            {!started && !reviewing && module && (
+                                <div className="text-center py-16 text-muted-foreground">
+                                    Click "Start Learning" to begin the module.
                                 </div>
                             )}
                         </div>

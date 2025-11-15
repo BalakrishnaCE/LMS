@@ -27,6 +27,7 @@ import { ErrorBoundary } from "@/lib/error-boundary";
 
 import { PermissionProvider } from "@/contexts/PermissionContext";
 import { NavigationProvider } from "@/contexts/NavigationContext";
+import { MediaManagerProvider } from "@/contexts/MediaManagerContext";
 function App() {
   return (
     <ErrorBoundary>
@@ -35,7 +36,8 @@ function App() {
           <NovelLMSFrappeProvider>
             <PermissionProvider>
               <NavigationProvider>
-                <Router base={BASE_PATH}>
+                <MediaManagerProvider>
+                  <Router base={BASE_PATH}>
             {/* <div className="w-full flex justify-center py-2 bg-muted/30">
               <a href="/test/h5p-react-demo" className="text-primary underline font-medium mx-2">Test H5P React Demo</a>
             </div> */}
@@ -115,6 +117,7 @@ function App() {
             </Switch>
             <Toaster />
           </Router>
+                </MediaManagerProvider>
                 </NavigationProvider>
                     </PermissionProvider>
           </NovelLMSFrappeProvider> 

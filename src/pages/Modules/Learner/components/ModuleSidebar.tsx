@@ -119,9 +119,12 @@ export function ModuleSidebar({
     console.log('🔍 isLessonCompleted called:', {
       lessonName: lesson.name,
       progressStatus: progress?.status,
-      progressObject: progress
+      progressObject: progress,
+      mode,
+      completionData: completionData
     });
     // Check if module is completed - if so, all lessons are completed
+    // This works in both learner and review modes (progress is now passed in review mode too)
     if (progress?.status === "Completed") {
       console.log('🎯 Module is completed - all lessons are completed', lesson.name);
       return true;
@@ -158,9 +161,12 @@ export function ModuleSidebar({
       chapterName: chapter.name,
       lessonName: lesson.name,
       progressStatus: progress?.status,
-      progressObject: progress
+      progressObject: progress,
+      mode,
+      completionData: completionData
     });
     // Check if module is completed - if so, all chapters are completed
+    // This works in both learner and review modes (progress is now passed in review mode too)
     if (progress?.status === "Completed") {
       console.log('🎯 Module is completed - all chapters are completed', chapter.name);
       return true;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useFrappeAuth, useFrappeGetDocList, useFrappePostCall } from 'frappe-react-sdk';
+import { useFrappeAuth, useFrappePostCall, useFrappeGetCall } from 'frappe-react-sdk';
 import Lottie from 'lottie-react';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
@@ -9,13 +9,6 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import InstructionDialog from '@/components/InstructionDialog';
-
-// Cache validation helper function
-const isValidQuizCache = (attemptData: any, currentUser: string) => {
-  return attemptData.userEmail === currentUser && 
-         attemptData.timestamp && 
-         new Date(attemptData.timestamp) > new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours max
-};
 
 interface QuizProps {
   quizReference?: string;
@@ -41,7 +34,8 @@ interface Quiz {
     score: number;
     options: {
       option_text: string;
-      correct: boolean;
+      correct?: boolean | number;
+      is_correct?: boolean | number;
     }[];
   }[];
 }
@@ -171,17 +165,20 @@ function AdminQuizPreview({
             dangerouslySetInnerHTML={{ __html: question.question_text }}
           />
           <div className="space-y-2 ml-4">
-            {question.options?.map((opt: { option_text: string; correct: boolean }, oidx: number) => (
-              <div key={oidx} className="flex items-center gap-2">
-                <span className="inline-block w-4 h-4 rounded-full border border-muted-foreground bg-background" />
-                <Label className="text-base text-muted-foreground cursor-default">{opt.option_text}</Label>
-                {opt.correct ? (
-                  <span className="ml-2 text-green-600 text-xs font-semibold">(Correct)</span>
-                ) : (
-                  <span className="ml-2 text-red-600 text-xs font-semibold"></span>
-                )}
-              </div>
-            ))}
+            {question.options?.map((opt: any, oidx: number) => {
+              const isCorrect = opt.correct === true || opt.correct === 1 || opt.is_correct === true || opt.is_correct === 1;
+              return (
+                <div key={oidx} className="flex items-center gap-2">
+                  <span className="inline-block w-4 h-4 rounded-full border border-muted-foreground bg-background" />
+                  <Label className="text-base text-muted-foreground cursor-default">{opt.option_text}</Label>
+                  {isCorrect ? (
+                    <span className="ml-2 text-green-600 text-xs font-semibold">(Correct)</span>
+                  ) : (
+                    <span className="ml-2 text-red-600 text-xs font-semibold"></span>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <div className="mt-2 text-xs text-muted-foreground">Score: {question.score}</div>
         </div>
@@ -194,36 +191,48 @@ function AdminQuizPreview({
 function QuizDialog({ 
   quiz, 
   onClose, 
-  onComplete 
+  onComplete,
+  moduleId
 }: { 
   quiz: Quiz; 
   onClose: () => void; 
-  onComplete: () => void; 
+  onComplete: () => void;
+  moduleId?: string;
 }) {
   const { currentUser } = useFrappeAuth();
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
+  const [maxScore, setMaxScore] = useState(0);
   const [hasAttempted, setHasAttempted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState(0);
 
-  // Check for existing quiz progress in DocType
-  const { data: existingProgress } = useFrappeGetDocList(
-    'Quiz Progress',
-    {
-      fields: ['name', 'score', 'max_score'],
-      filters: [
-        ['user', '=', typeof currentUser === 'string' ? currentUser : (currentUser as any)?.name || '']
-      ],
-      limit: 1
-    },
-    {
-      enabled: !!currentUser && !!quiz?.name
-    }
+  // Check for existing quiz progress using API
+  const { data: quizProgressStatus, isLoading: progressLoading, mutate: refetchProgress } = useFrappeGetCall<{
+    message: {
+      completed: boolean;
+      score?: number;
+      max_score?: number;
+      percentage?: number;
+      message?: string;
+      quiz_data?: Array<{
+        question_id: string;
+        question_text: string;
+        marked_answer: string;
+        correct_answer: string;
+        is_correct: boolean;
+        question_score: number;
+      }>;
+    };
+  }>(
+    'novel_lms.novel_lms.api.quiz_qa_progress.get_quiz_progress_status',
+    currentUser && quiz?.name ? { quiz_id: quiz.name } : undefined
   );
 
-  // Create quiz progress
-  const { call: createQuizProgress } = useFrappePostCall('frappe.desk.form.save.save');
+  // Use the proper quiz progress API
+  const { call: updateQuizProgress } = useFrappePostCall('novel_lms.novel_lms.api.quiz_qa_progress.update_quiz_progress');
 
   const handleAnswerChange = (questionId: string, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
@@ -233,58 +242,139 @@ function QuizDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Calculate score first
-    let correctAnswers = 0;
-    let totalQuestions = 0;
-    
-    if (quiz?.questions) {
-      totalQuestions = quiz.questions.length;
-      quiz.questions.forEach(question => {
-        const userAnswer = answers[question.name];
-        if (userAnswer && question.options) {
-          const selectedOption = question.options.find(opt => opt.option_text === userAnswer);
-          if (selectedOption?.correct) {
-            correctAnswers += 1;
-          }
-        }
-      });
+    if (!quiz?.questions || quiz.questions.length === 0) {
+      console.error('No questions available to submit');
+      return;
     }
     
-    const percentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
-    setScore(percentage);
-    setSubmitted(true);
-    setHasAttempted(true);
-    
-    // Save attempt data to localStorage (for internet/browser issues)
-    const attemptData = {
-      score: percentage,
-      correctAnswers: correctAnswers,
-      totalQuestions: totalQuestions,
-      timestamp: new Date().toISOString(),
-      quizName: quiz?.name
-    };
-    localStorage.setItem(`quiz_attempt_${quiz?.name}`, JSON.stringify(attemptData));
-    
-    // Now save to DocType after completion
     try {
       setIsSaving(true);
       
-      // Create quiz progress record (simplified - no detailed responses)
-      await createQuizProgress({
-        doc: {
-          doctype: 'Quiz Progress',
-          quiz: quiz?.name,
-          user: typeof currentUser === 'string' ? currentUser : (currentUser as any)?.name,
-          score: percentage,
-          max_score: 100,
-          status: 'Completed'
+      // Format answers for the API: { question_id: { marked_ans: string, correct_ans: string } }
+      const formattedAnswers: { [key: string]: { marked_ans: string; correct_ans: string } } = {};
+      let correctCount = 0;
+      let totalCount = 0;
+      
+      quiz.questions.forEach(question => {
+        totalCount += 1;
+        const userAnswer = answers[question.name] || '';
+        let correctAnswer = '';
+        
+        // Find the correct answer from options
+        // Options can have either 'correct' or 'is_correct' field depending on API response
+        if (question.options && question.options.length > 0) {
+          const correctOption = question.options.find(opt => {
+            const correct = opt.correct === true || opt.correct === 1;
+            const isCorrect = (opt as any).is_correct === true || (opt as any).is_correct === 1;
+            return correct || isCorrect;
+          });
+          if (correctOption) {
+            correctAnswer = correctOption.option_text || '';
+          }
+          
+          // Check if user's answer is correct
+          if (userAnswer && correctAnswer && userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase()) {
+            correctCount += 1;
+          }
+        }
+        
+        // Format answer for API - ensure correct_ans is always sent
+        formattedAnswers[question.name] = {
+          marked_ans: userAnswer,
+          correct_ans: correctAnswer
+        };
+        
+        // Debug log to verify correct answer is found
+        if (!correctAnswer) {
+          console.warn(`No correct answer found for question ${question.name}`, {
+            questionName: question.name,
+            options: question.options,
+            optionsLength: question.options?.length
+          });
         }
       });
       
-      console.log('Quiz progress saved to DocType successfully');
+      // Save to API using the proper update_quiz_progress endpoint
+      console.log('Submitting quiz with:', {
+        quiz_id: quiz.name,
+        module: moduleId,
+        answersCount: Object.keys(formattedAnswers).length,
+        formattedAnswers: formattedAnswers
+      });
+      
+      // Debug: Check if all questions have correct answers
+      const questionsWithoutCorrectAnswer = Object.entries(formattedAnswers)
+        .filter(([_, ans]) => !ans.correct_ans || ans.correct_ans === '')
+        .map(([qId, _]) => qId);
+      if (questionsWithoutCorrectAnswer.length > 0) {
+        console.warn('Questions without correct answers:', questionsWithoutCorrectAnswer);
+      }
+      
+      const result = await updateQuizProgress({
+        quiz_id: quiz.name,
+        answers: formattedAnswers,
+        module: moduleId || undefined
+      });
+      
+      console.log('Quiz progress saved successfully:', result);
+      
+      // Get score and max_score from API response
+      const savedScore = result?.message?.score || 0;
+      const savedMaxScore = result?.message?.max_score || totalCount;
+      
+      // Refetch progress status to get detailed quiz_data
+      let actualCorrectCount = correctCount;
+      let actualTotalCount = totalCount;
+      
+      if (refetchProgress) {
+        const refetchedData = await refetchProgress();
+        const progressData = refetchedData?.message;
+        
+        // Calculate correct answers from quiz_data if available
+        if (progressData?.quiz_data && progressData.quiz_data.length > 0) {
+          actualCorrectCount = progressData.quiz_data.filter(q => q.is_correct).length;
+          actualTotalCount = progressData.quiz_data.length;
+        }
+      }
+      
+      // Update UI state
+      // Use actual correct count for score if available, otherwise use API score
+      // The API score might be weighted by question scores, so we use correct count for display
+      const displayScore = actualCorrectCount > 0 ? actualCorrectCount : savedScore;
+      const displayMaxScore = actualTotalCount > 0 ? actualTotalCount : savedMaxScore;
+      
+      setScore(displayScore);
+      setMaxScore(displayMaxScore);
+      setCorrectAnswers(actualCorrectCount);
+      setTotalQuestions(actualTotalCount);
+      setSubmitted(true);
+      setHasAttempted(true);
+      
     } catch (error) {
-      console.error('Failed to save quiz progress to DocType:', error);
-      // Still show the score even if saving fails
+      console.error('Failed to save quiz progress:', error);
+      // Calculate score locally for display if API fails
+      let correctCount = 0;
+      let totalCount = 0;
+      
+      if (quiz?.questions) {
+        totalCount = quiz.questions.length;
+        quiz.questions.forEach(question => {
+          const userAnswer = answers[question.name];
+          if (userAnswer && question.options) {
+            const selectedOption = question.options.find(opt => opt.option_text === userAnswer);
+            if (selectedOption?.correct) {
+              correctCount += 1;
+            }
+          }
+        });
+      }
+      
+      setScore(correctCount);
+      setMaxScore(totalCount);
+      setCorrectAnswers(correctCount);
+      setTotalQuestions(totalCount);
+      setSubmitted(true);
+      setHasAttempted(true);
     } finally {
       setIsSaving(false);
     }
@@ -295,40 +385,38 @@ function QuizDialog({
     onClose();
   };
 
-  // Debug logging
-  console.log('QuizDialog - Quiz data:', quiz);
-  console.log('QuizDialog - Questions:', quiz?.questions);
-
-  // Check if quiz has already been attempted - DocType first, then localStorage
+  // Check if quiz has already been attempted using API
   useEffect(() => {
-    if (existingProgress && existingProgress.length > 0 && !hasAttempted) {
-      // Filter by quiz name in frontend since we can't filter by quiz field in query
-      const progressForThisQuiz = existingProgress.find((progress: any) => 
-        progress.quiz === quiz?.name
-      );
-      
-      if (progressForThisQuiz) {
-        // Found in DocType - show previous score
-        setScore(progressForThisQuiz.score || 0);
-        setSubmitted(true);
-        setHasAttempted(true);
-        return;
-      }
-    }
+    if (progressLoading || hasAttempted || !quiz?.name) return;
     
-    // Check localStorage only if no DocType record exists for this quiz
-    if (!hasAttempted) {
-      const quizAttemptKey = `quiz_attempt_${quiz?.name}`;
-      const savedAttempt = localStorage.getItem(quizAttemptKey);
+    const progressData = quizProgressStatus?.message;
+    
+    if (progressData?.completed) {
+      // Quiz has been completed - show previous results
+      const savedScore = progressData.score || 0;
+      const savedMaxScore = progressData.max_score || 0;
       
-      if (savedAttempt) {
-        const attemptData = JSON.parse(savedAttempt);
-        setScore(attemptData.score);
-        setSubmitted(true);
-        setHasAttempted(true);
+      // Calculate correct answers from quiz_data if available
+      let correctCount = 0;
+      let totalCount = quiz?.questions?.length || 0;
+      
+      if (progressData.quiz_data && progressData.quiz_data.length > 0) {
+        // Use actual quiz_data from database
+        correctCount = progressData.quiz_data.filter(q => q.is_correct).length;
+        totalCount = progressData.quiz_data.length;
+      } else {
+        // Fallback: estimate from score (not as accurate)
+        correctCount = Math.round((savedScore / savedMaxScore) * totalCount) || 0;
       }
+      
+      setScore(savedScore);
+      setMaxScore(savedMaxScore);
+      setCorrectAnswers(correctCount);
+      setTotalQuestions(totalCount);
+      setSubmitted(true);
+      setHasAttempted(true);
     }
-  }, [existingProgress, hasAttempted, quiz?.questions, quiz?.name]);
+  }, [quizProgressStatus, progressLoading, hasAttempted, quiz?.name, quiz?.questions?.length]);
 
   // Safety checks
   if (!quiz || !quiz.questions || quiz.questions.length === 0) {
@@ -351,33 +439,9 @@ function QuizDialog({
   }
 
   if (submitted) {
-    // Get correct answers count - prioritize localStorage, then calculate
-    let correctAnswers = 0;
-    let totalQuestions = 0;
-    
-    // Check localStorage first (most reliable for current attempt)
-    const savedAttempt = localStorage.getItem(`quiz_attempt_${quiz?.name}`);
-    if (savedAttempt) {
-      const attemptData = JSON.parse(savedAttempt);
-      correctAnswers = attemptData.correctAnswers || 0;
-      totalQuestions = attemptData.totalQuestions || quiz?.questions?.length || 0;
-    } else {
-      // Fallback calculation
-      if (quiz?.questions) {
-        totalQuestions = quiz.questions.length;
-        quiz.questions.forEach(question => {
-          const userAnswer = answers[question.name];
-          if (userAnswer && question.options) {
-            const selectedOption = question.options.find(opt => opt.option_text === userAnswer);
-            if (selectedOption?.correct) {
-              correctAnswers += 1;
-            }
-          }
-        });
-      }
-    }
-    
-    const percent = score; // score is already the percentage
+    // Calculate percentage from correct answers count and total questions
+    // Use correctAnswers/totalQuestions for accurate percentage display
+    const percent = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
     const scoreColor = percent >= 70 ? '#10b981' : percent >= 50 ? '#f59e0b' : '#ef4444';
     
     return (
@@ -410,13 +474,11 @@ function QuizDialog({
           <div className="text-center mb-6">
             <p className="text-lg">You got {correctAnswers} out of {totalQuestions} questions correct</p>
             <p className="text-sm text-gray-600 mt-2">
+              Score: {correctAnswers} / {totalQuestions} ({percent}%)
+            </p>
+            <p className="text-sm text-gray-600 mt-2">
               {percent >= 70 ? 'Congratulations! You passed!' : percent >= 50 ? 'Good effort! Try again to improve.' : 'Better luck next time!'}
             </p>
-            {existingProgress && existingProgress.length > 0 && existingProgress.find((progress: any) => progress.quiz === quiz?.name) && (
-              <p className="text-xs text-blue-600 mt-2 font-medium">
-                Previous attempt result (from database)
-              </p>
-            )}
             {isSaving && (
               <p className="text-xs text-orange-600 mt-2 font-medium">
                 Saving your progress...
@@ -778,6 +840,7 @@ export default function Quiz({
           quiz={quiz}
           onClose={() => setShowQuiz(false)}
           onComplete={handleQuizComplete}
+          moduleId={_moduleId}
         />
       )}
     </>

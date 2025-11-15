@@ -936,7 +936,21 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
-              <Input value={addForm.mobile_no} onChange={e => setAddForm(f => ({ ...f, mobile_no: e.target.value }))} disabled={addLoading} />
+              <Input 
+                type="tel"
+                value={addForm.mobile_no} 
+                onChange={e => {
+                  // Only allow digits and limit to 10 characters
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setAddForm(f => ({ ...f, mobile_no: value }));
+                }} 
+                disabled={addLoading}
+                placeholder="Enter 10 digit mobile number"
+                maxLength={10}
+              />
+              {addForm.mobile_no && addForm.mobile_no.length !== 10 && (
+                <p className="text-sm text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
+              )}
             </div>
             <div>
               <label className="block mb-1 font-medium">Password</label>
@@ -1070,7 +1084,21 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
-              <Input value={editForm.mobile_no} onChange={e => setEditForm(f => ({ ...f, mobile_no: e.target.value }))} disabled={editLoading} />
+              <Input 
+                type="tel"
+                value={editForm.mobile_no} 
+                onChange={e => {
+                  // Only allow digits and limit to 10 characters
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setEditForm(f => ({ ...f, mobile_no: value }));
+                }} 
+                disabled={editLoading}
+                placeholder="Enter 10 digit mobile number"
+                maxLength={10}
+              />
+              {editForm.mobile_no && editForm.mobile_no.length !== 10 && (
+                <p className="text-sm text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
+              )}
             </div>
             <div>
               <label className="block mb-1 font-medium">Password</label>
