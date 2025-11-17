@@ -271,40 +271,55 @@ function SettingsDialog({
                   <div className="space-y-2">
                     <Label>Module Image</Label>
                     {editState?.image && (
-                      <img
-                        src={(() => {
-                          // Helper function to get full image URL
-                          const getImageUrl = (path: string): string => {
-                            if (!path) return '';
-                            const trimmed = path.trim();
-                            if (!trimmed) return '';
-                            
-                            // If already a full URL, return as is
-                            if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-                              return trimmed;
-                            }
-                            
-                            // Ensure path starts with / if it doesn't already
-                            const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-                            
-                            // Determine base URL
-                            // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
-                            // In development: use http://lms.noveloffice.org
-                            const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
-                            const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-                            
-                            return `${cleanBaseUrl}${relativePath}`;
-                          };
-                          return getImageUrl(editState.image);
-                        })()}
-                        alt="Module"
-                        className="mb-2 max-h-32 rounded"
-                        onError={(e) => {
-                          console.error('Failed to load module image:', editState.image);
-                          // Hide broken image
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
+                      <div className="relative inline-block mb-2">
+                        <img
+                          src={(() => {
+                            // Helper function to get full image URL
+                            const getImageUrl = (path: string): string => {
+                              if (!path) return '';
+                              const trimmed = path.trim();
+                              if (!trimmed) return '';
+                              
+                              // If already a full URL, return as is
+                              if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                return trimmed;
+                              }
+                              
+                              // Ensure path starts with / if it doesn't already
+                              const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                              
+                              // Determine base URL
+                              // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                              // In development: use http://lms.noveloffice.org
+                              const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                              const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                              
+                              return `${cleanBaseUrl}${relativePath}`;
+                            };
+                            return getImageUrl(editState.image);
+                          })()}
+                          alt="Module"
+                          className="max-h-32 rounded"
+                          onError={(e) => {
+                            console.error('Failed to load module image:', editState.image);
+                            // Hide broken image
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={() => {
+                            handleFieldChange("image", "");
+                            toast.success("Image removed");
+                          }}
+                          disabled={uploadingImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
                     <Input
                       type="file"
@@ -1123,6 +1138,13 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     if (!editState) return;
     if (field === "department") {
       setEditState({ ...editState, department: value });
+    } else if (field === "assignment_based") {
+      // When switching from Everyone or Department to Manual, clear learners
+      const previousAssignment = editState.assignment_based;
+      if (previousAssignment && ["Everyone", "Department"].includes(previousAssignment) && value === "Manual") {
+        setLearners([]); // Clear learners when switching to Manual
+      }
+      setEditState({ ...editState, [field]: value });
     } else {
       setEditState({ ...editState, [field]: value });
     }

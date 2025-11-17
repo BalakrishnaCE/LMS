@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import RichEditor from "@/components/RichEditor";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -106,6 +106,18 @@ export default function ModuleCreationForm() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImageUrl("");
+    setImagePreview("");
+    // Reset the file input
+    const fileInput = document.getElementById("image") as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = "";
+    }
+    toast.success("Image removed");
   };
 
   return (
@@ -209,7 +221,7 @@ export default function ModuleCreationForm() {
           />
           {uploading && <div className="text-sm text-muted-foreground">Uploading...</div>}
           {(imagePreview || imageUrl) && (
-            <div className="mt-2">
+            <div className="mt-2 relative inline-block">
               <img 
                 src={imagePreview || (imageUrl.startsWith('http') ? imageUrl : `${LMS_API_BASE_URL.replace(/\/$/, '')}${imageUrl}`)} 
                 alt="Module preview" 
@@ -219,6 +231,16 @@ export default function ModuleCreationForm() {
                   e.currentTarget.style.display = 'none';
                 }}
               />
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2 h-8 w-8"
+                onClick={handleRemoveImage}
+                disabled={uploading}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           )}
         </div>

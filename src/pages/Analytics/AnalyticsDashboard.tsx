@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -21,7 +21,8 @@ import {
   Target,
   FileText,
   MessageSquare,
-  AlertCircle
+  AlertCircle,
+  Search
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -145,6 +146,66 @@ export default function AnalyticsDashboard() {
   const [learnerCurrentPage, setLearnerCurrentPage] = useState(1);
   const [learnerTotalPages, setLearnerTotalPages] = useState(1);
   const itemsPerPage = 10;
+  
+  // Module search with localStorage
+  const [moduleSearchQuery, setModuleSearchQuery] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('analytics_module_search') || '';
+    }
+    return '';
+  });
+  
+  // Save search query to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_module_search', moduleSearchQuery);
+    }
+  }, [moduleSearchQuery]);
+
+  // Quiz search with localStorage (by email)
+  const [quizSearchQuery, setQuizSearchQuery] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('analytics_quiz_search') || '';
+    }
+    return '';
+  });
+  
+  // Save quiz search query to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_quiz_search', quizSearchQuery);
+    }
+  }, [quizSearchQuery]);
+
+  // Q&A search with localStorage (by email)
+  const [qaSearchQuery, setQaSearchQuery] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('analytics_qa_search') || '';
+    }
+    return '';
+  });
+  
+  // Save Q&A search query to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_qa_search', qaSearchQuery);
+    }
+  }, [qaSearchQuery]);
+
+  // Learner search with localStorage (by email or name)
+  const [learnerSearchQuery, setLearnerSearchQuery] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('analytics_learner_search') || '';
+    }
+    return '';
+  });
+  
+  // Save learner search query to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_learner_search', learnerSearchQuery);
+    }
+  }, [learnerSearchQuery]);
   
   
   // Debug: Log learnerDetails changes
@@ -339,22 +400,7 @@ export default function AnalyticsDashboard() {
     }
   }, [error, mutate]);
 
-  // Update pagination when Q&A score filter changes
-  React.useEffect(() => {
-    if (qaAnalyticsData.length > 0) {
-      const currentData = qaScoreFilter === 'scored' ? qaScoredData : qaPendingData;
-      setQaTotalPages(Math.ceil(currentData.length / itemsPerPage));
-      setQaCurrentPage(1); // Reset to first page when filter changes
-    }
-  }, [qaScoreFilter, qaScoredData, qaPendingData]);
 
-  // Update pagination when learners data changes
-  React.useEffect(() => {
-    if (learnersData?.message?.message?.learner_analytics?.length > 0) {
-      setLearnerTotalPages(Math.ceil(learnersData.message.message.learner_analytics.length / itemsPerPage));
-      setLearnerCurrentPage(1); // Reset to first page when data changes
-    }
-  }, [learnersData]);
 
   const handleFilterChange = (key: keyof FilterState, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -660,7 +706,7 @@ export default function AnalyticsDashboard() {
       if (data.message && data.message.success) {
         const allData = data.message.data.quiz_progress || [];
         setQuizAnalyticsData(allData);
-        setQuizTotalPages(Math.ceil(allData.length / itemsPerPage));
+        // Total pages will be updated by useEffect when filteredQuizData changes
         setQuizCurrentPage(1); // Reset to first page when new data is loaded
       } else {
         console.error('Quiz Analytics API Error:', data.message?.error);
@@ -697,9 +743,7 @@ export default function AnalyticsDashboard() {
         setQaAnalyticsData(allData);
         setQaScoredData(scoredData);
         setQaPendingData(pendingData);
-        // Set total pages based on the current filter (scored or pending)
-        const currentData = qaScoreFilter === 'scored' ? scoredData : pendingData;
-        setQaTotalPages(Math.ceil(currentData.length / itemsPerPage));
+        // Total pages will be updated by useEffect when filteredQaData changes
         setQaCurrentPage(1); // Reset to first page when new data is loaded
       } else {
         console.error('Q&A Analytics API Error:', data.message?.error);
@@ -718,19 +762,61 @@ export default function AnalyticsDashboard() {
     }
   };
 
+  // Filter quiz analytics based on email search query
+  const filteredQuizData = React.useMemo(() => {
+    if (!quizSearchQuery.trim()) {
+      return quizAnalyticsData;
+    }
+    const searchLower = quizSearchQuery.toLowerCase();
+    return quizAnalyticsData.filter((quiz: any) => {
+      const userEmail = (quiz.user || '').toLowerCase();
+      return userEmail.includes(searchLower);
+    });
+  }, [quizAnalyticsData, quizSearchQuery]);
+
+  // Update quiz pagination when filtered data changes
+  React.useEffect(() => {
+    const totalPages = Math.ceil(filteredQuizData.length / itemsPerPage);
+    setQuizTotalPages(totalPages);
+    if (quizCurrentPage > totalPages && totalPages > 0) {
+      setQuizCurrentPage(1); // Reset to first page if current page exceeds total
+    }
+  }, [filteredQuizData, quizCurrentPage]);
+
   // Get current page data for quiz analytics
   const getCurrentPageData = () => {
     const startIndex = (quizCurrentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return quizAnalyticsData.slice(startIndex, endIndex);
+    return filteredQuizData.slice(startIndex, endIndex);
   };
+
+  // Filter Q&A analytics based on email search query
+  const filteredQaData = React.useMemo(() => {
+    const currentData = qaScoreFilter === 'scored' ? qaScoredData : qaPendingData;
+    if (!qaSearchQuery.trim()) {
+      return currentData;
+    }
+    const searchLower = qaSearchQuery.toLowerCase();
+    return currentData.filter((qa: any) => {
+      const userEmail = (qa.user || '').toLowerCase();
+      return userEmail.includes(searchLower);
+    });
+  }, [qaScoredData, qaPendingData, qaScoreFilter, qaSearchQuery]);
+
+  // Update pagination when Q&A score filter or search changes
+  React.useEffect(() => {
+    const totalPages = Math.ceil(filteredQaData.length / itemsPerPage);
+    setQaTotalPages(totalPages);
+    if (qaCurrentPage > totalPages && totalPages > 0) {
+      setQaCurrentPage(1); // Reset to first page if current page exceeds total
+    }
+  }, [qaScoreFilter, filteredQaData, qaCurrentPage]);
 
   // Get current page data for Q&A analytics
   const getCurrentQaPageData = () => {
     const startIndex = (qaCurrentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    const currentData = qaScoreFilter === 'scored' ? qaScoredData : qaPendingData;
-    return currentData.slice(startIndex, endIndex);
+    return filteredQaData.slice(startIndex, endIndex);
   };
 
   // Pagination handlers for quiz analytics
@@ -768,11 +854,34 @@ export default function AnalyticsDashboard() {
   };
 
   // Get current page data for learners
+  // Filter learners based on search query
+  const filteredLearnersData = React.useMemo(() => {
+    const learners = learnersData?.message?.message?.learner_analytics || [];
+    if (!learnerSearchQuery.trim()) {
+      return learners;
+    }
+    const searchLower = learnerSearchQuery.toLowerCase();
+    return learners.filter((learner: any) => {
+      const email = (learner.email || '').toLowerCase();
+      const fullName = (learner.full_name || learner.name || '').toLowerCase();
+      return email.includes(searchLower) || fullName.includes(searchLower);
+    });
+  }, [learnersData?.message?.message?.learner_analytics, learnerSearchQuery]);
+
   const getCurrentLearnerPageData = () => {
     const startIndex = (learnerCurrentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return learnersData?.message?.message?.learner_analytics?.slice(startIndex, endIndex) || [];
+    return filteredLearnersData.slice(startIndex, endIndex);
   };
+
+  // Update pagination when learners data or search changes
+  React.useEffect(() => {
+    const totalPages = Math.ceil(filteredLearnersData.length / itemsPerPage);
+    setLearnerTotalPages(totalPages);
+    if (learnerCurrentPage > totalPages && totalPages > 0) {
+      setLearnerCurrentPage(1); // Reset to first page if current page exceeds total
+    }
+  }, [filteredLearnersData, learnerCurrentPage]);
 
   // Pagination handlers for learners
   const handleLearnerPageChange = (page: number) => {
@@ -1367,8 +1476,21 @@ export default function AnalyticsDashboard() {
   };
 
 
+  // Filter modules based on search query
+  const filteredModules = React.useMemo(() => {
+    const modules = finalDataWithFallback?.module_analytics || [];
+    if (!moduleSearchQuery.trim()) {
+      return modules;
+    }
+    const searchLower = moduleSearchQuery.toLowerCase();
+    return modules.filter((module: any) => {
+      const moduleName = (module.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
+      return moduleName.includes(searchLower);
+    });
+  }, [finalDataWithFallback?.module_analytics, moduleSearchQuery]);
+
   // Pagination hooks
-  const modulePagination = usePagination(finalDataWithFallback?.module_analytics || []);
+  const modulePagination = usePagination(filteredModules);
   const quizPagination = usePagination(finalData?.quiz_analytics || []);
   
  
@@ -1572,6 +1694,19 @@ export default function AnalyticsDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Search Bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search modules..."
+                    value={moduleSearchQuery}
+                    onChange={(e) => setModuleSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
@@ -1630,10 +1765,10 @@ export default function AnalyticsDashboard() {
               </div>
               
               {/* Pagination Controls */}
-              {(finalDataWithFallback?.module_analytics?.length || 0) > 0 && (
+              {(filteredModules?.length || 0) > 0 && (
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-muted-foreground">
-                    Showing {((modulePagination.currentPage - 1) * 10) + 1} to {Math.min(modulePagination.currentPage * 10, finalDataWithFallback?.module_analytics?.length || 0)} of {finalDataWithFallback?.module_analytics?.length || 0} entries
+                    Showing {((modulePagination.currentPage - 1) * 10) + 1} to {Math.min(modulePagination.currentPage * 10, filteredModules.length || 0)} of {filteredModules.length || 0} entries
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -1756,6 +1891,19 @@ export default function AnalyticsDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Search Bar */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search by email..."
+                      value={quizSearchQuery}
+                      onChange={(e) => setQuizSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
@@ -1778,7 +1926,7 @@ export default function AnalyticsDashboard() {
                             </div>
                           </td>
                         </tr>
-                      ) : quizAnalyticsData.length > 0 ? (
+                      ) : filteredQuizData.length > 0 ? (
                         getCurrentPageData().map((quiz: any, index: number) => (
                           <tr 
                             key={index} 
@@ -1817,10 +1965,10 @@ export default function AnalyticsDashboard() {
                 </div>
                 
                 {/* Pagination */}
-                {quizAnalyticsData.length > 0 && (
+                {filteredQuizData.length > 0 && (
                   <div className="flex items-center justify-between mt-4">
                     <div className="text-sm text-muted-foreground">
-                      Showing {((quizCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(quizCurrentPage * itemsPerPage, quizAnalyticsData.length)} of {quizAnalyticsData.length} entries
+                      Showing {((quizCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(quizCurrentPage * itemsPerPage, filteredQuizData.length)} of {filteredQuizData.length} entries
                     </div>
                     <div className="flex items-center gap-2">
                       <Button 
@@ -1942,6 +2090,20 @@ export default function AnalyticsDashboard() {
                   </Button>
           </div>
 
+                {/* Search Bar */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search by email..."
+                      value={qaSearchQuery}
+                      onChange={(e) => setQaSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
@@ -1965,7 +2127,7 @@ export default function AnalyticsDashboard() {
                             </div>
                           </td>
                         </tr>
-                      ) : getCurrentQaPageData().length > 0 ? (
+                      ) : filteredQaData.length > 0 ? (
                         getCurrentQaPageData().map((qa: any, index: number) => (
                           <tr 
                             key={index} 
@@ -2028,12 +2190,11 @@ export default function AnalyticsDashboard() {
                 
                 {/* Pagination for Q&A Analytics */}
                 {(() => {
-                  const currentData = qaScoreFilter === 'scored' ? qaScoredData : qaPendingData;
-                  const totalPages = Math.ceil(currentData.length / itemsPerPage);
-                  return currentData.length > 0 && (
+                  const totalPages = Math.ceil(filteredQaData.length / itemsPerPage);
+                  return filteredQaData.length > 0 && (
                     <div className="flex items-center justify-between mt-4">
                       <div className="text-sm text-muted-foreground">
-                        Showing {((qaCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(qaCurrentPage * itemsPerPage, currentData.length)} of {currentData.length} entries
+                        Showing {((qaCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(qaCurrentPage * itemsPerPage, filteredQaData.length)} of {filteredQaData.length} entries
                       </div>
                     <div className="flex items-center gap-2">
                       <Button 
@@ -2048,7 +2209,7 @@ export default function AnalyticsDashboard() {
                       {/* Page Numbers */}
                       <div className="flex items-center gap-1">
                         {(() => {
-                          const totalPages = Math.ceil(currentData.length / itemsPerPage);
+                          const totalPages = Math.ceil(filteredQaData.length / itemsPerPage);
                           const currentPage = qaCurrentPage;
                           const pages = [];
                           
@@ -2164,6 +2325,19 @@ export default function AnalyticsDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Search Bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search by email or name..."
+                    value={learnerSearchQuery}
+                    onChange={(e) => setLearnerSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -2175,9 +2349,9 @@ export default function AnalyticsDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {learnersData?.message?.message?.learner_analytics?.length > 0 ? (
+                    {filteredLearnersData.length > 0 ? (
                       getCurrentLearnerPageData().map((learner: any, index: number) => (
-                        <tr key={index} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => handleLearnerClick(learner)}>
+                        <tr key={index} className="border-b hover:bg-secondary cursor-pointer" onClick={() => handleLearnerClick(learner)}>
                           <td className="p-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
@@ -2231,10 +2405,10 @@ export default function AnalyticsDashboard() {
               </div>
               
               {/* Learners Pagination */}
-              {(learnersData?.message?.message?.learner_analytics?.length || 0) > 0 && (
+              {filteredLearnersData.length > 0 && (
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-muted-foreground">
-                    Showing {((learnerCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(learnerCurrentPage * itemsPerPage, learnersData.message.message.learner_analytics.length)} of {learnersData.message.message.learner_analytics.length} entries
+                    Showing {((learnerCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(learnerCurrentPage * itemsPerPage, filteredLearnersData.length)} of {filteredLearnersData.length} entries
                   </div>
                   <div className="flex items-center gap-2">
                     <Button 
