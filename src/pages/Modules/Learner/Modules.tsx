@@ -14,7 +14,7 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination"
-import React, { useState, useMemo, useEffect } from "react"
+import React, { useState, useMemo, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useUser } from "@/hooks/use-user"
 import { useNavigation } from "@/contexts/NavigationContext"
@@ -130,54 +130,55 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
     // Debug API response
     useEffect(() => {
         if (data) {
+            const modulesFromData = data?.modules || data?.message?.modules || [];
             console.log('🔍 LearnerModules - API Response:', {
                 hasData: !!data,
                 dataKeys: Object.keys(data || {}),
                 hasMessage: !!data?.message,
                 hasMessageModules: !!data?.message?.modules,
                 hasDirectModules: !!data?.modules,
-                modulesCount: data?.modules?.length || data?.message?.modules?.length || 0,
-                modules: data?.modules || data?.message?.modules,
+                modulesCount: modulesFromData.length,
+                modules: modulesFromData,
                 meta: data?.meta || data?.message?.meta,
                 error: data?.error
             });
+            
+            // Check if modules have is_locked field
+            if (modulesFromData.length > 0) {
+                const sampleModule = modulesFromData[0];
+                console.log('🔍 LearnerModules - Sample Module Structure:', {
+                    name: sampleModule?.name,
+                    name1: sampleModule?.name1,
+                    hasIsLocked: 'is_locked' in sampleModule,
+                    isLockedValue: sampleModule?.is_locked,
+                    isLockedType: typeof sampleModule?.is_locked,
+                    assignment_based: sampleModule?.assignment_based,
+                    department: sampleModule?.department,
+                    order: sampleModule?.order
+                });
+            }
         }
         if (error) {
             console.error('❌ LearnerModules - API Error:', error);
         }
     }, [data, error]);
     
-    // Extract modules and meta - match dashboard logic to handle different response formats
-    // Prioritize get_learner_dashboard (filters for published modules) over useLearnerModuleData
+    // Extract modules and meta - PRIORITIZE useLearnerModuleData (has is_locked field) over useLearnerDashboard
+    // CRITICAL: get_learner_module_data includes is_locked field which is essential for proper locking
     let modules: any[] = [];
     let meta: any = {};
     
-    // First try to use get_learner_dashboard (filters for published modules) - same as dashboard
-    if (dashboardData?.message && Array.isArray(dashboardData.message) && dashboardData.message.length > 0) {
-        // Transform the data to match expected format
-        modules = dashboardData.message.map((item: any) => ({
-            ...item.module,
-            progress: item.progress
-        }));
-        
-        // Calculate meta from modules
-        meta = {
-            total_modules: modules.length,
-            completed_modules: modules.filter((m: any) => m.progress?.status === "Completed").length,
-            in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
-            not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
-            total_count: modules.length
-        };
-    } 
-    // Fallback to useLearnerModuleData
-    else if (data?.message?.modules && Array.isArray(data.message.modules)) {
+    // PRIORITY 1: Use useLearnerModuleData (has is_locked field) - this is the primary source
+    if (data?.message?.modules && Array.isArray(data.message.modules)) {
         // Response format: { message: { modules: [...], meta: {...} } }
         modules = data.message.modules || [];
         meta = data.message.meta || {};
+        console.log(`✅ [FRONTEND] Using get_learner_module_data API - ${modules.length} modules with is_locked field`);
     } else if (data?.modules && Array.isArray(data.modules)) {
         // Direct structure: { modules: [...], meta: {...} }
         modules = data.modules || [];
         meta = data.meta || {};
+        console.log(`✅ [FRONTEND] Using get_learner_module_data API (direct) - ${modules.length} modules with is_locked field`);
     } else if (data?.message && Array.isArray(data.message)) {
         // Array format: { message: [{ module: {...}, progress: {...} }] }
         modules = data.message.map((item: any) => ({
@@ -192,15 +193,72 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
             not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
             total_count: modules.length
         };
+        console.log(`✅ [FRONTEND] Using get_learner_module_data API (array) - ${modules.length} modules with is_locked field`);
+    }
+    // FALLBACK: Use get_learner_dashboard only if useLearnerModuleData is not available
+    else if (dashboardData?.message && Array.isArray(dashboardData.message) && dashboardData.message.length > 0) {
+        // Transform the data to match expected format
+        // WARNING: get_learner_dashboard may not have is_locked field
+        modules = dashboardData.message.map((item: any) => {
+            const moduleData = {
+                ...item.module,
+                progress: item.progress,
+                // Explicitly preserve is_locked if it exists (may be undefined)
+                is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : undefined
+            };
+            // Debug logging for is_locked
+            if (item.module?.is_locked !== undefined) {
+                console.log(`🔒 [FRONTEND] Module ${item.module?.name} (${item.module?.name1}) - is_locked from dashboard API: ${item.module.is_locked}`);
+            } else {
+                console.warn(`⚠️ [FRONTEND] Module ${item.module?.name} (${item.module?.name1}) - is_locked is MISSING from dashboard API, will use fallback logic`);
+            }
+            return moduleData;
+        });
+        
+        // Calculate meta from modules
+        meta = {
+            total_modules: modules.length,
+            completed_modules: modules.filter((m: any) => m.progress?.status === "Completed").length,
+            in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
+            not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
+            total_count: modules.length
+        };
+        console.log(`⚠️ [FRONTEND] Using get_learner_dashboard API (fallback) - ${modules.length} modules, is_locked may be missing`);
     }
     
     // Check if modules have the nested structure (module.module, module.progress)
     if (modules.length > 0 && modules[0].module) {
-        modules = modules.map((item: any) => ({
-            ...item.module,
-            progress: item.progress
-        }));
+        modules = modules.map((item: any) => {
+            const moduleData = {
+                ...item.module,
+                progress: item.progress,
+                // CRITICAL: Preserve is_locked field if it exists
+                is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : item.is_locked
+            };
+            console.log(`🔍 [FRONTEND] Nested structure - Module ${moduleData.name} (${moduleData.name1}) - is_locked: ${moduleData.is_locked}`);
+            return moduleData;
+        });
     }
+    
+    // Final check: Log all modules and their is_locked status
+    const modulesString = JSON.stringify(modules.map((m: any) => ({
+        name: m.name,
+        is_locked: m.is_locked
+    })));
+    useEffect(() => {
+        if (modules.length > 0) {
+            console.log('🔍 [FRONTEND] Final modules array:', modules.map((m: any) => ({
+                name: m.name,
+                name1: m.name1,
+                is_locked: m.is_locked,
+                hasIsLocked: 'is_locked' in m,
+                assignment_based: m.assignment_based,
+                department: m.department,
+                order: m.order
+            })));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [modulesString]);
     const totalPages = Math.ceil((meta.total_count || 0) / itemsPerPage)
 
     // Handle search query change
@@ -228,13 +286,43 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
         setPage(1);
     }, [searchQuery]);
 
+    // Memoize module IDs to create a stable dependency that only changes when module list actually changes
+    const moduleIdsString = useMemo(() => {
+        return modules.map((m: any) => m.name).sort().join(',');
+    }, [modules]);
+    
+    // Use ref to track previous module IDs to prevent unnecessary re-fetches
+    const previousModuleIdsRef = useRef<string>('');
+
     // Check which completed modules have quiz/QA content
+    // Only fetch when module IDs actually change, not on every render
     useEffect(() => {
+        // Skip if module IDs haven't actually changed
+        if (previousModuleIdsRef.current === moduleIdsString) {
+            return;
+        }
+        
+        // Update the ref with current module IDs
+        previousModuleIdsRef.current = moduleIdsString;
+        
+        let isMounted = true;
+        let timeoutId: NodeJS.Timeout;
+
         const checkModulesWithQuizQA = async () => {
-            if (!user?.name || modules.length === 0) return;
+            if (!user?.name || modules.length === 0) {
+                if (isMounted) {
+                    setModulesWithQuizQA(new Set());
+                }
+                return;
+            }
 
             const completedModules = modules.filter((m: any) => m.progress?.status === "Completed");
-            if (completedModules.length === 0) return;
+            if (completedModules.length === 0) {
+                if (isMounted) {
+                    setModulesWithQuizQA(new Set());
+                }
+                return;
+            }
 
             try {
                 // Fetch all quiz progress for the user
@@ -250,6 +338,8 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                     { credentials: 'include' }
                 );
                 const qaProgressList = (await qaRes.json())?.data || [];
+
+                if (!isMounted) return;
 
                 // Create a set of module IDs that have quiz/QA progress
                 const modulesWithContent = new Set<string>();
@@ -271,11 +361,22 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                 setModulesWithQuizQA(modulesWithContent);
             } catch (error) {
                 console.error('Error checking modules with quiz/QA:', error);
+                if (isMounted) {
+                    setModulesWithQuizQA(new Set());
+                }
             }
         };
 
-        checkModulesWithQuizQA();
-    }, [modules, user?.name]);
+        // Debounce the API calls to prevent excessive requests during rapid state changes
+        timeoutId = setTimeout(() => {
+            checkModulesWithQuizQA();
+        }, 300); // 300ms debounce
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
+    }, [moduleIdsString, user?.name]); // Use stable dependency instead of modules array
 
     // Sort modules: ordered modules (order > 0) first by order asc, then unordered (order 0 or undefined) in original order
     const sortedModules = useMemo(() => {
@@ -639,21 +740,59 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                     const isNotStarted = status === "Not Started";
                     const hasImage = !!module.image;
 
-                    // Locking logic
+                    // Locking logic - Use backend is_locked field if available, otherwise calculate
+                    // IMPORTANT: 
+                    // - Completed modules are NEVER locked (always accessible)
+                    // - Only Department-based modules can be locked
+                    // - Manual and Everyone modules are NEVER locked
                     let isLocked = false;
                     let lockReason = "";
-                    if (module.assignment_based === "Department" && module.order && module.order > 0) {
-                        // Find all department-ordered modules
-                        const deptOrdered = sortedModules.filter((m: any) => m.assignment_based === "Department" && m.order && m.order > 0);
-                        // Find all previous modules (lower order)
-                        const previous = deptOrdered.filter((m: any) => m.order < module.order);
-                        // If any previous is not completed, lock this module
-                        if (previous.some((m: any) => m.progress?.status !== "Completed")) {
-                            isLocked = true;
+                    
+                    // Only Department-based modules can be locked
+                    if (module.assignment_based !== "Department") {
+                        isLocked = false;
+                    } else if (isCompleted) {
+                        // If module is completed, it's never locked
+                        isLocked = false;
+                    } else if (module.is_locked !== undefined && module.is_locked !== null) {
+                        // CRITICAL: Use backend is_locked field - backend has department-aware locking logic
+                        // Backend returns false for unlocked modules, true for locked modules
+                        // IMPORTANT: false is a valid value, so we must check !== undefined && !== null
+                        isLocked = Boolean(module.is_locked);
+                        console.log(`🔒 [FRONTEND] Module ${module.name} (${module.name1}) - Using backend is_locked: ${module.is_locked} (type: ${typeof module.is_locked}) -> isLocked: ${isLocked}`);
+                        if (isLocked) {
                             lockReason = "Complete previous modules to unlock this module.";
+                            console.log(`🔒 [FRONTEND] Module ${module.name} (${module.name1}) - LOCKED (is_locked=true from backend)`);
+                        } else {
+                            console.log(`✅ [FRONTEND] Module ${module.name} (${module.name1}) - UNLOCKED (is_locked=false from backend)`);
+                        }
+                    } else {
+                        // is_locked is undefined or null - use fallback calculation
+                        console.warn(`⚠️ [FRONTEND] Module ${module.name} (${module.name1}) - is_locked is ${module.is_locked} (undefined/null), using fallback calculation`);
+                        // Fallback to frontend calculation (for backward compatibility only)
+                        // IMPORTANT: Filter by department to ensure independent locking per department
+                        if (module.assignment_based === "Department" && module.order && module.order > 0) {
+                            const moduleDepartment = (module.department || "").trim().toLowerCase();
+                            
+                            // Find all Department-based ordered modules from the SAME department only
+                            const deptOrdered = sortedModules.filter((m: any) => {
+                                const mDept = (m.department || "").trim().toLowerCase();
+                                return m.assignment_based === "Department" 
+                                    && m.order && m.order > 0
+                                    && mDept === moduleDepartment; // SAME DEPARTMENT ONLY
+                            });
+                            
+                            // Find all previous Department-based modules (lower order) from SAME department
+                            const previous = deptOrdered.filter((m: any) => m.order < module.order);
+                            
+                            // If any previous Department-based module from SAME department is not completed, lock this module
+                            if (previous.some((m: any) => m.progress?.status !== "Completed")) {
+                                isLocked = true;
+                                lockReason = "Complete previous modules to unlock this module.";
+                            }
                         }
                     }
-                    // Unordered or Everyone/Manual modules are never locked
+                    // Unordered modules (order 0 or undefined) are never locked
 
                     // Status bar color logic
                     let statusColor = "bg-gray-200 text-gray-700";

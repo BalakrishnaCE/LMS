@@ -19,8 +19,9 @@ import {
 import { useState, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { motion } from "framer-motion"
-import { Download, X } from "lucide-react"
+import { Download, X, CopyPlus } from "lucide-react"
 import { toast } from "sonner"
 import { LMS_API_BASE_URL, ROUTES } from "@/config/routes"
 
@@ -89,6 +90,9 @@ function Modules({ itemsPerPage }: ModulesProps) {
     const [isExporting, setIsExporting] = useState(false)
     // Add image error state for all cards
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+    // Duplicate dialog state
+    const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+    const [moduleToDuplicate, setModuleToDuplicate] = useState<{ name: string; name1: string } | null>(null);
 
     // Add authentication check to prevent race condition
     const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
@@ -261,6 +265,57 @@ function Modules({ itemsPerPage }: ModulesProps) {
         }
     };
 
+    const handleDuplicateClick = (moduleName: string, moduleDisplayName: string) => {
+        setModuleToDuplicate({ name: moduleName, name1: moduleDisplayName });
+        setShowDuplicateDialog(true);
+    };
+
+    const handleDuplicateConfirm = async () => {
+        if (!moduleToDuplicate) return;
+
+        setShowDuplicateDialog(false);
+
+        try {
+            toast.loading("Duplicating module...");
+
+            const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.module_management.duplicate_module`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    module_name: moduleToDuplicate.name
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to duplicate module');
+            }
+
+            const data = await response.json();
+            
+            if (data.message && data.message.success) {
+                toast.dismiss();
+                toast.success("Module duplicated successfully");
+                
+                // Refresh the page to show the new module
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                throw new Error(data.message?.error || 'Failed to duplicate module');
+            }
+        } catch (error: any) {
+            toast.dismiss();
+            toast.error(error.message || "Failed to duplicate module");
+            console.error("Duplicate error:", error);
+        } finally {
+            setModuleToDuplicate(null);
+        }
+    };
+
     return (
         <div>
 
@@ -384,6 +439,18 @@ function Modules({ itemsPerPage }: ModulesProps) {
                                              style={{ position: 'absolute', top: 0, left: 0 }}>
                                             {module.status === "Approval Pending" ? "Pending" : module.status}
                                         </div>
+                                        {/* Duplicate Icon Button - Top Right Corner */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                handleDuplicateClick(module.name, module.name1);
+                                            }}
+                                            className="absolute top-2 right-2 z-20 p-2 rounded-full bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
+                                            title="Duplicate Module"
+                                        >
+                                            <CopyPlus className="h-4 w-4 text-primary" />
+                                        </button>
                                         {/* Image or Letter Avatar with fallback */}
                                         {imageUrl && !hasError ? (
                                             <img
@@ -510,6 +577,62 @@ function Modules({ itemsPerPage }: ModulesProps) {
                     </PaginationContent>
                 </Pagination>
             </div>
+
+            {/* Duplicate Confirmation Dialog */}
+            <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <CopyPlus className="h-5 w-5 text-primary" />
+                            Duplicate Module
+                        </DialogTitle>
+                        <DialogDescription className="pt-2">
+                            Are you sure you want to duplicate all lessons, chapters and contents from this module?
+                        </DialogDescription>
+                    </DialogHeader>
+                    {moduleToDuplicate && (
+                        <div className="py-4">
+                            <div className="rounded-lg bg-muted p-4">
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Module Name:</p>
+                                <p className="text-base font-semibold">{moduleToDuplicate.name1}</p>
+                            </div>
+                            <div className="mt-4 space-y-2">
+                                <p className="text-sm text-muted-foreground">
+                                    This will create a duplicate module with:
+                                </p>
+                                <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1 ml-2">
+                                    <li>All lessons</li>
+                                    <li>All chapters</li>
+                                    <li>All contents (including Audio,video,image etc.)</li>
+                                    <li>Quiz questions and answers</li>
+                                    <li>Question Answer questions</li>
+                                </ul>
+                                <p className="text-sm font-medium mt-3">
+                                    The new module will be named: <span className="text-primary">{moduleToDuplicate.name1} (copy)</span>
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowDuplicateDialog(false);
+                                setModuleToDuplicate(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleDuplicateConfirm}
+                            className="bg-primary hover:bg-primary/90"
+                        >
+                            <CopyPlus className="mr-2 h-4 w-4" />
+                            Confirm Duplicate
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -162,6 +162,34 @@ export default function AnalyticsDashboard() {
     }
   }, [moduleSearchQuery]);
 
+  // Module Performance filters
+  const [modulePerformanceDepartment, setModulePerformanceDepartment] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('analytics_module_perf_department') || 'all';
+    }
+    return 'all';
+  });
+
+  const [modulePerformanceAssignmentType, setModulePerformanceAssignmentType] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('analytics_module_perf_assignment') || 'all';
+    }
+    return 'all';
+  });
+
+  // Save module performance filters to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_module_perf_department', modulePerformanceDepartment);
+    }
+  }, [modulePerformanceDepartment]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_module_perf_assignment', modulePerformanceAssignmentType);
+    }
+  }, [modulePerformanceAssignmentType]);
+
   // Quiz search with localStorage (by email)
   const [quizSearchQuery, setQuizSearchQuery] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -177,6 +205,22 @@ export default function AnalyticsDashboard() {
     }
   }, [quizSearchQuery]);
 
+  // Quiz module filter with localStorage (by typing)
+  const [quizModuleFilter, setQuizModuleFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('analytics_quiz_module_filter') || '';
+    }
+    return '';
+  });
+
+  // Save quiz module filter to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_quiz_module_filter', quizModuleFilter);
+    }
+  }, [quizModuleFilter]);
+
+
   // Q&A search with localStorage (by email)
   const [qaSearchQuery, setQaSearchQuery] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -191,6 +235,21 @@ export default function AnalyticsDashboard() {
       localStorage.setItem('analytics_qa_search', qaSearchQuery);
     }
   }, [qaSearchQuery]);
+
+  // Q&A module filter with localStorage (by typing)
+  const [qaModuleFilter, setQaModuleFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('analytics_qa_module_filter') || '';
+    }
+    return '';
+  });
+
+  // Save Q&A module filter to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('analytics_qa_module_filter', qaModuleFilter);
+    }
+  }, [qaModuleFilter]);
 
   // Learner search with localStorage (by email or name)
   const [learnerSearchQuery, setLearnerSearchQuery] = useState<string>(() => {
@@ -762,17 +821,30 @@ export default function AnalyticsDashboard() {
     }
   };
 
-  // Filter quiz analytics based on email search query
+  // Filter quiz analytics based on email search query and module name
   const filteredQuizData = React.useMemo(() => {
-    if (!quizSearchQuery.trim()) {
-      return quizAnalyticsData;
+    let filtered = quizAnalyticsData;
+
+    // Filter by email search query
+    if (quizSearchQuery.trim()) {
+      const searchLower = quizSearchQuery.toLowerCase();
+      filtered = filtered.filter((quiz: any) => {
+        const userEmail = (quiz.user || '').toLowerCase();
+        return userEmail.includes(searchLower);
+      });
     }
-    const searchLower = quizSearchQuery.toLowerCase();
-    return quizAnalyticsData.filter((quiz: any) => {
-      const userEmail = (quiz.user || '').toLowerCase();
-      return userEmail.includes(searchLower);
-    });
-  }, [quizAnalyticsData, quizSearchQuery]);
+
+    // Filter by module name (search by typing)
+    if (quizModuleFilter.trim()) {
+      const moduleSearchLower = quizModuleFilter.toLowerCase();
+      filtered = filtered.filter((quiz: any) => {
+        const moduleName = (quiz.module?.name1 || quiz.module?.name || '').toLowerCase();
+        return moduleName.includes(moduleSearchLower);
+      });
+    }
+
+    return filtered;
+  }, [quizAnalyticsData, quizSearchQuery, quizModuleFilter]);
 
   // Update quiz pagination when filtered data changes
   React.useEffect(() => {
@@ -790,18 +862,30 @@ export default function AnalyticsDashboard() {
     return filteredQuizData.slice(startIndex, endIndex);
   };
 
-  // Filter Q&A analytics based on email search query
+  // Filter Q&A analytics based on email search query and module name
   const filteredQaData = React.useMemo(() => {
-    const currentData = qaScoreFilter === 'scored' ? qaScoredData : qaPendingData;
-    if (!qaSearchQuery.trim()) {
-      return currentData;
+    let filtered = qaScoreFilter === 'scored' ? qaScoredData : qaPendingData;
+
+    // Filter by email search query
+    if (qaSearchQuery.trim()) {
+      const searchLower = qaSearchQuery.toLowerCase();
+      filtered = filtered.filter((qa: any) => {
+        const userEmail = (qa.user || '').toLowerCase();
+        return userEmail.includes(searchLower);
+      });
     }
-    const searchLower = qaSearchQuery.toLowerCase();
-    return currentData.filter((qa: any) => {
-      const userEmail = (qa.user || '').toLowerCase();
-      return userEmail.includes(searchLower);
-    });
-  }, [qaScoredData, qaPendingData, qaScoreFilter, qaSearchQuery]);
+
+    // Filter by module name (search by typing)
+    if (qaModuleFilter.trim()) {
+      const moduleSearchLower = qaModuleFilter.toLowerCase();
+      filtered = filtered.filter((qa: any) => {
+        const moduleName = (qa.module?.name1 || qa.module?.name || '').toLowerCase();
+        return moduleName.includes(moduleSearchLower);
+      });
+    }
+
+    return filtered;
+  }, [qaScoredData, qaPendingData, qaScoreFilter, qaSearchQuery, qaModuleFilter]);
 
   // Update pagination when Q&A score filter or search changes
   React.useEffect(() => {
@@ -1476,18 +1560,38 @@ export default function AnalyticsDashboard() {
   };
 
 
-  // Filter modules based on search query
+  // Filter modules based on search query, department, and assignment type
   const filteredModules = React.useMemo(() => {
     const modules = finalDataWithFallback?.module_analytics || [];
-    if (!moduleSearchQuery.trim()) {
-      return modules;
-    }
-    const searchLower = moduleSearchQuery.toLowerCase();
     return modules.filter((module: any) => {
-      const moduleName = (module.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
-      return moduleName.includes(searchLower);
+      // Search filter
+      if (moduleSearchQuery.trim()) {
+        const searchLower = moduleSearchQuery.toLowerCase();
+        const moduleName = (module.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
+        if (!moduleName.includes(searchLower)) {
+          return false;
+        }
+      }
+
+      // Department filter
+      if (modulePerformanceDepartment && modulePerformanceDepartment !== 'all') {
+        const moduleDept = (module.department || '').toLowerCase();
+        if (moduleDept !== modulePerformanceDepartment.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Assignment type filter
+      if (modulePerformanceAssignmentType && modulePerformanceAssignmentType !== 'all') {
+        const moduleAssignment = (module.assignment_type || module.assignment_based || '').toLowerCase();
+        if (moduleAssignment !== modulePerformanceAssignmentType.toLowerCase()) {
+          return false;
+        }
+      }
+
+      return true;
     });
-  }, [finalDataWithFallback?.module_analytics, moduleSearchQuery]);
+  }, [finalDataWithFallback?.module_analytics, moduleSearchQuery, modulePerformanceDepartment, modulePerformanceAssignmentType]);
 
   // Pagination hooks
   const modulePagination = usePagination(filteredModules);
@@ -1694,9 +1798,10 @@ export default function AnalyticsDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Search Bar */}
-              <div className="mb-4">
-                <div className="relative">
+              {/* Search Bar and Filters in a single row */}
+              <div className="mb-4 flex flex-col sm:flex-row gap-4">
+                {/* Search Bar */}
+                <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="text"
@@ -1705,6 +1810,66 @@ export default function AnalyticsDashboard() {
                     onChange={(e) => setModuleSearchQuery(e.target.value)}
                     className="pl-10"
                   />
+                </div>
+                
+                {/* Department Filter */}
+                <div className="w-full sm:w-[200px]">
+                  <Select
+                    value={modulePerformanceDepartment}
+                    onValueChange={setModulePerformanceDepartment}
+                  >
+                    <SelectTrigger id="module-perf-department">
+                      <SelectValue placeholder="All Departments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {(() => {
+                        const modules = finalDataWithFallback?.module_analytics || [];
+                        const uniqueDepartments = Array.from(
+                          new Set(
+                            modules
+                              .map((m: any) => m.department)
+                              .filter((d: any) => d && d.trim() !== '')
+                          )
+                        ).sort();
+                        return uniqueDepartments.map((dept: any) => (
+                          <SelectItem key={dept} value={dept}>
+                            {dept}
+                          </SelectItem>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Assignment Type Filter */}
+                <div className="w-full sm:w-[200px]">
+                  <Select
+                    value={modulePerformanceAssignmentType}
+                    onValueChange={setModulePerformanceAssignmentType}
+                  >
+                    <SelectTrigger id="module-perf-assignment">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      {(() => {
+                        const modules = finalDataWithFallback?.module_analytics || [];
+                        const uniqueAssignmentTypes = Array.from(
+                          new Set(
+                            modules
+                              .map((m: any) => m.assignment_type || m.assignment_based)
+                              .filter((a: any) => a && a.trim() !== '')
+                          )
+                        ).sort();
+                        return uniqueAssignmentTypes.map((type: any) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -1891,15 +2056,28 @@ export default function AnalyticsDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Search Bar */}
-                <div className="mb-4">
-                  <div className="relative">
+                {/* Search Bar and Filters */}
+                <div className="mb-4 flex flex-col sm:flex-row gap-4">
+                  {/* Search Bar - Email */}
+                  <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="text"
                       placeholder="Search by email..."
                       value={quizSearchQuery}
                       onChange={(e) => setQuizSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  
+                  {/* Module Filter - Text Input (by typing) */}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Filter by module name..."
+                      value={quizModuleFilter}
+                      onChange={(e) => setQuizModuleFilter(e.target.value)}
                       className="pl-10"
                     />
                   </div>
@@ -2090,15 +2268,28 @@ export default function AnalyticsDashboard() {
                   </Button>
           </div>
 
-                {/* Search Bar */}
-                <div className="mb-4">
-                  <div className="relative">
+                {/* Search Bar and Filters */}
+                <div className="mb-4 flex flex-col sm:flex-row gap-4">
+                  {/* Search Bar - Email */}
+                  <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="text"
                       placeholder="Search by email..."
                       value={qaSearchQuery}
                       onChange={(e) => setQaSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  
+                  {/* Module Filter - Text Input (by typing) */}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Filter by module name..."
+                      value={qaModuleFilter}
+                      onChange={(e) => setQaModuleFilter(e.target.value)}
                       className="pl-10"
                     />
                   </div>

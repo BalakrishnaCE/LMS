@@ -46,43 +46,60 @@ const itemVariants = {
 
 // Locking logic for department-ordered modules
 function getLockState(module: any, allModules: any[]) {
+  // IMPORTANT: 
+  // - Completed modules are NEVER locked (always accessible)
+  // - Only Department-based modules can be locked
+  // - Manual and Everyone modules are NEVER locked
+  const isCompleted = module.progress?.status === "Completed";
   let isLocked = false;
   let lockReason = "";
-  if (module.assignment_based === "Department" && module.order && module.order > 0) {
-    const deptOrdered = allModules.filter((m: any) => m.assignment_based === "Department" && m.order && m.order > 0);
-    const previous = deptOrdered.filter((m: any) => m.order < module.order);
-    if (previous.some((m: any) => m.progress?.status !== "Completed")) {
-      isLocked = true;
+  
+  // Only Department-based modules can be locked
+  if (module.assignment_based !== "Department") {
+    isLocked = false;
+  } else if (isCompleted) {
+    // If module is completed, it's never locked
+    isLocked = false;
+  } else if (module.is_locked !== undefined && module.is_locked !== null) {
+    // CRITICAL: Use backend is_locked field - backend has department-aware locking logic
+    // Backend returns false for unlocked modules, true for locked modules
+    // IMPORTANT: false is a valid value, so we must check !== undefined && !== null
+    isLocked = Boolean(module.is_locked);
+    
+    if (isLocked) {
       lockReason = "Complete previous modules to unlock this module.";
+      
+    } else {
+      
+    }
+  } else {
+    // is_locked is undefined or null - use fallback calculation
+    console.warn(`⚠️ [DASHBOARD] Module ${module.name} (${module.name1}) - is_locked is ${module.is_locked} (undefined/null), using fallback calculation`);
+    // Fallback to frontend calculation (for backward compatibility only)
+    // IMPORTANT: Filter by department to ensure independent locking per department
+    if (module.assignment_based === "Department" && module.order && module.order > 0) {
+      const moduleDepartment = (module.department || "").trim().toLowerCase();
+      
+      // Find all Department-based ordered modules from the SAME department only
+      const deptOrdered = allModules.filter((m: any) => {
+        const mDept = (m.department || "").trim().toLowerCase();
+        return m.assignment_based === "Department" 
+          && m.order && m.order > 0
+          && mDept === moduleDepartment; // SAME DEPARTMENT ONLY
+      });
+      
+      // Find all previous Department-based modules (lower order) from SAME department
+      const previous = deptOrdered.filter((m: any) => m.order < module.order);
+      
+      // If any previous Department-based module from SAME department is not completed, lock this module
+      if (previous.some((m: any) => m.progress?.status !== "Completed")) {
+        isLocked = true;
+        lockReason = "Complete previous modules to unlock this module.";
+      }
     }
   }
   return { isLocked, lockReason };
 }
-
-// const StatusBadge = ({ status, isMissed, isLocked, tooltip }: { status: string, isMissed?: boolean, isLocked?: boolean, tooltip?: string }) => {
-//   let icon = null, color = "";
-//   if (isLocked) {
-//     icon = <Lock className="h-4 w-4" />;
-//     color = "bg-gray-300 text-gray-700";
-//   } else if (isMissed) {
-//     icon = <Clock className="h-4 w-4" />;
-//     color = "bg-red-100 text-red-600";
-//   } else if (status === "In Progress") {
-//     icon = <FastForward className="h-4 w-4" />;
-//     color = "bg-blue-100 text-blue-600";
-//   } else if (status === "Completed") {
-//     icon = <CheckCircle className="h-4 w-4" />;
-//     color = "bg-green-100 text-green-600";
-//   } else {
-//     icon = <PlayCircle className="h-4 w-4" />;
-//     color = "bg-gray-100 text-gray-700";
-//   }
-//   return (
-//     <div className={`absolute top-3 right-3 rounded-full p-1 shadow ${color} cursor-default`} title={tooltip || status} aria-label={tooltip || status}>
-//       {icon}
-//     </div>
-//   );
-// };
 
 export default function LearnerDashboard() {
   const { user, isLoading: userLoading } = useUser();
@@ -165,21 +182,65 @@ export default function LearnerDashboard() {
     fetchAchievements();
   }, [fetchAchievements]);
 
-  // Extract modules and meta - use both APIs but prioritize useLearnerDashboard
+  // Extract modules and meta - PRIORITIZE useLearnerModuleData (has is_locked field) over useLearnerDashboard
+  // CRITICAL: get_learner_module_data includes is_locked field which is essential for proper locking
   // useLearnerModuleData returns data directly: { modules: [...], meta: {...} }
   // useLearnerDashboard returns data under message: [{ module: {...}, progress: {...} }]
   
-  // Prioritize get_learner_dashboard (filters for published modules) over useLearnerModuleData
   let modules: any[] = [];
   let meta: any = {};
   
-  // First try to use get_learner_dashboard (filters for published modules)
-  if (DeadlineData?.message && Array.isArray(DeadlineData.message) && DeadlineData.message.length > 0) {
-    // Transform the data to match expected format
-    modules = DeadlineData.message.map((item: any) => ({
+  // PRIORITY 1: Use useLearnerModuleData (has is_locked field) - this is the primary source
+  if (data?.message?.modules && Array.isArray(data.message.modules)) {
+    // Response format: { message: { modules: [...], meta: {...} } }
+    modules = data.message.modules || [];
+    meta = data.message.meta || {};
+    
+  } else if (data?.modules && Array.isArray(data.modules)) {
+    // Direct structure: { modules: [...], meta: {...} }
+    modules = data.modules || [];
+    meta = data.meta || {};
+    
+  } else if (data?.message && Array.isArray(data.message)) {
+    // Array format: { message: [{ module: {...}, progress: {...} }] }
+    modules = data.message.map((item: any) => ({
       ...item.module,
-      progress: item.progress
+      progress: item.progress,
+      // CRITICAL: Preserve is_locked field
+      is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : item.is_locked
     }));
+    // Calculate meta from modules
+    meta = {
+      total_modules: modules.length,
+      completed_modules: modules.filter((m: any) => m.progress?.status === "Completed").length,
+      in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
+      not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
+      overdue_modules: 0,
+      average_progress: modules.length > 0 ? 
+        Math.round(modules.reduce((sum: number, m: any) => sum + (m.progress?.progress || 0), 0) / modules.length) : 0,
+      total_count: modules.length
+    };
+   
+  }
+  // FALLBACK: Use get_learner_dashboard only if useLearnerModuleData is not available
+  else if (DeadlineData?.message && Array.isArray(DeadlineData.message) && DeadlineData.message.length > 0) {
+    // Transform the data to match expected format
+    // WARNING: get_learner_dashboard may not have is_locked field
+    modules = DeadlineData.message.map((item: any) => {
+      const moduleData = {
+        ...item.module,
+        progress: item.progress,
+        // Explicitly preserve is_locked if it exists (may be undefined)
+        is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : undefined
+      };
+      // Debug logging for is_locked
+      if (item.module?.is_locked !== undefined) {
+        
+      } else {
+        console.warn(`⚠️ [DASHBOARD] Module ${item.module?.name} (${item.module?.name1}) - is_locked is MISSING from dashboard API, will use fallback logic`);
+      }
+      return moduleData;
+    });
     
     // Calculate meta from modules
     meta = {
@@ -193,28 +254,20 @@ export default function LearnerDashboard() {
       total_count: modules.length
     };
     
-    // console.log('Using get_learner_dashboard (published modules only) - modules count:', modules.length);
-  } else if (data?.message?.modules) {
-    // Fallback to useLearnerModuleData if get_learner_dashboard fails
-    modules = data.message.modules || [];
-    meta = data.message.meta || {};
-   
-  } else if (data?.modules) {
-    // Direct structure fallback
-    modules = data.modules || [];
-    meta = data.meta || {};
-  
   }
-  
-  // Debug logging
-  
   
   // Check if modules have the nested structure (module.module, module.progress)
   if (modules.length > 0 && modules[0].module) {
-    modules = modules.map((item: any) => ({
-      ...item.module,
-      progress: item.progress
-    }));
+    modules = modules.map((item: any) => {
+      const moduleData = {
+        ...item.module,
+        progress: item.progress,
+        // CRITICAL: Preserve is_locked field if it exists
+        is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : item.is_locked
+      };
+      
+      return moduleData;
+    });
   }
   
   // Check if modules are empty and add fallback
@@ -223,22 +276,49 @@ export default function LearnerDashboard() {
     if (DeadlineData?.message && Array.isArray(DeadlineData.message)) {
       modules = DeadlineData.message.map((item: any) => ({
         ...item.module,
-        progress: item.progress
+        progress: item.progress,
+        // Preserve is_locked if it exists
+        is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : undefined
       }));
     }
   }
   
-  // If useLearnerModuleData doesn't have data, use useLearnerDashboard data
+  // Final check: Log all modules and their is_locked status for debugging
+  React.useEffect(() => {
+    if (modules.length > 0) {
+      console.log('🔍 [DASHBOARD] Final modules array:', modules.map((m: any) => ({
+        name: m.name,
+        name1: m.name1,
+        is_locked: m.is_locked,
+        hasIsLocked: 'is_locked' in m,
+        assignment_based: m.assignment_based,
+        department: m.department,
+        order: m.order
+      })));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(modules.map((m: any) => ({ name: m.name, is_locked: m.is_locked })))]);
+  
+  // If useLearnerModuleData doesn't have data, use useLearnerDashboard data (final fallback)
   if (modules.length === 0 && DeadlineData?.message && !deadlineError) {
     const deadlineModules = DeadlineData.message;
     
     // Ensure deadlineModules is an array before calling map
     if (Array.isArray(deadlineModules)) {
       // Transform the data to match expected format
-      modules = deadlineModules.map((item: any) => ({
-        ...item.module,
-        progress: item.progress
-      }));
+      // WARNING: Preserve is_locked if it exists, but it may be undefined
+      modules = deadlineModules.map((item: any) => {
+        const moduleData = {
+          ...item.module,
+          progress: item.progress,
+          // Explicitly preserve is_locked if it exists
+          is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : undefined
+        };
+        if (moduleData.is_locked === undefined) {
+          console.warn(`⚠️ [DASHBOARD] Module ${moduleData.name} (${moduleData.name1}) - is_locked is MISSING from final fallback`);
+        }
+        return moduleData;
+      });
     } else {
       console.warn('DeadlineData.message is not an array:', deadlineModules);
       // If it's not an array, try to extract array from nested structure
@@ -246,7 +326,9 @@ export default function LearnerDashboard() {
       if (Array.isArray(extractedArray) && extractedArray.length > 0) {
         modules = extractedArray.map((item: any) => ({
           ...item.module,
-          progress: item.progress
+          progress: item.progress,
+          // Preserve is_locked if it exists
+          is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : undefined
         }));
       }
     }
@@ -947,19 +1029,31 @@ export default function LearnerDashboard() {
                             const moduleName = module?.name1 || module?.name || "Module";
                             const duration = module?.duration;
                             
-                            // For "Ready to Start" modules, only check if it's a department-ordered module
-                            // Since these modules haven't been started, we don't need complex locking logic
+                            // For "Ready to Start" modules, use backend is_locked if available
                             let isLocked = false;
                             let lockReason = "";
-                            if (module.assignment_based === "Department" && module.order && module.order > 0) {
-                              // Check if there are any previous department-ordered modules that aren't completed
-                              const deptOrdered = sortedModules.filter((m: any) => 
-                                m.assignment_based === "Department" && m.order && m.order > 0
-                              );
+                            
+                            // CRITICAL: Use backend is_locked field if available (same as other sections)
+                            if (module.is_locked !== undefined && module.is_locked !== null) {
+                              isLocked = Boolean(module.is_locked);
+                              console.log(`🔒 [DASHBOARD] Ready to Start - Module ${module.name} (${module.name1}) - Using backend is_locked: ${module.is_locked} -> isLocked: ${isLocked}`);
+                              if (isLocked) {
+                                lockReason = "Complete previous modules to unlock this module.";
+                              }
+                            } else if (module.assignment_based === "Department" && module.order && module.order > 0) {
+                              // Fallback: Check if there are any previous department-ordered modules from SAME department that aren't completed
+                              const moduleDepartment = (module.department || "").trim().toLowerCase();
+                              const deptOrdered = sortedModules.filter((m: any) => {
+                                const mDept = (m.department || "").trim().toLowerCase();
+                                return m.assignment_based === "Department" 
+                                  && m.order && m.order > 0
+                                  && mDept === moduleDepartment; // SAME DEPARTMENT ONLY
+                              });
                               const previous = deptOrdered.filter((m: any) => m.order < module.order);
                               if (previous.some((m: any) => m.progress?.status !== "Completed")) {
                                 isLocked = true;
                                 lockReason = "Complete previous modules to unlock this module.";
+                                console.warn(`⚠️ [DASHBOARD] Ready to Start - Module ${module.name} (${module.name1}) - Using fallback calculation, is_locked was missing`);
                               }
                             }
                             

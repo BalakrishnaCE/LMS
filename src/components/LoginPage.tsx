@@ -31,128 +31,168 @@ export function LoginForm({
   const [password, setPassword] = React.useState("")
   const [showPassword, setShowPassword] = React.useState(false)
   const [isLoggingIn, setIsLoggingIn] = React.useState(false)
-  const { login, error: loginError, isLoading: isLoginLoading, currentUser } = useFrappeAuth()
-  const [user, setUser] = React.useState<any>(null)
+  const { login, error: loginError, currentUser } = useFrappeAuth()
   const [userLoading, setUserLoading] = React.useState(false)
-  const [userLoadingError, setUserLoadingError] = React.useState<string | null>(null)
-  const [userError, setUserError] = React.useState<string | null>(null)
-  const [isLMSAdmin, setIsLMSAdmin] = React.useState(false)
-  const [isLMSStudent, setIsLMSStudent] = React.useState(false)
-  const [isLMSContentEditor, setIsLMSContentEditor] = React.useState(false)
-  const [loginTriggered, setLoginTriggered] = React.useState(false)
+  const [isRedirecting, setIsRedirecting] = React.useState(false)
+
+  // Clear error state when component mounts (e.g., after logout)
+  React.useEffect(() => {
+    // If we're on login page and there's no current user, reset state
+    // This handles the case after logout when auth hook might show an error
+    if (!currentUser) {
+      setIsRedirecting(false)
+      setIsLoggingIn(false)
+      setUserLoading(false)
+    }
+  }, [currentUser])
+  
+  // Helper function to check if error should be shown
+  const shouldShowError = () => {
+    // Don't show error if we're redirecting
+    if (isRedirecting) return false
+    
+    // Don't show error if there's a current user (we're not on login page)
+    if (currentUser) return false
+    
+    // Don't show error if it's about fetching logged in user (expected after logout)
+    if (loginError?.message?.toLowerCase().includes('fetching the logged in user')) {
+      return false
+    }
+    
+    // Show error for actual login failures
+    return !!loginError
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Reset state for new login attempt
+    setUserLoading(false)
+    setIsRedirecting(false)
+    
     setIsLoggingIn(true)
-    setLoginTriggered(true)
     try {
       // First, attempt to login
       const loginResponse = await login({ username: username, password: password })
       if (loginResponse) {
         toast.success("Login successful")
-        // Now wait for user data to load (handled by useEffect below)
+        setIsRedirecting(true) // Mark that we're redirecting to prevent error display
+        
+        // Remove "login" from URL immediately after successful login
+        const currentPath = window.location.pathname
+        if (currentPath.includes('/login')) {
+          // Remove /login from the path, keeping base path if it exists
+          // Preserve /lms prefix if it exists in production
+          const cleanPath = currentPath.replace(/\/login\/?$/, '') || getFullPath(ROUTES.HOME)
+          // Ensure we maintain the base path
+          const finalPath = cleanPath || getFullPath(ROUTES.HOME)
+          window.history.replaceState({}, '', finalPath)
+        }
+        
+        // Immediately fetch user data using the username to check roles
+        const trimmedUsername = username.trim()
+        setUserLoading(true)
+        
+        try {
+          // Determine API base URL
+          const apiBaseUrl = LMS_API_BASE_URL || '';
+          const cleanApiBaseUrl = apiBaseUrl.replace(/\/$/, '');
+          const apiUrl = cleanApiBaseUrl 
+            ? `${cleanApiBaseUrl}/api/resource/User/${trimmedUsername}`
+            : `/api/resource/User/${trimmedUsername}`;
+          
+        
+          
+          const res = await fetch(apiUrl, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+            }
+          });
+          
+          if (!res.ok) {
+            throw new Error(`Failed to fetch user: ${res.status} ${res.statusText}`);
+          }
+          
+          const userDoc = await res.json();
+          const userData = userDoc.data || userDoc;
+          
+          if (!userData || !userData.name) {
+            throw new Error('User data not found in response');
+          }
+          
+          const userName = userData.name; // User name (usually email)
+          
+          // Step 2: Get LMS Users doctype (Single doctype, name is always "LMS Users")
+          const lmsUsersApiUrl = cleanApiBaseUrl 
+            ? `${cleanApiBaseUrl}/api/resource/LMS Users/LMS Users`
+            : `/api/resource/LMS Users/LMS Users`;
+          
+          const lmsUsersRes = await fetch(lmsUsersApiUrl, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+            }
+          });
+          
+          if (!lmsUsersRes.ok) {
+            throw new Error(`Failed to fetch LMS Users: ${lmsUsersRes.status} ${lmsUsersRes.statusText}`);
+          }
+          
+          const lmsUsersDoc = await lmsUsersRes.json();
+          const lmsUsersData = lmsUsersDoc.data || lmsUsersDoc;
+          
+          // Step 3: Check which child table the user exists in (priority: admin > content_editor > student)
+          const lmsAdmin = (lmsUsersData.lms_admin || []).some((row: any) => row.user === userName);
+          const lmsContentEditor = (lmsUsersData.lms_content_editor || []).some((row: any) => row.user === userName);
+          const lmsStudent = (lmsUsersData.lms_student || []).some((row: any) => row.user === userName);
+          
+          // Determine redirect path based on LMS Users doctype roles
+          let redirectPath = '';
+          if (lmsAdmin) {
+            redirectPath = ROUTES.HOME; // "/"
+          } else if (lmsContentEditor) {
+            redirectPath = ROUTES.MODULES; // "/modules"
+          } else if (lmsStudent) {
+            redirectPath = ROUTES.LEARNER_DASHBOARD; // "/learner-dashboard"
+          } else {
+            redirectPath = ROUTES.LOGIN; // "/login"
+            toast.error("You don't have the required permissions to access this system");
+          }
+          
+         
+          
+          setIsLoggingIn(false)
+          setUserLoading(false)
+          
+          // Redirect immediately - use getFullPath to preserve /lms prefix in production
+          const fullRedirectPath = getFullPath(redirectPath);
+          navigate(fullRedirectPath);
+          
+          // Fallback: if still on login page after 200ms, force redirect
+          setTimeout(() => {
+            if (window.location.pathname.includes('/login') && redirectPath !== ROUTES.LOGIN) {
+              window.location.href = fullRedirectPath;
+            }
+          }, 200);
+          
+        } catch (fetchErr: any) {
+          console.error('❌ Error fetching user data:', fetchErr);
+          setIsRedirecting(false) // Reset redirecting flag on error
+          setIsLoggingIn(false)
+          setUserLoading(false)
+          toast.error("Failed to load user data. Please try again.");
+        }
       }
     } catch (err) {
       console.error("Login failed", err)
       toast.error("Login failed. Please check your credentials.")
       setIsLoggingIn(false)
-      setLoginTriggered(false)
+      setUserLoading(false)
     }
   }
 
-  // Fetch user doc after login
-  React.useEffect(() => {
-    if (!loginTriggered || !currentUser) return;
-    setUserLoading(true);
-    setUserError(null);
-    setUserLoadingError(null);
-    // Fetch user doc using direct fetch
-    const fetchUser = async () => {
-      try {
-        // Determine API base URL
-        // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
-        // In development: use relative path so Vite proxy handles it, or http://lms.noveloffice.org
-        const apiBaseUrl = LMS_API_BASE_URL || '';
-        const cleanApiBaseUrl = apiBaseUrl.replace(/\/$/, '');
-        const apiUrl = cleanApiBaseUrl 
-          ? `${cleanApiBaseUrl}/api/resource/User/${currentUser}`
-          : `/api/resource/User/${currentUser}`;
-        
-        console.log('📡 Fetching user data:', { currentUser, apiUrl });
-        
-        const res = await fetch(apiUrl, {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
-        
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error('❌ Failed to fetch user:', {
-            status: res.status,
-            statusText: res.statusText,
-            url: apiUrl,
-            errorText
-          });
-          throw new Error(`Failed to fetch user: ${res.status} ${res.statusText}`);
-        }
-        
-        const userDoc = await res.json();
-        console.log('📦 User data response:', userDoc);
-        
-        const userData = userDoc.data || userDoc;
-        if (!userData) {
-          throw new Error('User data not found in response');
-        }
-        
-        setUser(userData);
-        // Set role flags
-        const roles = (userData.roles || []) as Array<{ role: string }>;
-        setIsLMSAdmin(roles.some((role: { role: string }) => role.role === "LMS Admin"));
-        setIsLMSStudent(roles.some((role: { role: string }) => role.role === "LMS Student"));
-        setIsLMSContentEditor(roles.some((role: { role: string }) => role.role === "LMS Content Editor"));
-        setUserLoading(false);
-        setUserLoadingError(null);
-      } catch (err: any) {
-        console.error('❌ Error fetching user:', err);
-        const errorMessage = err?.message || "Failed to fetch user data";
-        setUserError(errorMessage);
-        setUserLoadingError(errorMessage);
-        setUserLoading(false);
-      }
-    };
-    fetchUser();
-  }, [loginTriggered, currentUser]);
-
-  // Redirect as soon as user data is available after login
-  React.useEffect(() => {
-    if (!loginTriggered) return;
-    if (user) {
-      setIsLoggingIn(false);
-      setLoginTriggered(false);
-      if (isLMSAdmin) {
-        navigate(getFullPath(ROUTES.HOME));
-      } else if (isLMSContentEditor) {
-        navigate(getFullPath(ROUTES.MODULES));
-      } else if (isLMSStudent) {
-        navigate(getFullPath(ROUTES.LEARNER_DASHBOARD));
-      } else {
-        navigate(getFullPath(ROUTES.LOGIN));
-        toast.error("You don't have the required permissions to access this system");
-      }
-    }
-    // If user data doesn't load in 5 seconds, show error
-    const timeout = setTimeout(() => {
-      if (!user) {
-        setIsLoggingIn(false);
-        setLoginTriggered(false);
-        toast.error("Failed to load user data. Please try again.");
-      }
-    }, 5000);
-    return () => clearTimeout(timeout);
-  }, [user, isLMSAdmin, isLMSStudent, isLMSContentEditor, loginTriggered]);
 
   const motionProps: HTMLMotionProps<"div"> = {
     initial: { opacity: 0, y: 20 },
@@ -250,7 +290,7 @@ export function LoginForm({
                 )}
               </Button>
             </motion.div>
-            {loginError && (
+            {shouldShowError() && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}

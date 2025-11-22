@@ -13,6 +13,7 @@ import loadingAnimation from '@/assets/Loading.json';
 import {
   Pagination,
   PaginationContent,
+  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -169,18 +170,86 @@ function Admindashboard() {
                                                                     />
                                                                 </PaginationItem>
                                                                 
-                                                                {/* Page numbers */}
-                                                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                                                    <PaginationItem key={page}>
-                                                                        <PaginationLink
-                                                                            isActive={currentPage === page}
-                                                                            onClick={() => setCurrentPage(page)}
-                                                                            className="cursor-pointer"
-                                                                        >
-                                                                            {page}
-                                                                        </PaginationLink>
-                                                                    </PaginationItem>
-                                                                ))}
+                                                                {/* Updated Pagination Logic with Ellipsis - matching Modules format */}
+                                                                {(() => {
+                                                                    const pageButtons = [];
+                                                                    const maxPageButtons = 5; // Show at most 5 page numbers
+                                                                    let startPage = Math.max(1, currentPage - 1);
+                                                                    let endPage = Math.min(totalPages, currentPage + 1);
+
+                                                                    // Always show first and last page
+                                                                    if (currentPage <= 3) {
+                                                                        startPage = 1;
+                                                                        endPage = Math.min(totalPages, maxPageButtons);
+                                                                    } else if (currentPage >= totalPages - 2) {
+                                                                        startPage = Math.max(1, totalPages - maxPageButtons + 1);
+                                                                        endPage = totalPages;
+                                                                    } else {
+                                                                        startPage = currentPage - 1;
+                                                                        endPage = currentPage + 1;
+                                                                    }
+
+                                                                    // First page
+                                                                    if (startPage > 1) {
+                                                                        pageButtons.push(
+                                                                            <PaginationItem key={1}>
+                                                                                <PaginationLink 
+                                                                                    onClick={() => setCurrentPage(1)} 
+                                                                                    isActive={currentPage === 1} 
+                                                                                    className="cursor-pointer"
+                                                                                >
+                                                                                    {1}
+                                                                                </PaginationLink>
+                                                                            </PaginationItem>
+                                                                        );
+                                                                        if (startPage > 2) {
+                                                                            pageButtons.push(
+                                                                                <PaginationItem key="start-ellipsis">
+                                                                                    <PaginationEllipsis />
+                                                                                </PaginationItem>
+                                                                            );
+                                                                        }
+                                                                    }
+
+                                                                    // Middle pages
+                                                                    for (let i = startPage; i <= endPage; i++) {
+                                                                        pageButtons.push(
+                                                                            <PaginationItem key={i}>
+                                                                                <PaginationLink 
+                                                                                    onClick={() => setCurrentPage(i)} 
+                                                                                    isActive={currentPage === i} 
+                                                                                    className="cursor-pointer"
+                                                                                >
+                                                                                    {i}
+                                                                                </PaginationLink>
+                                                                            </PaginationItem>
+                                                                        );
+                                                                    }
+
+                                                                    // Last page
+                                                                    if (endPage < totalPages) {
+                                                                        if (endPage < totalPages - 1) {
+                                                                            pageButtons.push(
+                                                                                <PaginationItem key="end-ellipsis">
+                                                                                    <PaginationEllipsis />
+                                                                                </PaginationItem>
+                                                                            );
+                                                                        }
+                                                                        pageButtons.push(
+                                                                            <PaginationItem key={totalPages}>
+                                                                                <PaginationLink 
+                                                                                    onClick={() => setCurrentPage(totalPages)} 
+                                                                                    isActive={currentPage === totalPages} 
+                                                                                    className="cursor-pointer"
+                                                                                >
+                                                                                    {totalPages}
+                                                                                </PaginationLink>
+                                                                            </PaginationItem>
+                                                                        );
+                                                                    }
+
+                                                                    return pageButtons;
+                                                                })()}
                                                                 
                                                                 <PaginationItem>
                                                                     <PaginationNext 

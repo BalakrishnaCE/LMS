@@ -3,16 +3,13 @@ import { useParams } from "wouter";
 import { useUser } from "@/hooks/use-user";
 import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
 import { useLearnerCompletionData, CompletionData, useLearnerDashboard } from "@/lib/api";
-import { motion, AnimatePresence } from "framer-motion";
 import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar";
 import { CompletionScreen } from "@/pages/Modules/Learner/components/CompletionScreen";
 import { Button } from "@/components/ui/button";
 import ContentRenderer from "@/pages/Modules/Learner/components/ContentRenderer";
 import { BookOpen, ArrowLeft, ArrowRight } from "lucide-react";
-import { Link } from "wouter";
 import { ROUTES, LMS_API_BASE_URL, getFullPath } from "@/config/routes";
 import Lottie from "lottie-react";
-import learningAnimation from "@/assets/learning-bg.json"; // Place your Lottie JSON here
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
@@ -144,16 +141,14 @@ async function checkQuizQACompletion(module: Module, user: any) {
     try {
         const quizRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Quiz Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"name\",\"quiz_id\"]`, { credentials: 'include' });
         quizProgressList = (await quizRes.json())?.data || [];
-        console.log('Quiz Progress Data:', quizProgressList);
-        console.log('Available quiz_ids:', quizProgressList.map(p => p.quiz_id));
+
     } catch (error) {
         console.error('Error fetching quiz progress:', error);
     }
     try {
         const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"score_added\",\"name\",\"question_answer\"]`, { credentials: 'include' });
         qaProgressList = (await qaRes.json())?.data || [];
-        console.log('QA Progress Data:', qaProgressList);
-        console.log('Available question_answer IDs:', qaProgressList.map(p => p.question_answer));
+        
     } catch (error) {
         console.error('Error fetching QA progress:', error);
     }
@@ -231,13 +226,13 @@ async function checkQuizQACompletion(module: Module, user: any) {
                 // If no specific match found, use the first available quiz progress
                 // This handles cases where module content doesn't match progress records
                 progress = quizProgressList.length > 0 ? quizProgressList[0] : null;
-                console.log('No specific match found, using first available quiz progress:', progress);
+               
             }
-            console.log('Quiz progress for', content.name, 'content_reference:', content.content_reference, 'found:', progress);
+            
             if (!progress || typeof progress.score !== 'number') {
                 allCompleted = false;
             } else {
-                console.log('Adding quiz score:', { title: displayTitle, score: progress.score, maxScore: progress.max_score || 0, type: 'Quiz' });
+               
                 scores.push({ title: displayTitle, score: progress.score, maxScore: progress.max_score || 0, type: 'Quiz' });
             }
         } else if (content.content_type === "Question Answer") {
@@ -251,7 +246,7 @@ async function checkQuizQACompletion(module: Module, user: any) {
                 // If no specific match found, use the first available QA progress
                 // This handles cases where module content doesn't match progress records
                 progress = qaProgressList.length > 0 ? qaProgressList[0] : null;
-                console.log('No specific QA match found, using first available QA progress:', progress);
+                
             }
             console.log('QA progress for', content.name, 'content_reference:', content.content_reference, 'found:', progress);
             if (!progress) {
@@ -259,7 +254,7 @@ async function checkQuizQACompletion(module: Module, user: any) {
             } else {
                 // Only show score if score_added is set
                 if (progress.score_added === 1) {
-                    console.log('Adding QA score:', { title: displayTitle, score: progress.score, maxScore: progress.max_score || 0, type: 'Question Answer' });
+                    
                     scores.push({ title: displayTitle, score: progress.score, maxScore: progress.max_score || 0, type: 'Question Answer' });
                 }
             }
@@ -335,7 +330,6 @@ export default function ModuleDetail() {
     const { user, isLoading: userLoading, isLMSAdmin } = useUser();
     const [isLoading, setIsLoading] = useState(true);
     const [module, setModule] = useState<Module | null>(null);
-    const [showWelcome, setShowWelcome] = useState(true);
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [progress, setProgress] = useState<ModuleProgress | null>(null);
     const [completed, setCompleted] = useState(false);
@@ -347,10 +341,7 @@ export default function ModuleDetail() {
     const [quizQAScores, setQuizQAScores] = useState<Array<{title: string, score: number, maxScore: number, type: string}>>([]);
 
     // Console logging: Component mount
-    console.log('🎯 LearnerModuleDetail mounted:', {
-        moduleName,
-        timestamp: new Date().toISOString()
-    });
+
 
     // Phase 2: Completion data state management
     const [completionData, setCompletionData] = useState<CompletionData>({
@@ -386,12 +377,7 @@ export default function ModuleDetail() {
     // Track API call trigger
     useEffect(() => {
         const shouldCallAPI = !!(userIdentifier && moduleName && !userLoading && userIdentifier !== '');
-        console.log('🔌 API call should trigger:', shouldCallAPI, {
-            hasUserIdentifier: !!userIdentifier,
-            hasModuleName: !!moduleName,
-            userLoading,
-            userIdentifierNotEmpty: userIdentifier !== ''
-        });
+       
     }, [userIdentifier, moduleName, userLoading]);
     
     // Persistent progress state - Production approach
@@ -425,13 +411,7 @@ export default function ModuleDetail() {
     
     // Console logging: API call states
     useEffect(() => {
-        console.log('📡 API call state:', {
-            enabled: !!(userIdentifier && moduleName && !userLoading && userIdentifier !== ''),
-            moduleDataLoading,
-            hasData: !!moduleListData,
-            hasError: !!moduleListError,
-            errorMessage: moduleListError?.message
-        });
+        
     }, [moduleDataLoading, moduleListData, moduleListError, userIdentifier, moduleName, userLoading]);
 
     // Simplified retry mechanism - only retry on actual errors, not empty results
@@ -448,7 +428,7 @@ export default function ModuleDetail() {
     // Retry API call when user becomes available (fixes timing issue)
     useEffect(() => {
         if (userIdentifier && moduleName && !userLoading && !moduleListData && !moduleDataLoading && !moduleListError) {
-            console.log('🔄 User became available, triggering module data fetch...', { userIdentifier, moduleName });
+           
             refetchModuleData();
         }
     }, [userIdentifier, moduleName, userLoading, moduleListData, moduleDataLoading, moduleListError, refetchModuleData]);
@@ -473,70 +453,44 @@ export default function ModuleDetail() {
     // Extract module data only when API call is complete - Fixed extraction paths
     let moduleData = null;
     if (moduleListData && !moduleDataLoading) {
-        console.log('🔍 EXTRACTION START:', new Date().toISOString());
-        console.log('🔍 API Call completed, extracting module data...');
-        console.log('🔍 Raw API response keys:', Object.keys(moduleListData || {}));
-        console.log('🔍 Full API response:', JSON.stringify(moduleListData, null, 2));
-        console.log('🔍 isLMSAdmin:', isLMSAdmin);
+        
         
         const response = moduleListData as any;
-        console.log('🔍 Full response keys:', Object.keys(response));
-        console.log('🔍 Response.message keys:', response?.message ? Object.keys(response.message) : 'no message');
+        
         
         // For admin users using get_module_with_details API, the response structure is different
         if (isLMSAdmin && response?.message) {
             // get_module_with_details returns data directly in message field or message.data
             moduleData = response.message.data || response.message;
-            console.log('✅ Module data extracted via admin API (get_module_with_details)');
+            
         }
         // For learner users using LearnerModuleData API
         else if (response?.message?.message?.modules && Array.isArray(response.message.message.modules) && response.message.message.modules.length > 0) {
             moduleData = response.message.message.modules[0];
-            console.log('✅ Module data extracted via learner API (message.message.modules[0])');
+            
         }
         // Try message.modules (wrapped by frappe-react-sdk)
         else if (response?.message?.modules && Array.isArray(response.message.modules) && response.message.modules.length > 0) {
             moduleData = response.message.modules[0];
-            console.log('✅ Module data extracted via message path (message.modules[0])');
+          
         }
         // Try message.message.modules (double-wrapped response) - NEW FIX
         else if (response?.message?.message?.modules && Array.isArray(response.message.message.modules) && response.message.message.modules.length > 0) {
             moduleData = response.message.message.modules[0];
-            console.log('✅ Module data extracted via double-wrapped path (message.message.modules[0])');
+            
         }
         else {
-            console.log('❌ Failed to extract module data - no modules found in response');
-            console.log('🔍 Response structure:', {
-                hasModules: !!response?.modules,
-                hasMessage: !!response?.message,
-                hasNestedMessage: !!response?.message?.message,
-                hasMessageModules: !!response?.message?.modules,
-                hasNestedModules: !!response?.message?.message?.modules,
-                modulesLength: response?.message?.modules?.length || 0,
-                nestedModulesLength: response?.message?.message?.modules?.length || 0,
-                isLMSAdmin: isLMSAdmin
-            });
+            
         }
         
         // Log extracted data for debugging
         if (moduleData) {
-            console.log('🔍 Extracted moduleData:', {
-                name: moduleData.name,
-                name1: moduleData.name1,
-                hasLessons: !!moduleData.lessons,
-                lessonsLength: moduleData.lessons?.length || 0
-            });
+            
             
             // Check if contents have data
             if (moduleData.lessons?.[0]?.chapters?.[0]?.contents?.[0]) {
                 const firstContent = moduleData.lessons[0].chapters[0].contents[0];
-                console.log('🔍 First content sample:', {
-                    name: firstContent.name,
-                    contentType: firstContent.content_type,
-                    contentReference: firstContent.content_reference,
-                    hasData: !!firstContent.data,
-                    dataKeys: firstContent.data ? Object.keys(firstContent.data) : []
-                });
+               
             }
         }
     }
@@ -663,7 +617,7 @@ export default function ModuleDetail() {
                         chapter => chapter.name === currentChapterName
                     ) ?? 0;
                     
-                    console.log('🎯 Resume position found (completion data):', { lessonIdx, chapterIdx, currentChapterName });
+                    
                     setCurrentLessonIdx(lessonIdx);
                     setCurrentChapterIdx(chapterIdx);
                     return;
@@ -688,7 +642,7 @@ export default function ModuleDetail() {
                             chapter => chapter.name === currentChapterName
                         ) ?? 0;
                         
-                        console.log('🎯 Resume position found (completion data fallback):', { lessonIdx, chapterIdx, currentChapterName });
+                        
                         setCurrentLessonIdx(lessonIdx);
                         setCurrentChapterIdx(chapterIdx);
                         return;
@@ -726,17 +680,7 @@ export default function ModuleDetail() {
 
     // Phase 2: Debug logging for hook dependencies
     useEffect(() => {
-        console.log('🔍 Hook dependencies debug:', {
-            userEmail: user?.email,
-            userName: user?.name,
-            userIdentifier: userIdentifier,
-            moduleName: moduleName,
-            isLMSAdmin: isLMSAdmin,
-            reviewing: reviewing,
-            started: started,
-            completionDataResponse: !!completionDataResponse,
-            completionDataError: !!completionDataError
-        });
+        
     }, [userIdentifier, moduleName, isLMSAdmin, reviewing, started, completionDataResponse, completionDataError]);
 
     // Phase 2: Helper function to check if a lesson is completed based on its chapters
@@ -896,7 +840,14 @@ export default function ModuleDetail() {
         if (progress?.status !== "Not Started") {
             setStarted(true);
         }
-    }, [progress]);
+        // IMPORTANT: Always set completed state when progress status is "Completed"
+        // This ensures completion screen shows every time, even after data refetch
+        if (progress?.status === "Completed" || savedProgress?.status === "Completed") {
+            setCompleted(true);
+            // Reset reviewing to false so completion screen can show
+            setReviewing(false);
+        }
+    }, [progress, savedProgress]);
 
     // Progress restoration on mount - Production approach
     useEffect(() => {
@@ -923,7 +874,7 @@ export default function ModuleDetail() {
             // For completed modules, default to first lesson/chapter
             setCurrentLessonIdx(0);
             setCurrentChapterIdx(0);
-            console.log('🎯 Module completed - setting to first lesson/chapter');
+       
           } else if (progress.current_lesson && progress.current_chapter) {
             // For in-progress modules, use progress data
             let lessonIdx = module?.lessons?.findIndex(l => l.name === progress.current_lesson) ?? 0;
@@ -1285,26 +1236,50 @@ export default function ModuleDetail() {
 
     const handleNext = async () => {
         if (!module?.lessons?.length) return;
-        if (completed) {
-            return;
-        }
+        
+        // Check review mode FIRST, before checking completed status
+        // This allows navigation in review mode even when module is completed
         if (reviewing) {
             let lessonIdx = currentLessonIdx;
             let chapterIdx = currentChapterIdx;
             const currentLesson = module.lessons[lessonIdx];
+            
+            // Safety check: ensure currentLesson exists
+            if (!currentLesson || !currentLesson.chapters || currentLesson.chapters.length === 0) {
+                console.warn('Review mode: Invalid lesson or chapter data', { lessonIdx, chapterIdx, currentLesson });
+                return;
+            }
+            
+            console.log('Review mode: handleNext called', { 
+                lessonIdx, 
+                chapterIdx, 
+                totalChapters: currentLesson.chapters.length,
+                totalLessons: module.lessons.length
+            });
+            
             if (chapterIdx < currentLesson.chapters.length - 1) {
+                // Move to next chapter in the same lesson
                 chapterIdx += 1;
+                console.log('Review mode: Moving to next chapter', { lessonIdx, chapterIdx });
                 setCurrentLessonIdx(lessonIdx);
                 setCurrentChapterIdx(chapterIdx);
             } else if (lessonIdx < module.lessons.length - 1) {
+                // Move to next lesson's first chapter
                 lessonIdx += 1;
                 chapterIdx = 0;
+                console.log('Review mode: Moving to next lesson', { lessonIdx, chapterIdx });
                 setCurrentLessonIdx(lessonIdx);
                 setCurrentChapterIdx(chapterIdx);
             } else {
                 // End of review: show completion screen again
+                console.log('Review mode: End of review, returning to completion screen');
                 setReviewing(false);
             }
+            return;
+        }
+        
+        // Only check completed status if NOT in review mode
+        if (completed) {
             return;
         }
         if (!user) return;
@@ -1613,11 +1588,72 @@ export default function ModuleDetail() {
         if (!module?.lessons?.length || !user) return;
         
         try {
-            // For now, let's skip the quiz/QA completion check and just complete the module
-            // The user can manually check quizzes and Q&As if needed
-            console.log('Completing module without quiz/QA check');
+            // CRITICAL: Check if all quizzes and question answers are completed before allowing module completion
+            const { allCompleted, scores } = await checkQuizQACompletion(module, user);
+            if (!allCompleted) {
+                const incompleteTitles = await getIncompleteQuizQATitles(module, user);
+                
+                // Build error message with specific quiz/QA titles
+                const quizQAContents = getQuizQAContents(module);
+                const incompleteQuizzes: string[] = [];
+                const incompleteQAs: string[] = [];
+                
+                // Separate incomplete items by type
+                for (const title of incompleteTitles) {
+                    const matchingContent = quizQAContents.find(c => {
+                        const contentTitle = (c.content as any).title || c.content.name;
+                        return contentTitle === title;
+                    });
+                    
+                    if (matchingContent) {
+                        if (matchingContent.content.content_type === "Quiz") {
+                            incompleteQuizzes.push(title);
+                        } else if (matchingContent.content.content_type === "Question Answer") {
+                            incompleteQAs.push(title);
+                        }
+                    }
+                }
+                
+                // Build error message
+                const errorParts: string[] = [];
+                if (incompleteQuizzes.length > 0) {
+                    errorParts.push(`Complete the quiz: ${incompleteQuizzes.join(", ")}`);
+                }
+                if (incompleteQAs.length > 0) {
+                    errorParts.push(`Complete the question answer: ${incompleteQAs.join(", ")}`);
+                }
+                
+                const errorMessage = errorParts.length > 0 
+                    ? errorParts.join(". ") + "."
+                    : "You must complete all Quiz and Question/Answer sections before completing this module.";
+                
+                toast.warning(
+                    <div>
+                        <div>{errorMessage}</div>
+                        {incompleteTitles.length > 0 && (
+                            <ul className="list-disc ml-6 mt-2">
+                                {incompleteTitles.map((title, idx) => (
+                                    <li key={title + idx}>{title}</li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                );
+                return; // Stop execution - don't mark module as completed
+            }
             
+            // All quizzes and QAs are completed - proceed with module completion
+            console.log('Completing module - showing completion screen');
+            
+            // ALWAYS set completed state to true FIRST - this ensures completion screen shows immediately
+            // This works even if module is already completed (second click, third click, etc.)
             setCompleted(true);
+            
+            // Reset reviewing state to false so completion screen can show
+            setReviewing(false);
+            
+            // Store quiz/QA scores for completion screen
+            setQuizQAScores(scores);
             
             const completedProgress: ModuleProgress = {
                 ...progress!,
@@ -1627,7 +1663,7 @@ export default function ModuleDetail() {
             };
             setProgress(completedProgress);
             
-            // Update saved progress state
+            // Update saved progress state - ensures completion persists
             setSavedProgress(prev => ({
                 ...prev,
                 status: "Completed",
@@ -1637,18 +1673,23 @@ export default function ModuleDetail() {
                 current_chapter: prev?.current_chapter || ""
             }));
             
-            // Now call updateProgress to mark module as completed
+            // Now call updateProgress to mark module as completed in backend
             await updateProgress({
                 user: user.email,
                 module: moduleName,
-                lesson: module.lessons[currentLessonIdx].name,
-                chapter: module.lessons[currentLessonIdx].chapters[currentChapterIdx].name,
+                lesson: module.lessons[currentLessonIdx]?.name || module.lessons[0]?.name,
+                chapter: module.lessons[currentLessonIdx]?.chapters?.[currentChapterIdx]?.name || module.lessons[0]?.chapters?.[0]?.name,
                 status: "Completed"
             });
+            
+            
             
         } catch (error) {
             console.error("Failed to mark module as completed:", error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            
+            // Even on error, keep completion screen showing
+            // Don't reset completed state - let user see completion screen
             if (errorMessage.includes('TimestampMismatchError') || errorMessage.includes('Document has been modified')) {
                 toast.error("Module completion is being processed. Please wait a moment.");
             } else {
@@ -1669,7 +1710,6 @@ export default function ModuleDetail() {
                 throw new Error("Failed to start module");
             }
             setTimeout(() => {
-                setShowWelcome(false);
                 setIsTransitioning(false);
                 setStarted(true);
                 setProgress(getInitialProgress(module));
@@ -2049,14 +2089,7 @@ export default function ModuleDetail() {
     }
     
     if (!module && hasCompletedLoading && hasApiData && canExtractModule && !moduleData) {
-        console.log('❌ Module not found - API returned data but extraction failed');
-        console.log('🔍 Failed extraction details:', {
-            moduleListDataStructure: moduleListData,
-            hasDirectModules: !!apiResponse?.message?.modules,
-            hasNestedModules: !!apiResponse?.message?.message?.modules,
-            directModulesLength: apiResponse?.message?.modules?.length || 0,
-            nestedModulesLength: apiResponse?.message?.message?.modules?.length || 0
-        });
+        
         return (
             <div className="flex flex-col items-center justify-center h-full">
                 <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
@@ -2107,93 +2140,7 @@ export default function ModuleDetail() {
     }
 
     return (
-        <AnimatePresence mode="wait">
-            {(savedProgress?.status === "Not Started" || progress?.status === "Not Started") && showWelcome ? (
-                <motion.div
-                    key="welcome"
-                    initial={{ opacity: 0, x: 0 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -100 }}
-                    transition={{ duration: 0.5 }}
-                >
-                    {/* Back Button */}
-                    <div className="absolute left-8 top-8 z-10">
-                        <Link href={ROUTES.LEARNER_MODULES}>
-                            <Button variant="outline" size="icon" className="rounded-full shadow hover:bg-primary/10">
-                                <ArrowLeft className="h-6 w-6" />
-                            </Button>
-                        </Link>
-                    </div>
-                    <div className="flex flex-col items-center w-full mx-auto px-4 space-y-6 pt-8">
-                        {/* Module Image or Avatar */}
-                        <h1 className="text-4xl font-bold leading-tight">{module?.name1}</h1>
-                        
-                        {/* Lottie/Animated SVG Placeholder */}
-                        <div className=" inset-0 w-full h-full flex items-center justify-center pointer-events-none z-0">
-                            <Lottie
-                                animationData={learningAnimation}
-                                loop
-                                style={{ width: "40vw", height: "40vh"}}
-                            />
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="flex justify-center mb-2">
-                                {module?.image ? (
-                                    <img
-                                        src={(() => {
-                                            // Helper function to get full image URL
-                                            const getImageUrl = (path: string): string => {
-                                                if (!path) return '';
-                                                const trimmed = path.trim();
-                                                if (!trimmed) return '';
-                                                
-                                                // If already a full URL, return as is
-                                                if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-                                                    return trimmed;
-                                                }
-                                                
-                                                // Ensure path starts with / if it doesn't already
-                                                const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-                                                
-                                                // Determine base URL
-                                                // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
-                                                // In development: use http://lms.noveloffice.org
-                                                const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
-                                                const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-                                                
-                                                return `${cleanBaseUrl}${relativePath}`;
-                                            };
-                                            return getImageUrl(module.image);
-                                        })()}
-                                        alt={module.name1}
-                                        className="w-32 h-32 object-cover rounded-2xl shadow-lg border border-border bg-white"
-                                    />
-                                ) : (
-                                    <div className="w-32 h-32 flex items-center justify-center rounded-2xl shadow-lg border border-border bg-primary/10 text-primary text-6xl font-bold">
-                                        {module?.name1?.charAt(0).toUpperCase()}
-                                    </div>
-                                )}
-                            </div>
-                            {module?.description && (
-                                <div>
-                                    <h2 className="text-2xl font-bold mb-2">About this module</h2>
-                                    <p className="text-lg text-muted-foreground max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: module.description }} />
-                                </div>
-                            )}
-                        </div>
-                    
-                        <Button
-                            size="lg"
-                            className="text-lg px-10 py-6 rounded-xl shadow-lg bg-primary text-white hover:bg-primary/90 transition-all duration-200 mt-2"
-                            onClick={handleStartModule}
-                            disabled={isTransitioning}
-                        >
-                            Start Learning
-                        </Button>
-                    </div>
-                </motion.div>
-            ) : (
-                <div className="flex h-screen bg-muted gap-6 w-full overflow-hidden">
+        <div className="flex h-screen bg-muted gap-6 w-full overflow-hidden">
                     {/* Sidebar on the left - Fixed and scrollable */}
                     <div className="w-80 border-r flex-shrink-0 h-full overflow-y-auto">
                         <ModuleSidebar
@@ -2330,12 +2277,16 @@ export default function ModuleDetail() {
                                             Chapter {currentChapterIdx + 1} of {currentLesson.chapters.length}
                                         </div>
                                         <Button 
-                                            onClick={(() => {
+                                            onClick={() => {
                                                 const isLastLesson = currentLessonIdx === module.lessons.length - 1;
                                                 const isLastChapter = currentChapterIdx === (module.lessons[currentLessonIdx]?.chapters?.length || 0) - 1;
                                                 const isLastChapterOfLastLesson = isLastLesson && isLastChapter;
-                                                return isLastChapterOfLastLesson ? handleFinishModule : handleNext;
-                                            })()}
+                                                if (isLastChapterOfLastLesson) {
+                                                    handleFinishModule();
+                                                } else {
+                                                    handleNext();
+                                                }
+                                            }}
                                             disabled={updateLoading}
                                             className="gap-2"
                                         >
@@ -2350,17 +2301,8 @@ export default function ModuleDetail() {
                                     </div>
                                 </div>
                             )}
-                            
-                            {/* Show message when module is loaded but not started */}
-                            {!started && !reviewing && module && (
-                                <div className="text-center py-16 text-muted-foreground">
-                                    Click "Start Learning" to begin the module.
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
-            )}
-        </AnimatePresence>
     );
 }
