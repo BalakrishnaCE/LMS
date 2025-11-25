@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 
 interface TextContentProps {
@@ -12,11 +11,11 @@ interface TextContentProps {
 
 export default function TextContent({
   content,
-  contentReference,
-  moduleId,
-  onProgressUpdate,
-  onComplete,
-  isCompleted
+  contentReference: _contentReference,
+  moduleId: _moduleId,
+  onProgressUpdate: _onProgressUpdate,
+  onComplete: _onComplete,
+  isCompleted: _isCompleted
 }: TextContentProps) {
 
   if (!content) {
@@ -59,10 +58,36 @@ export default function TextContent({
         )}
         
         {hasContent && (
-          <div 
-            className="prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground prose-blockquote:text-foreground"
-            dangerouslySetInnerHTML={{ __html: bodyContent }}
-          />
+          <>
+            <style>{`
+              .text-content-prose ol {
+                list-style-type: decimal;
+                padding-left: 1.5em;
+                margin: 1em 0;
+              }
+              .text-content-prose ol li {
+                margin-bottom: 0.5em;
+                display: list-item;
+              }
+              .text-content-prose ul {
+                list-style-type: disc;
+                padding-left: 1.5em;
+                margin: 1em 0;
+              }
+              .text-content-prose ul li {
+                margin-bottom: 0.5em;
+                display: list-item;
+              }
+              .text-content-prose p {
+                margin: 1em 0;
+              }
+            `}</style>
+            <div 
+              className="prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground prose-blockquote:text-foreground prose-ol:text-foreground prose-ul:text-foreground text-content-prose"
+              style={{ whiteSpace: 'pre-wrap' }}
+              dangerouslySetInnerHTML={{ __html: bodyContent }}
+            />
+          </>
         )}
       </div>
     </motion.div>

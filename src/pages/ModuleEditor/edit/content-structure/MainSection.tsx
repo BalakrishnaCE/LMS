@@ -940,7 +940,35 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto">
           {/* <div className="font-bold mb-2">{content.title}</div> */}
-          <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: content.body }} />
+          <>
+            <style>{`
+              .editor-text-prose ol {
+                list-style-type: decimal;
+                padding-left: 1.5em;
+                margin: 1em 0;
+              }
+              .editor-text-prose ol li {
+                margin-bottom: 0.5em;
+                display: list-item;
+              }
+              .editor-text-prose ul {
+                list-style-type: disc;
+                padding-left: 1.5em;
+                margin: 1em 0;
+              }
+              .editor-text-prose ul li {
+                margin-bottom: 0.5em;
+                display: list-item;
+              }
+              .editor-text-prose p {
+                margin: 1em 0;
+              }
+            `}</style>
+            <div 
+              className="prose prose-sm dark:prose-invert prose-ol:text-foreground prose-ul:text-foreground editor-text-prose" 
+              dangerouslySetInnerHTML={{ __html: content.body }}
+            />
+          </>
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
