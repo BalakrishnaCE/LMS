@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/pagination"
 import { useState, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { motion } from "framer-motion"
@@ -36,6 +37,8 @@ const debounce = (fn: Function, delay: number) => {
 
 interface ModulesProps {
     itemsPerPage: number;
+    showArchived?: boolean;
+    onShowArchivedChange?: (value: boolean) => void;
 }
 
 
@@ -72,7 +75,7 @@ function downloadCSV(csv: string, filename: string) {
   document.body.removeChild(link);
 }
 
-function Modules({ itemsPerPage }: ModulesProps) {
+function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: ModulesProps) {
     const [page, setPage] = useState(1)
     // Initialize search query from localStorage
     const [searchQuery, setSearchQuery] = useState(() => {
@@ -155,8 +158,18 @@ function Modules({ itemsPerPage }: ModulesProps) {
     if (selectedDepartment && selectedDepartment !== "all") {
         filters.push(["department", "=", selectedDepartment])
     }
-    if (selectedStatus && selectedStatus !== "all") {
-        filters.push(["status", "=", selectedStatus])
+    // If showArchived is true, filter to show only archived modules
+    // If showArchived is false, exclude archived modules from the list
+    if (showArchived) {
+        // When showing archived, force status to Archived
+        filters.push(["status", "=", "Archived"])
+    } else {
+        // When not showing archived, exclude archived modules
+        filters.push(["status", "!=", "Archived"])
+        // Apply status filter if selected and not "all"
+        if (selectedStatus && selectedStatus !== "all") {
+            filters.push(["status", "=", selectedStatus])
+        }
     }
     if (searchQuery) {
         filters.push(["name1", "like", `%${searchQuery}%`])
@@ -198,7 +211,14 @@ function Modules({ itemsPerPage }: ModulesProps) {
     // Reset page when filters change
     useEffect(() => {
         setPage(1)
-    }, [searchQuery, selectedDepartment, selectedStatus])
+    }, [searchQuery, selectedDepartment, selectedStatus, showArchived])
+    
+    // Reset status filter when showArchived changes
+    useEffect(() => {
+        if (showArchived && selectedStatus !== "all" && selectedStatus !== "Archived") {
+            setSelectedStatus("all")
+        }
+    }, [showArchived])
 
     // Show loading state while authentication is being determined
     if (isAuthLoading || !currentUser) {
@@ -320,12 +340,12 @@ function Modules({ itemsPerPage }: ModulesProps) {
         <div>
 
             <div className="flex gap-4 p-4 mb-4">
-                <div className="flex-1 relative">
+                <div className="flex-[5] relative min-w-[550px]">
                     <Input
                         placeholder="Search modules..."
                         value={searchQuery}
                         onChange={handleSearchChange}
-                        className="pr-10"
+                        className="pr-10 w-full"
                     />
                     {searchQuery && (
                         <button
@@ -337,7 +357,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
                         </button>
                     )}
                 </div>
-                <div className="w-[200px]">
+                <div className="w-[180px] flex-shrink-0">
                     <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                         <SelectTrigger>
                             <SelectValue placeholder="Department" />
@@ -352,7 +372,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="w-[200px]">
+                <div className="w-[180px] -ml-3 flex-shrink-0">
                     <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                         <SelectTrigger>
                             <SelectValue placeholder="Status" />
@@ -365,9 +385,33 @@ function Modules({ itemsPerPage }: ModulesProps) {
                         </SelectContent>
                     </Select>
                 </div>
+                <div className="flex items-center gap-2 flex-shrink-0 -ml-2">
+                    <Label htmlFor="archived-toggle" className="text-sm font-medium whitespace-nowrap">
+                        {showArchived ? "Archived" : "Archived"}
+                    </Label>
+                    <button
+                        id="archived-toggle"
+                        type="button"
+                        role="switch"
+                        aria-checked={showArchived}
+                        onClick={() => onShowArchivedChange?.(!showArchived)}
+                        className={`
+                            relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                            focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+                            ${showArchived ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}
+                        `}
+                    >
+                        <span
+                            className={`
+                                inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                                ${showArchived ? 'translate-x-6' : 'translate-x-1'}
+                            `}
+                        />
+                    </button>
+                </div>
                 <Button 
                     variant="outline" 
-                    className="w-auto"
+                    className="w-auto flex-shrink-0 ml-2"
                     onClick={handleExport}
                     disabled={isExporting}
                 >
@@ -383,11 +427,13 @@ function Modules({ itemsPerPage }: ModulesProps) {
                     if (module.status === "Published") statusColor = "bg-green-100 text-green-700";
                     else if (module.status === "Approval Pending") statusColor = "bg-amber-100 text-amber-700";
                     else if (module.status === "Draft") statusColor = "bg-gray-200 text-gray-700";
+                    else if (module.status === "Archived") statusColor = "bg-orange-100 text-orange-700";
 
                     let statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
                     if (module.status === "Published") statusDarkColor = "dark:bg-green-900 dark:text-green-300";
                     else if (module.status === "Approval Pending") statusDarkColor = "dark:bg-amber-900 dark:text-amber-200";
                     else if (module.status === "Draft") statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
+                    else if (module.status === "Archived") statusDarkColor = "dark:bg-orange-900 dark:text-orange-300";
 
                     // Helper function to get full image URL
                     const getImageUrl = (path?: string): string => {

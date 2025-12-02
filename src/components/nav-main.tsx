@@ -1,3 +1,4 @@
+import * as React from "react"
 import { IconCirclePlusFilled, IconPlus, type Icon } from "@tabler/icons-react"
 import { useLocation } from "wouter"
 import { Button } from "@/components/ui/button"
@@ -12,15 +13,19 @@ import { navigate } from "wouter/use-browser-location"
 import { useUser } from "@/hooks/use-user"
 import { getRelativePath, getFullPath, BASE_PATH, ROUTES } from "@/config/routes"
 
+export type NavItemIcon = Icon | React.ComponentType<{ className?: string }>
+
+export type NavMainItem = {
+  title: string
+  url: string
+  icon?: NavItemIcon
+  tooltip?: string
+}
+
 export function NavMain({
   items,
 }: {
-  items: {
-    title: string
-    url: string
-    icon?: Icon
-    tooltip?: string
-  }[]
+  items: NavMainItem[]
 }) {
   const [location] = useLocation();
   const { isLMSAdmin } = useUser();

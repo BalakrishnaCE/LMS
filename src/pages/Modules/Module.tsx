@@ -149,32 +149,51 @@ function Module() {
     const { data: draftCount } = useFrappeGetDocCount("LMS Module", [
         ["status", "=", "Draft"]
     ]);
+    
+    // Get count of archived modules
+    const { data: archivedCount } = useFrappeGetDocCount("LMS Module", [
+        ["status", "=", "Archived"]
+    ]);
 
+    // Toggle state for showing archived modules
+    const [showArchived, setShowArchived] = useState(false);
 
-    // Dynamically get CSS variable colors
+    // Colors - using CSS variable for primary (used for both Total and Published), accent for archived
     const [colors, setColors] = useState({
-        primary: '#0ea5e9', // fallback Tailwind blue-500
-        published: '#22c55e', // fallback Tailwind green-500 for published
-        draft: '#9ca3af'    // Tailwind gray-400 for draft
+        primary: '#14b8a6', // fallback teal color (same as Total and Published)
+        published: '#14b8a6', // same teal color as Total Modules
+        draft: '#9ca3af',    // Tailwind gray-400 for draft
+        archived: '#0ea5e9'   // fallback accent color for archived
     });
 
     useEffect(() => {
-        setColors({
-            primary: getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#0ea5e9',
-            published: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#22c55e',
-            draft: '#9ca3af'
-        });
+        // Get primary color from CSS variable, use same for both Total and Published
+        const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || 
+                            getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || 
+                            '#14b8a6';
+        // Get accent color from CSS variable for archived modules
+        const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() ||
+                           getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() ||
+                           '#0ea5e9';
+        setColors(prev => ({
+            ...prev,
+            primary: primaryColor || '#14b8a6',
+            published: primaryColor || '#14b8a6', // Same color as Total Modules
+            archived: accentColor || '#0ea5e9' // Accent color for archived
+        }));
     }, []);
 
     // Calculate percentages for better visualization
     const total = totalCount || 0;
     const published = publishedCount || 0;
     const draft = draftCount || 0;
+    const archived = archivedCount || 0;
     
     const publishedPercent = total > 0 ? (published / total) * 100 : 0;
     const draftPercent = total > 0 ? (draft / total) * 100 : 0;
+    const archivedPercent = total > 0 ? (archived / total) * 100 : 0;
 
-    // Prepare data for the interactive pie chart
+    // Prepare data for the interactive pie chart - show Total, Published, Draft, and Archived
     const pieChartData = [
         {
             name: 'Total Modules',
@@ -193,6 +212,12 @@ function Module() {
             value: draft,
             percentage: draftPercent,
             fill: colors.draft,
+        },
+        {
+            name: 'Archived Modules',
+            value: archived,
+            percentage: archivedPercent,
+            fill: colors.archived,
         }
     ];
 
@@ -245,6 +270,12 @@ function Module() {
                                     {draftCount || 0}
                                 </p>
                             </div>
+                            <div>
+                                <h3 className="text-sm font-medium">Archived Modules</h3>
+                                <p className="text-3xl font-bold" style={{ color: colors.archived }}>
+                                    {archivedCount || 0}
+                                </p>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -261,7 +292,7 @@ function Module() {
                 </Card>
             </div>
 
-            <Modules itemsPerPage={8} />
+            <Modules itemsPerPage={8} showArchived={showArchived} onShowArchivedChange={setShowArchived} />
         </div>
     )
 }

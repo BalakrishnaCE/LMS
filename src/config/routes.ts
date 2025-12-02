@@ -26,6 +26,7 @@ export const ROUTES = {
   LEARNER_MODULE_DETAIL: (moduleName: string) => `/modules/learner/${moduleName}`,
   LEARNERS: '/learners',
   ANALYTICS: '/analytics',
+  DEPARTMENT: '/department',
   PROJECTS: '/projects',
   PROFILE: '/profile',
   NEW_MODULE: '/module/new',

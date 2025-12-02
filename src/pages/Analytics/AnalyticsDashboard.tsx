@@ -22,17 +22,16 @@ import {
   FileText,
   MessageSquare,
   AlertCircle,
-  Search
+  Search,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
@@ -49,8 +48,6 @@ interface FilterState {
   dateTo: string;
   department: string;
   module: string;
-  learner: string;
-  quiz: string;
 }
 
 // Custom hook for pagination
@@ -90,9 +87,98 @@ const usePagination = (data: any[], itemsPerPage: number = 10): {
   };
 };
 
-// Utility functions
+// Reusable SortButton Component
+interface SortButtonProps {
+  column: string;
+  currentColumn: string | null;
+  currentOrder: 'asc' | 'desc' | null;
+  direction: 'asc' | 'desc';
+  onSortChange: (column: string | null, order: 'asc' | 'desc' | null) => void;
+  onReset?: () => void;
+}
 
+const SortButton = ({ 
+  column, 
+  currentColumn, 
+  currentOrder, 
+  direction, 
+  onSortChange,
+  onReset 
+}: SortButtonProps) => {
+  const isActive = currentColumn === column && currentOrder === direction;
+  
+  const handleClick = () => {
+    if (isActive) {
+      onSortChange(null, null);
+    } else {
+      onSortChange(column, direction);
+    }
+    onReset?.();
+  };
 
+  return (
+    <button
+      onClick={handleClick}
+      className={`p-0.5 hover:bg-muted rounded transition-colors ${
+        isActive ? 'text-primary' : 'text-muted-foreground'
+      }`}
+      title={`Sort ${direction === 'asc' ? 'ascending' : 'descending'}`}
+    >
+      {direction === 'asc' ? (
+        <ChevronUp className="h-3 w-3" />
+      ) : (
+        <ChevronDown className="h-3 w-3" />
+      )}
+    </button>
+  );
+};
+
+// Reusable SortableHeader Component
+interface SortableHeaderProps {
+  label: string;
+  column: string;
+  sortColumn: string | null;
+  sortOrder: 'asc' | 'desc' | null;
+  onSortChange: (column: string | null, order: 'asc' | 'desc' | null) => void;
+  onReset?: () => void;
+  className?: string; // Optional className for custom styling
+}
+
+const SortableHeader = ({
+  label,
+  column,
+  sortColumn,
+  sortOrder,
+  onSortChange,
+  onReset,
+  className = "text-left p-3 font-medium text-sm text-muted-foreground"
+}: SortableHeaderProps) => {
+  return (
+    <th className={className}>
+      <div className="flex items-center gap-1">
+        <span>{label}</span>
+        <div className="flex flex-col gap-0">
+          <SortButton
+            column={column}
+            currentColumn={sortColumn}
+            currentOrder={sortOrder}
+            direction="asc"
+            onSortChange={onSortChange}
+            onReset={onReset}
+          />
+          <SortButton
+            column={column}
+            currentColumn={sortColumn}
+            currentOrder={sortOrder}
+            direction="desc"
+            onSortChange={onSortChange}
+            onReset={onReset}
+          />
+        </div>
+      </div>
+    </th>
+  );
+};
 
 export default function AnalyticsDashboard() {
   const [activeTab, setActiveTab] = useState("modules");
@@ -102,11 +188,8 @@ export default function AnalyticsDashboard() {
     dateFrom: "",
     dateTo: "",
     department: "",
-    module: "",
-    learner: "",
-    quiz: ""
+    module: ""
   });
-  const [showFilters, setShowFilters] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [sidebarContent, setSidebarContent] = useState<{
@@ -116,7 +199,7 @@ export default function AnalyticsDashboard() {
   const [selectedStatus, setSelectedStatus] = useState<string>('total');
   const [learnerDetails, setLearnerDetails] = useState<any[]>([]);
   const [allLearnerDetails, setAllLearnerDetails] = useState<any[]>([]);
-  const [quizAnalyticsView, setQuizAnalyticsView] = useState<'overview' | 'quiz' | 'qa'>('overview');
+  const [quizAnalyticsView, setQuizAnalyticsView] = useState<'quiz' | 'qa'>('quiz');
   const [qaScoreFilter, setQaScoreFilter] = useState<'scored' | 'pending'>('scored');
   const [quizAnalyticsData, setQuizAnalyticsData] = useState<any[]>([]);
   const [qaAnalyticsData, setQaAnalyticsData] = useState<any[]>([]);
@@ -190,6 +273,36 @@ export default function AnalyticsDashboard() {
     }
   }, [modulePerformanceAssignmentType]);
 
+  // Module sort state - tracks which column and order
+  const [moduleSortColumn, setModuleSortColumn] = useState<'name' | 'assigned' | 'completed' | 'completion_rate' | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('analytics_module_sort_column') as 'name' | 'assigned' | 'completed' | 'completion_rate' | null) || null;
+    }
+    return null;
+  });
+  const [moduleSortOrder, setModuleSortOrder] = useState<'asc' | 'desc' | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('analytics_module_sort_order') as 'asc' | 'desc' | null) || null;
+    }
+    return null;
+  });
+
+  // Save module sort state to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (moduleSortColumn) {
+        localStorage.setItem('analytics_module_sort_column', moduleSortColumn);
+      } else {
+        localStorage.removeItem('analytics_module_sort_column');
+      }
+      if (moduleSortOrder) {
+        localStorage.setItem('analytics_module_sort_order', moduleSortOrder);
+      } else {
+        localStorage.removeItem('analytics_module_sort_order');
+      }
+    }
+  }, [moduleSortColumn, moduleSortOrder]);
+
   // Quiz search with localStorage (by email)
   const [quizSearchQuery, setQuizSearchQuery] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -219,6 +332,36 @@ export default function AnalyticsDashboard() {
       localStorage.setItem('analytics_quiz_module_filter', quizModuleFilter);
     }
   }, [quizModuleFilter]);
+
+  // Quiz sort state
+  const [quizSortColumn, setQuizSortColumn] = useState<'user' | 'module' | 'score' | 'date_attended' | 'time_spent' | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('analytics_quiz_sort_column') as 'user' | 'module' | 'score' | 'date_attended' | 'time_spent' | null) || null;
+    }
+    return null;
+  });
+  const [quizSortOrder, setQuizSortOrder] = useState<'asc' | 'desc' | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('analytics_quiz_sort_order') as 'asc' | 'desc' | null) || null;
+    }
+    return null;
+  });
+
+  // Save quiz sort state to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (quizSortColumn) {
+        localStorage.setItem('analytics_quiz_sort_column', quizSortColumn);
+      } else {
+        localStorage.removeItem('analytics_quiz_sort_column');
+      }
+      if (quizSortOrder) {
+        localStorage.setItem('analytics_quiz_sort_order', quizSortOrder);
+      } else {
+        localStorage.removeItem('analytics_quiz_sort_order');
+      }
+    }
+  }, [quizSortColumn, quizSortOrder]);
 
 
   // Q&A search with localStorage (by email)
@@ -251,6 +394,66 @@ export default function AnalyticsDashboard() {
     }
   }, [qaModuleFilter]);
 
+  // Q&A sort state
+  const [qaSortColumn, setQaSortColumn] = useState<'user' | 'module' | 'score' | 'date_attended' | 'time_spent' | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('analytics_qa_sort_column') as 'user' | 'module' | 'score' | 'date_attended' | 'time_spent' | null) || null;
+    }
+    return null;
+  });
+  const [qaSortOrder, setQaSortOrder] = useState<'asc' | 'desc' | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('analytics_qa_sort_order') as 'asc' | 'desc' | null) || null;
+    }
+    return null;
+  });
+
+  // Save Q&A sort state to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (qaSortColumn) {
+        localStorage.setItem('analytics_qa_sort_column', qaSortColumn);
+      } else {
+        localStorage.removeItem('analytics_qa_sort_column');
+      }
+      if (qaSortOrder) {
+        localStorage.setItem('analytics_qa_sort_order', qaSortOrder);
+      } else {
+        localStorage.removeItem('analytics_qa_sort_order');
+      }
+    }
+  }, [qaSortColumn, qaSortOrder]);
+
+  // Learner sort state
+  const [learnerSortColumn, setLearnerSortColumn] = useState<'name' | 'assigned' | 'completed' | 'completion_rate' | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('analytics_learner_sort_column') as 'name' | 'assigned' | 'completed' | 'completion_rate' | null) || null;
+    }
+    return null;
+  });
+  const [learnerSortOrder, setLearnerSortOrder] = useState<'asc' | 'desc' | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('analytics_learner_sort_order') as 'asc' | 'desc' | null) || null;
+    }
+    return null;
+  });
+
+  // Save learner sort state to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (learnerSortColumn) {
+        localStorage.setItem('analytics_learner_sort_column', learnerSortColumn);
+      } else {
+        localStorage.removeItem('analytics_learner_sort_column');
+      }
+      if (learnerSortOrder) {
+        localStorage.setItem('analytics_learner_sort_order', learnerSortOrder);
+      } else {
+        localStorage.removeItem('analytics_learner_sort_order');
+      }
+    }
+  }, [learnerSortColumn, learnerSortOrder]);
+
   // Learner search with localStorage (by email or name)
   const [learnerSearchQuery, setLearnerSearchQuery] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -267,9 +470,6 @@ export default function AnalyticsDashboard() {
   }, [learnerSearchQuery]);
   
   
-  // Debug: Log learnerDetails changes
-  React.useEffect(() => {
-  }, [learnerDetails]);
   const [loadingLearners, setLoadingLearners] = useState(false);
   
   // Data persistence state to prevent data loss during tab switches
@@ -427,26 +627,21 @@ export default function AnalyticsDashboard() {
     }
   }, [showSidebar, sidebarContent]);
 
-  // Fetch quiz analytics when quiz view is selected
+  // Fetch quiz analytics when quiz view is selected (only if data doesn't exist and not already loading)
   React.useEffect(() => {
     if (quizAnalyticsView === 'quiz') {
-      fetchQuizAnalytics();
-    } else if (quizAnalyticsView === 'qa') {
-      fetchQaAnalytics();
-    }
-  }, [quizAnalyticsView]);
-
-  // Ensure modules tab has quiz and Q&A counts available by fetching once when modules is active
-  React.useEffect(() => {
-    if (activeTab === 'modules') {
-      if (!quizAnalyticsData || quizAnalyticsData.length === 0) {
+      // Only fetch if we don't have data and we're not already loading
+      if (quizAnalyticsData.length === 0 && !loadingQuizAnalytics) {
         fetchQuizAnalytics();
       }
-      if (!qaAnalyticsData || qaAnalyticsData.length === 0) {
+    } else if (quizAnalyticsView === 'qa') {
+      // Only fetch if we don't have data and we're not already loading
+      if (qaAnalyticsData.length === 0 && !loadingQaAnalytics) {
         fetchQaAnalytics();
       }
     }
-  }, [activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizAnalyticsView]);
 
   // Add error boundary for analytics data
   React.useEffect(() => {
@@ -461,13 +656,6 @@ export default function AnalyticsDashboard() {
 
 
 
-  const handleFilterChange = (key: keyof FilterState, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-    // Reset pagination when filters change
-    modulePagination.reset();
-    quizPagination.reset();
-    setLearnerCurrentPage(1);
-  };
 
   // Helper function to convert data to CSV
   const convertToCSV = (data: any[], headers: string[]) => {
@@ -749,9 +937,13 @@ export default function AnalyticsDashboard() {
   };
 
   const fetchQuizAnalytics = async () => {
+    // Don't fetch if already loading or if data already exists
+    if (loadingQuizAnalytics || (quizAnalyticsData.length > 0 && quizAnalyticsView === 'quiz')) {
+      return;
+    }
     setLoadingQuizAnalytics(true);
     try {
-      const response = await fetch(`${LMS_API_BASE_URL}api/method/novel_lms.novel_lms.api.analytics.get_quiz_analytics`, {
+      const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_quiz_analytics`, {
         credentials: 'include'
       });
       
@@ -781,9 +973,13 @@ export default function AnalyticsDashboard() {
   };
 
   const fetchQaAnalytics = async () => {
+    // Don't fetch if already loading or if data already exists
+    if (loadingQaAnalytics || (qaAnalyticsData.length > 0 && quizAnalyticsView === 'qa')) {
+      return;
+    }
     setLoadingQaAnalytics(true);
     try {
-      const response = await fetch(`${LMS_API_BASE_URL}api/method/novel_lms.novel_lms.api.analytics.get_qa_analytics`, {
+      const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_qa_analytics`, {
         credentials: 'include'
       });
       
@@ -821,7 +1017,132 @@ export default function AnalyticsDashboard() {
     }
   };
 
-  // Filter quiz analytics based on email search query and module name
+  // Helper function to parse time strings to seconds for sorting (handles HH:MM:SS, HH:MM, Xh Ym formats)
+  const parseTimeToSeconds = (timeStr: string): number => {
+    if (!timeStr) return 0;
+    // If it's already a number, return it
+    if (typeof timeStr === 'number') return timeStr;
+    
+    const str = String(timeStr).trim();
+    // Try to parse "HH:MM:SS" format
+    const timeMatchFull = str.match(/(\d+):(\d+):(\d+)/);
+    if (timeMatchFull) {
+      const hours = parseInt(timeMatchFull[1], 10);
+      const minutes = parseInt(timeMatchFull[2], 10);
+      const seconds = parseInt(timeMatchFull[3], 10);
+      return hours * 3600 + minutes * 60 + seconds;
+    }
+    // Try to parse "HH:MM" format
+    const timeMatch = str.match(/(\d+):(\d+)/);
+    if (timeMatch) {
+      const hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      return hours * 3600 + minutes * 60;
+    }
+    // Try to parse "Xh Ym Zs" format
+    const hourMatch = str.match(/(\d+)h/);
+    const minMatch = str.match(/(\d+)m/);
+    const secMatch = str.match(/(\d+)s/);
+    const hours = hourMatch ? parseInt(hourMatch[1], 10) : 0;
+    const minutes = minMatch ? parseInt(minMatch[1], 10) : 0;
+    const seconds = secMatch ? parseInt(secMatch[1], 10) : 0;
+    return hours * 3600 + minutes * 60 + seconds;
+  };
+
+  // Helper function to parse date strings to timestamp for sorting
+  // Prioritizes DD/MM/YYYY format (day/month/year)
+  // Returns timestamp in milliseconds for accurate sorting by year, month, day, hour, minute, second
+  const parseDateToTimestamp = (dateStr: string | Date | null | undefined): number => {
+    if (!dateStr) return 0;
+    
+    // If it's already a Date object, return timestamp
+    if (dateStr instanceof Date) {
+      const timestamp = dateStr.getTime();
+      return isNaN(timestamp) ? 0 : timestamp;
+    }
+    
+    // If it's already a number (timestamp), return it
+    if (typeof dateStr === 'number') {
+      return isNaN(dateStr) ? 0 : dateStr;
+    }
+    
+    const str = String(dateStr).trim();
+    if (!str || str === 'null' || str === 'undefined') return 0;
+    
+    // Priority 1: Try DD/MM/YYYY format with time (e.g., "15/01/2024 14:30:00", "15/01/2024 14:30", "15/01/2024")
+    const ddMMYYYYTimeMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (ddMMYYYYTimeMatch) {
+      const day = parseInt(ddMMYYYYTimeMatch[1], 10);
+      const month = parseInt(ddMMYYYYTimeMatch[2], 10) - 1; // Month is 0-indexed
+      const year = parseInt(ddMMYYYYTimeMatch[3], 10);
+      const hour = ddMMYYYYTimeMatch[4] ? parseInt(ddMMYYYYTimeMatch[4], 10) : 0;
+      const minute = ddMMYYYYTimeMatch[5] ? parseInt(ddMMYYYYTimeMatch[5], 10) : 0;
+      const second = ddMMYYYYTimeMatch[6] ? parseInt(ddMMYYYYTimeMatch[6], 10) : 0;
+      
+      // Validate: day should be 1-31, month should be 0-11 (after -1)
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+        const parsedDate = new Date(year, month, day, hour, minute, second);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.getTime();
+        }
+      }
+    }
+    
+    // Priority 2: Try YYYY-MM-DD format with time (e.g., "2024-01-15 14:30:00", "2024-01-15 14:30", "2024-01-15")
+    const yyyyMMDDTimeMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (yyyyMMDDTimeMatch) {
+      const year = parseInt(yyyyMMDDTimeMatch[1], 10);
+      const month = parseInt(yyyyMMDDTimeMatch[2], 10) - 1; // Month is 0-indexed
+      const day = parseInt(yyyyMMDDTimeMatch[3], 10);
+      const hour = yyyyMMDDTimeMatch[4] ? parseInt(yyyyMMDDTimeMatch[4], 10) : 0;
+      const minute = yyyyMMDDTimeMatch[5] ? parseInt(yyyyMMDDTimeMatch[5], 10) : 0;
+      const second = yyyyMMDDTimeMatch[6] ? parseInt(yyyyMMDDTimeMatch[6], 10) : 0;
+      
+      const parsedDate = new Date(year, month, day, hour, minute, second);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.getTime();
+      }
+    }
+    
+    // Priority 3: Try standard Date constructor (handles ISO strings, etc.)
+    const date = new Date(str);
+    if (!isNaN(date.getTime())) {
+      return date.getTime();
+    }
+    
+    // Priority 4: Try simple DD/MM/YYYY format without time
+    const ddMMYYYYMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddMMYYYYMatch) {
+      const day = parseInt(ddMMYYYYMatch[1], 10);
+      const month = parseInt(ddMMYYYYMatch[2], 10) - 1; // Month is 0-indexed
+      const year = parseInt(ddMMYYYYMatch[3], 10);
+      
+      // Validate: day should be 1-31, month should be 0-11 (after -1)
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+        const parsedDate = new Date(year, month, day);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.getTime();
+        }
+      }
+    }
+    
+    // Priority 5: Try YYYY-MM-DD format without time
+    const yyyyMMDDMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (yyyyMMDDMatch) {
+      const year = parseInt(yyyyMMDDMatch[1], 10);
+      const month = parseInt(yyyyMMDDMatch[2], 10) - 1; // Month is 0-indexed
+      const day = parseInt(yyyyMMDDMatch[3], 10);
+      
+      const parsedDate = new Date(year, month, day);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.getTime();
+      }
+    }
+    
+    return 0;
+  };
+
+  // Filter and sort quiz analytics based on email search query, module name, and sort order
   const filteredQuizData = React.useMemo(() => {
     let filtered = quizAnalyticsData;
 
@@ -843,8 +1164,56 @@ export default function AnalyticsDashboard() {
       });
     }
 
+    // Sort by selected column if sort order is set
+    if (quizSortColumn && quizSortOrder) {
+      return [...filtered].sort((a: any, b: any) => {
+        let valueA: any;
+        let valueB: any;
+
+        switch (quizSortColumn) {
+          case 'user':
+            valueA = (a.user || '').toLowerCase();
+            valueB = (b.user || '').toLowerCase();
+            return quizSortOrder === 'asc' 
+              ? valueA.localeCompare(valueB)
+              : valueB.localeCompare(valueA);
+          
+          case 'module':
+            valueA = (a.module?.name1 || a.module?.name || '').toLowerCase();
+            valueB = (b.module?.name1 || b.module?.name || '').toLowerCase();
+            return quizSortOrder === 'asc' 
+              ? valueA.localeCompare(valueB)
+              : valueB.localeCompare(valueA);
+          
+          case 'score':
+            valueA = a.percentage_score || 0;
+            valueB = b.percentage_score || 0;
+            return quizSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          case 'date_attended':
+            valueA = parseDateToTimestamp(a.started_on || a.date_attended);
+            valueB = parseDateToTimestamp(b.started_on || b.date_attended);
+            return quizSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          case 'time_spent':
+            valueA = parseTimeToSeconds(a.time_spent || '0');
+            valueB = parseTimeToSeconds(b.time_spent || '0');
+            return quizSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          default:
+            return 0;
+        }
+      });
+    }
+
     return filtered;
-  }, [quizAnalyticsData, quizSearchQuery, quizModuleFilter]);
+  }, [quizAnalyticsData, quizSearchQuery, quizModuleFilter, quizSortColumn, quizSortOrder, parseTimeToSeconds, parseDateToTimestamp]);
 
   // Update quiz pagination when filtered data changes
   React.useEffect(() => {
@@ -862,7 +1231,7 @@ export default function AnalyticsDashboard() {
     return filteredQuizData.slice(startIndex, endIndex);
   };
 
-  // Filter Q&A analytics based on email search query and module name
+  // Filter and sort Q&A analytics based on email search query, module name, and sort order
   const filteredQaData = React.useMemo(() => {
     let filtered = qaScoreFilter === 'scored' ? qaScoredData : qaPendingData;
 
@@ -884,8 +1253,64 @@ export default function AnalyticsDashboard() {
       });
     }
 
+    // Sort by selected column if sort order is set
+    if (qaSortColumn && qaSortOrder) {
+      return [...filtered].sort((a: any, b: any) => {
+        let valueA: any;
+        let valueB: any;
+
+        switch (qaSortColumn) {
+          case 'user':
+            valueA = (a.user || '').toLowerCase();
+            valueB = (b.user || '').toLowerCase();
+            return qaSortOrder === 'asc' 
+              ? valueA.localeCompare(valueB)
+              : valueB.localeCompare(valueA);
+          
+          case 'module':
+            valueA = (a.module?.name1 || a.module?.name || '').toLowerCase();
+            valueB = (b.module?.name1 || b.module?.name || '').toLowerCase();
+            return qaSortOrder === 'asc' 
+              ? valueA.localeCompare(valueB)
+              : valueB.localeCompare(valueA);
+          
+          case 'score':
+            valueA = a.percentage_score || 0;
+            valueB = b.percentage_score || 0;
+            return qaSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          case 'date_attended':
+            valueA = parseDateToTimestamp(a.started_on || a.date_attended);
+            valueB = parseDateToTimestamp(b.started_on || b.date_attended);
+            return qaSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          case 'time_spent':
+            valueA = parseTimeToSeconds(a.time_spent || '0');
+            valueB = parseTimeToSeconds(b.time_spent || '0');
+            return qaSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          default:
+            return 0;
+        }
+      });
+    }
+
     return filtered;
-  }, [qaScoredData, qaPendingData, qaScoreFilter, qaSearchQuery, qaModuleFilter]);
+  }, [qaScoredData, qaPendingData, qaScoreFilter, qaSearchQuery, qaModuleFilter, qaSortColumn, qaSortOrder, parseTimeToSeconds, parseDateToTimestamp]);
+
+  // Clear score sorting when switching to pending tab (since pending items don't have scores)
+  React.useEffect(() => {
+    if (qaScoreFilter === 'pending' && qaSortColumn === 'score') {
+      setQaSortColumn(null);
+      setQaSortOrder(null);
+    }
+  }, [qaScoreFilter, qaSortColumn]);
 
   // Update pagination when Q&A score filter or search changes
   React.useEffect(() => {
@@ -938,19 +1363,64 @@ export default function AnalyticsDashboard() {
   };
 
   // Get current page data for learners
-  // Filter learners based on search query
+  // Filter and sort learners based on search query and sort order
   const filteredLearnersData = React.useMemo(() => {
     const learners = learnersData?.message?.message?.learner_analytics || [];
-    if (!learnerSearchQuery.trim()) {
-      return learners;
+    let filtered = learners;
+    
+    // Filter by search query
+    if (learnerSearchQuery.trim()) {
+      const searchLower = learnerSearchQuery.toLowerCase();
+      filtered = learners.filter((learner: any) => {
+        const email = (learner.email || '').toLowerCase();
+        const fullName = (learner.full_name || learner.name || '').toLowerCase();
+        return email.includes(searchLower) || fullName.includes(searchLower);
+      });
     }
-    const searchLower = learnerSearchQuery.toLowerCase();
-    return learners.filter((learner: any) => {
-      const email = (learner.email || '').toLowerCase();
-      const fullName = (learner.full_name || learner.name || '').toLowerCase();
-      return email.includes(searchLower) || fullName.includes(searchLower);
-    });
-  }, [learnersData?.message?.message?.learner_analytics, learnerSearchQuery]);
+
+    // Sort by selected column if sort order is set
+    if (learnerSortColumn && learnerSortOrder) {
+      return [...filtered].sort((a: any, b: any) => {
+        let valueA: any;
+        let valueB: any;
+
+        switch (learnerSortColumn) {
+          case 'name':
+            valueA = ((a.full_name || a.name || '') + ' ' + (a.email || '')).toLowerCase();
+            valueB = ((b.full_name || b.name || '') + ' ' + (b.email || '')).toLowerCase();
+            return learnerSortOrder === 'asc' 
+              ? valueA.localeCompare(valueB)
+              : valueB.localeCompare(valueA);
+          
+          case 'assigned':
+            valueA = a.total_modules || a.modules_enrolled || 0;
+            valueB = b.total_modules || b.modules_enrolled || 0;
+            return learnerSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          case 'completed':
+            valueA = a.completed_modules || 0;
+            valueB = b.completed_modules || 0;
+            return learnerSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          case 'completion_rate':
+            valueA = a.completion_rate || 0;
+            valueB = b.completion_rate || 0;
+            return learnerSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          default:
+            return 0;
+        }
+      });
+    }
+
+    return filtered;
+  }, [learnersData?.message?.message?.learner_analytics, learnerSearchQuery, learnerSortColumn, learnerSortOrder]);
 
   const getCurrentLearnerPageData = () => {
     const startIndex = (learnerCurrentPage - 1) * itemsPerPage;
@@ -987,7 +1457,7 @@ export default function AnalyticsDashboard() {
   const fetchQuizDetails = async (quizProgressId: string) => {
     setLoadingQuizDetails(true);
     try {
-      const response = await fetch(`${LMS_API_BASE_URL}api/method/novel_lms.novel_lms.api.analytics.get_quiz_details?quiz_progress_id=${encodeURIComponent(quizProgressId)}`, {
+      const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_quiz_details?quiz_progress_id=${encodeURIComponent(quizProgressId)}`, {
         credentials: 'include'
       });
       
@@ -1109,7 +1579,7 @@ export default function AnalyticsDashboard() {
   const fetchQaDetails = async (qaProgressId: string) => {
     setLoadingQaDetails(true);
     try {
-      const response = await fetch(`${LMS_API_BASE_URL}api/method/novel_lms.novel_lms.api.analytics.get_qa_details?qa_progress_id=${encodeURIComponent(qaProgressId)}`, {
+      const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_qa_details?qa_progress_id=${encodeURIComponent(qaProgressId)}`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -1197,7 +1667,7 @@ export default function AnalyticsDashboard() {
         score: scoreValue
       });
 
-      const response = await fetch(`${LMS_API_BASE_URL}api/method/novel_lms.novel_lms.api.analytics.updateQAScore`, {
+      const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.updateQAScore`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -1292,7 +1762,7 @@ export default function AnalyticsDashboard() {
         score: String(total),
         response_marks: JSON.stringify(qaAllotedMarks)
       });
-      const response = await fetch(`${LMS_API_BASE_URL}api/method/novel_lms.novel_lms.api.analytics.updateQAScore?${params.toString()}`, {
+      const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.updateQAScore?${params.toString()}`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -1422,7 +1892,7 @@ export default function AnalyticsDashboard() {
       
        
        // Use the original API directly
-       let response = await fetch(`${LMS_API_BASE_URL}api/method/novel_lms.novel_lms.api.analytics.get_module_learners?module_id=${encodeURIComponent(moduleId)}&module_name=${encodeURIComponent(moduleName)}`, { credentials: 'include' });
+       let response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_module_learners?module_id=${encodeURIComponent(moduleId)}&module_name=${encodeURIComponent(moduleName)}`, { credentials: 'include' });
        
       
       if (!response.ok) {
@@ -1560,10 +2030,10 @@ export default function AnalyticsDashboard() {
   };
 
 
-  // Filter modules based on search query, department, and assignment type
+  // Filter and sort modules based on search query, department, assignment type, and sort order
   const filteredModules = React.useMemo(() => {
     const modules = finalDataWithFallback?.module_analytics || [];
-    return modules.filter((module: any) => {
+    const filtered = modules.filter((module: any) => {
       // Search filter
       if (moduleSearchQuery.trim()) {
         const searchLower = moduleSearchQuery.toLowerCase();
@@ -1591,11 +2061,110 @@ export default function AnalyticsDashboard() {
 
       return true;
     });
-  }, [finalDataWithFallback?.module_analytics, moduleSearchQuery, modulePerformanceDepartment, modulePerformanceAssignmentType]);
+
+    // Sort by selected column if sort order is set
+    if (moduleSortColumn && moduleSortOrder) {
+      return [...filtered].sort((a: any, b: any) => {
+        let valueA: any;
+        let valueB: any;
+
+        switch (moduleSortColumn) {
+          case 'name':
+            valueA = (a.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
+            valueB = (b.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
+            return moduleSortOrder === 'asc' 
+              ? valueA.localeCompare(valueB)
+              : valueB.localeCompare(valueA);
+          
+          case 'assigned':
+            valueA = a.enrolled_count || 0;
+            valueB = b.enrolled_count || 0;
+            return moduleSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          case 'completed':
+            valueA = a.completed_count || 0;
+            valueB = b.completed_count || 0;
+            return moduleSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          case 'completion_rate':
+            valueA = a.completion_rate || 0;
+            valueB = b.completion_rate || 0;
+            return moduleSortOrder === 'asc' 
+              ? valueA - valueB
+              : valueB - valueA;
+          
+          default:
+            return 0;
+        }
+      });
+    }
+
+    return filtered;
+  }, [finalDataWithFallback?.module_analytics, moduleSearchQuery, modulePerformanceDepartment, modulePerformanceAssignmentType, moduleSortColumn, moduleSortOrder]);
 
   // Pagination hooks
   const modulePagination = usePagination(filteredModules);
-  const quizPagination = usePagination(finalData?.quiz_analytics || []);
+
+  // Helper function to create sort handlers
+  const createModuleSortHandler = (column: string | null, order: 'asc' | 'desc' | null) => {
+    if (!column || !order) {
+      setModuleSortColumn(null);
+      setModuleSortOrder(null);
+    } else if (moduleSortColumn === column && moduleSortOrder === order) {
+      setModuleSortColumn(null);
+      setModuleSortOrder(null);
+    } else {
+      setModuleSortColumn(column as 'name' | 'assigned' | 'completed' | 'completion_rate');
+      setModuleSortOrder(order);
+    }
+    modulePagination.reset();
+  };
+
+  const createQuizSortHandler = (column: string | null, order: 'asc' | 'desc' | null) => {
+    if (!column || !order) {
+      setQuizSortColumn(null);
+      setQuizSortOrder(null);
+    } else if (quizSortColumn === column && quizSortOrder === order) {
+      setQuizSortColumn(null);
+      setQuizSortOrder(null);
+    } else {
+      setQuizSortColumn(column as 'user' | 'module' | 'score' | 'date_attended' | 'time_spent');
+      setQuizSortOrder(order);
+    }
+    setQuizCurrentPage(1);
+  };
+
+  const createQaSortHandler = (column: string | null, order: 'asc' | 'desc' | null) => {
+    if (!column || !order) {
+      setQaSortColumn(null);
+      setQaSortOrder(null);
+    } else if (qaSortColumn === column && qaSortOrder === order) {
+      setQaSortColumn(null);
+      setQaSortOrder(null);
+    } else {
+      setQaSortColumn(column as 'user' | 'module' | 'score' | 'date_attended' | 'time_spent');
+      setQaSortOrder(order);
+    }
+    setQaCurrentPage(1);
+  };
+
+  const createLearnerSortHandler = (column: string | null, order: 'asc' | 'desc' | null) => {
+    if (!column || !order) {
+      setLearnerSortColumn(null);
+      setLearnerSortOrder(null);
+    } else if (learnerSortColumn === column && learnerSortOrder === order) {
+      setLearnerSortColumn(null);
+      setLearnerSortOrder(null);
+    } else {
+      setLearnerSortColumn(column as 'name' | 'assigned' | 'completed' | 'completion_rate');
+      setLearnerSortOrder(order);
+    }
+    setLearnerCurrentPage(1);
+  };
   
  
   if ((isLoading || dataLoading) && !persistedData) {
@@ -1675,94 +2244,6 @@ export default function AnalyticsDashboard() {
           </Button>
         </div>
       </div>
-
-      {/* Filters Sheet */}
-      <Sheet open={showFilters} onOpenChange={setShowFilters}>
-        <SheetContent className="w-[400px] sm:w-[540px]">
-          <SheetHeader>
-            <SheetTitle>Analytics Filters</SheetTitle>
-            <SheetDescription>
-              Customize your analytics view with advanced filters
-            </SheetDescription>
-          </SheetHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="dateRange">Date Range</Label>
-              <Select
-                value={filters.dateRange}
-                onValueChange={(value) => handleFilterChange('dateRange', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select date range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="last_7_days">Last 7 Days</SelectItem>
-                  <SelectItem value="last_30_days">Last 30 Days</SelectItem>
-                  <SelectItem value="last_90_days">Last 90 Days</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {filters.dateRange === 'custom' && (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="dateFrom">From</Label>
-                  <Input
-                    type="date"
-                    value={filters.dateFrom}
-                    onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="dateTo">To</Label>
-                  <Input
-                    type="date"
-                    value={filters.dateTo}
-                    onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="grid gap-2">
-              <Label htmlFor="department">Department</Label>
-              <Select
-                value={filters.department}
-                onValueChange={(value) => handleFilterChange('department', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All departments</SelectItem>
-                  {/* Add department options dynamically */}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="module">Module</Label>
-              <Select
-                value={filters.module}
-                onValueChange={(value) => handleFilterChange('module', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All modules" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All modules</SelectItem>
-                  {/* Add module options dynamically */}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <SheetFooter>
-            <Button onClick={() => setShowFilters(false)}>Apply Filters</Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -1876,18 +2357,34 @@ export default function AnalyticsDashboard() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-3 font-medium text-sm text-muted-foreground">
-                        Module Name
-                      </th>
-                      <th className="text-left p-3 font-medium text-sm text-muted-foreground">
-                        Assigned
-                      </th>
-                      <th className="text-left p-3 font-medium text-sm text-muted-foreground">
-                        Completed
-                      </th>
-                      <th className="text-left p-3 font-medium text-sm text-muted-foreground">
-                        Completion Rate
-                      </th>
+                      <SortableHeader
+                        label="Module Name"
+                        column="name"
+                        sortColumn={moduleSortColumn}
+                        sortOrder={moduleSortOrder}
+                        onSortChange={createModuleSortHandler}
+                      />
+                      <SortableHeader
+                        label="Assigned"
+                        column="assigned"
+                        sortColumn={moduleSortColumn}
+                        sortOrder={moduleSortOrder}
+                        onSortChange={createModuleSortHandler}
+                      />
+                      <SortableHeader
+                        label="Completed"
+                        column="completed"
+                        sortColumn={moduleSortColumn}
+                        sortOrder={moduleSortOrder}
+                        onSortChange={createModuleSortHandler}
+                      />
+                      <SortableHeader
+                        label="Completion Rate"
+                        column="completion_rate"
+                        sortColumn={moduleSortColumn}
+                        sortOrder={moduleSortOrder}
+                        onSortChange={createModuleSortHandler}
+                      />
                     </tr>
                   </thead>
         <tbody>
@@ -2086,11 +2583,41 @@ export default function AnalyticsDashboard() {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">User</th>
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">Module</th>
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">Score (%)</th>
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">Date Attended</th>
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">Time Spent</th>
+                        <SortableHeader
+                          label="User"
+                          column="user"
+                          sortColumn={quizSortColumn}
+                          sortOrder={quizSortOrder}
+                          onSortChange={createQuizSortHandler}
+                        />
+                        <SortableHeader
+                          label="Module"
+                          column="module"
+                          sortColumn={quizSortColumn}
+                          sortOrder={quizSortOrder}
+                          onSortChange={createQuizSortHandler}
+                        />
+                        <SortableHeader
+                          label="Score (%)"
+                          column="score"
+                          sortColumn={quizSortColumn}
+                          sortOrder={quizSortOrder}
+                          onSortChange={createQuizSortHandler}
+                        />
+                        <SortableHeader
+                          label="Date Attended"
+                          column="date_attended"
+                          sortColumn={quizSortColumn}
+                          sortOrder={quizSortOrder}
+                          onSortChange={createQuizSortHandler}
+                        />
+                        <SortableHeader
+                          label="Time Spent"
+                          column="time_spent"
+                          sortColumn={quizSortColumn}
+                          sortOrder={quizSortOrder}
+                          onSortChange={createQuizSortHandler}
+                        />
                         <th className="text-left p-3 font-medium text-sm text-muted-foreground">Time Limit</th>
                       </tr>
                     </thead>
@@ -2299,11 +2826,45 @@ export default function AnalyticsDashboard() {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">User</th>
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">Module</th>
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">Score (%)</th>
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">Date</th>
-                        <th className="text-left p-3 font-medium text-sm text-muted-foreground">Time Spent</th>
+                        <SortableHeader
+                          label="User"
+                          column="user"
+                          sortColumn={qaSortColumn}
+                          sortOrder={qaSortOrder}
+                          onSortChange={createQaSortHandler}
+                        />
+                        <SortableHeader
+                          label="Module"
+                          column="module"
+                          sortColumn={qaSortColumn}
+                          sortOrder={qaSortOrder}
+                          onSortChange={createQaSortHandler}
+                        />
+                        {qaScoreFilter === 'scored' ? (
+                          <SortableHeader
+                            label="Score (%)"
+                            column="score"
+                            sortColumn={qaSortColumn}
+                            sortOrder={qaSortOrder}
+                            onSortChange={createQaSortHandler}
+                          />
+                        ) : (
+                          <th className="text-left p-3 font-medium text-sm text-muted-foreground">Score (%)</th>
+                        )}
+                        <SortableHeader
+                          label="Date"
+                          column="date_attended"
+                          sortColumn={qaSortColumn}
+                          sortOrder={qaSortOrder}
+                          onSortChange={createQaSortHandler}
+                        />
+                        <SortableHeader
+                          label="Time Spent"
+                          column="time_spent"
+                          sortColumn={qaSortColumn}
+                          sortOrder={qaSortOrder}
+                          onSortChange={createQaSortHandler}
+                        />
                         <th className="text-left p-3 font-medium text-sm text-muted-foreground">Time Limit</th>
                         <th className="text-left p-3 font-medium text-sm text-muted-foreground">Actions</th>
                       </tr>
@@ -2478,32 +3039,6 @@ export default function AnalyticsDashboard() {
             </Card>
           )}
 
-          {/* Default Overview */}
-          {quizAnalyticsView === 'overview' && (
-            <div className="space-y-4">
-              {quizPagination.currentData.map((quiz: any, index: number) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-medium">{quiz.quiz_name?.replace(/<[^>]*>/g, '') || 'N/A'}</h4>
-                      <Badge variant={quiz.type === "Quiz" ? "default" : "secondary"} className="text-xs">
-                        {quiz.type}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {quiz.module_name?.replace(/<[^>]*>/g, '') || 'N/A'} • {quiz.total_attempts} attempts
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold">{quiz.avg_score.toFixed(1)}%</div>
-                    <div className="text-sm text-muted-foreground">
-                      Pass Rate: {quiz.pass_rate.toFixed(1)}%
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </TabsContent>
 
         {/* Learners Tab */}
@@ -2533,10 +3068,38 @@ export default function AnalyticsDashboard() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-4 font-medium">Learner</th>
-                      <th className="text-left p-4 font-medium">Assigned</th>
-                      <th className="text-left p-4 font-medium">Completed</th>
-                      <th className="text-left p-4 font-medium">Completion Rate</th>
+                      <SortableHeader
+                        label="Learner"
+                        column="name"
+                        sortColumn={learnerSortColumn}
+                        sortOrder={learnerSortOrder}
+                        onSortChange={createLearnerSortHandler}
+                        className="text-left p-4 font-medium"
+                      />
+                      <SortableHeader
+                        label="Assigned"
+                        column="assigned"
+                        sortColumn={learnerSortColumn}
+                        sortOrder={learnerSortOrder}
+                        onSortChange={createLearnerSortHandler}
+                        className="text-left p-4 font-medium"
+                      />
+                      <SortableHeader
+                        label="Completed"
+                        column="completed"
+                        sortColumn={learnerSortColumn}
+                        sortOrder={learnerSortOrder}
+                        onSortChange={createLearnerSortHandler}
+                        className="text-left p-4 font-medium"
+                      />
+                      <SortableHeader
+                        label="Completion Rate"
+                        column="completion_rate"
+                        sortColumn={learnerSortColumn}
+                        sortOrder={learnerSortOrder}
+                        onSortChange={createLearnerSortHandler}
+                        className="text-left p-4 font-medium"
+                      />
                     </tr>
                   </thead>
                   <tbody>

@@ -31,7 +31,8 @@ import { Mermaid } from 'reactjs-tiptap-editor/mermaid';
 import { BubbleMenuMermaid } from 'reactjs-tiptap-editor/bubble-extra'; 
 import { Video } from 'reactjs-tiptap-editor/video'; 
 import { FontFamily } from 'reactjs-tiptap-editor/fontfamily'; 
-import { SlashCommand } from 'reactjs-tiptap-editor/slashcommand'; 
+// SlashCommand removed - it interferes with space key input
+// import { SlashCommand } from 'reactjs-tiptap-editor/slashcommand'; 
 import { Strike } from 'reactjs-tiptap-editor/strike'; 
 import { Emoji } from 'reactjs-tiptap-editor/emoji'; 
 import { LMS_API_BASE_URL } from "@/config/routes";
@@ -149,7 +150,8 @@ const extensions = [
     MoreMark.configure(),
     ColumnActionButton.configure(),
     Mermaid.configure(),
-    SlashCommand.configure(),
+    // SlashCommand removed - it was preventing space key from working
+    // SlashCommand.configure(),
     TextBubble.configure(),
 ];
 
@@ -157,6 +159,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, disabled = f
     const [isMounted, setIsMounted] = useState(false);
     const { theme } = useTheme();
     const observerRef = useRef<MutationObserver | null>(null);
+    const editorContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setIsMounted(true);
@@ -184,12 +187,183 @@ const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, disabled = f
         };
     }, [theme, isMounted]);
 
+    // Direct fix to ensure space key always works
+    useEffect(() => {
+        if (!isMounted) return;
+
+        const insertSpaceDirectly = (editorElement: HTMLElement) => {
+            try {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) {
+                    // If no selection, try to insert at the end
+                    const range = document.createRange();
+                    range.selectNodeContents(editorElement);
+                    range.collapse(false);
+                    selection?.removeAllRanges();
+                    selection?.addRange(range);
+                }
+                
+                const range = selection?.getRangeAt(0);
+                if (!range) return;
+                
+                // Insert space character
+                const textNode = document.createTextNode(' ');
+                range.insertNode(textNode);
+                
+                // Move cursor after the space
+                range.setStartAfter(textNode);
+                range.collapse(true);
+                selection?.removeAllRanges();
+                selection?.addRange(range);
+                
+                // Trigger input event to notify editor
+                const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+                editorElement.dispatchEvent(inputEvent);
+            } catch (error) {
+                console.error('Error inserting space:', error);
+            }
+        };
+
+        const fixSpaceKey = () => {
+            // Find all editor elements
+            const editorElements = document.querySelectorAll('.rich-editor .ProseMirror, .rich-editor [contenteditable="true"]');
+            
+            editorElements.forEach((element) => {
+                const el = element as HTMLElement;
+                
+                // Ensure whitespace is preserved
+                el.style.whiteSpace = 'pre-wrap';
+                
+                // Add keydown handler that ALWAYS inserts space
+                const handleKeyDown = (e: KeyboardEvent) => {
+                    if (e.key === ' ' || e.keyCode === 32) {
+                        // Always prevent default and insert space manually to ensure it works
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        e.stopPropagation();
+                        
+                        // Insert space directly
+                        insertSpaceDirectly(el);
+                    }
+                };
+                
+                // Remove any existing handler and add new one with capture (highest priority)
+                el.removeEventListener('keydown', handleKeyDown as EventListener, true);
+                el.addEventListener('keydown', handleKeyDown as EventListener, true);
+                
+                // Also add keypress handler as backup
+                const handleKeyPress = (e: KeyboardEvent) => {
+                    if (e.key === ' ' || e.keyCode === 32 || e.charCode === 32) {
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        e.stopPropagation();
+                        insertSpaceDirectly(el);
+                    }
+                };
+                
+                el.removeEventListener('keypress', handleKeyPress as EventListener, true);
+                el.addEventListener('keypress', handleKeyPress as EventListener, true);
+            });
+        };
+
+        // Apply fix immediately
+        fixSpaceKey();
+
+        // Apply fix after delays to catch dynamically created elements
+        const timeout1 = setTimeout(fixSpaceKey, 50);
+        const timeout2 = setTimeout(fixSpaceKey, 200);
+        const timeout3 = setTimeout(fixSpaceKey, 500);
+        const timeout4 = setTimeout(fixSpaceKey, 1000);
+        const timeout5 = setTimeout(fixSpaceKey, 2000);
+
+        // Use MutationObserver to catch editor initialization
+        const observer = new MutationObserver(() => {
+            fixSpaceKey();
+        });
+
+        const richEditorContainer = editorContainerRef.current || document.querySelector('.rich-editor');
+        if (richEditorContainer) {
+            observer.observe(richEditorContainer, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                characterData: true,
+            });
+        }
+
+        // Global handler that ALWAYS inserts space when pressed in editor
+        const globalHandler = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            const isInEditor = target?.closest?.('.rich-editor .ProseMirror, .rich-editor [contenteditable="true"]');
+            
+            if (isInEditor && (e.key === ' ' || e.keyCode === 32)) {
+                // Prevent any other handlers from interfering
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                e.stopPropagation();
+                
+                // Insert space directly
+                const editorEl = target.closest('.ProseMirror, [contenteditable="true"]') as HTMLElement;
+                if (editorEl) {
+                    insertSpaceDirectly(editorEl);
+                }
+            }
+        };
+
+        // Use capture phase with highest priority
+        document.addEventListener('keydown', globalHandler, { capture: true, passive: false });
+
+        return () => {
+            clearTimeout(timeout1);
+            clearTimeout(timeout2);
+            clearTimeout(timeout3);
+            clearTimeout(timeout4);
+            clearTimeout(timeout5);
+            observer.disconnect();
+            document.removeEventListener('keydown', globalHandler, { capture: true } as EventListenerOptions);
+        };
+    }, [isMounted]);
+
     if (!isMounted) {
         return null;
     }
 
     return (
-        <div className={`rich-editor ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div 
+            ref={editorContainerRef}
+            className={`rich-editor ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+            onKeyDown={(e) => {
+                // Direct handler on container - always insert space when pressed
+                if (e.key === ' ' || e.keyCode === 32) {
+                    const target = e.target as HTMLElement;
+                    const editorEl = target.closest('.ProseMirror, [contenteditable="true"]') as HTMLElement;
+                    if (editorEl) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Insert space directly
+                        try {
+                            const selection = window.getSelection();
+                            if (selection && selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                const textNode = document.createTextNode(' ');
+                                range.insertNode(textNode);
+                                range.setStartAfter(textNode);
+                                range.collapse(true);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                
+                                // Trigger input event
+                                const inputEvent = new Event('input', { bubbles: true });
+                                editorEl.dispatchEvent(inputEvent);
+                            }
+                        } catch (err) {
+                            console.error('Error inserting space:', err);
+                        }
+                    }
+                }
+            }}
+        >
             <RichTextEditor
                 output='html'
                 content={content || ''}
@@ -215,6 +389,21 @@ const RichEditor: React.FC<RichEditorProps> = ({ content, onChange, disabled = f
                     }
                   }}
            />
+           <style dangerouslySetInnerHTML={{__html: `
+             .rich-editor .ProseMirror {
+               white-space: pre-wrap !important;
+             }
+             .rich-editor .ProseMirror p,
+             .rich-editor .ProseMirror div,
+             .rich-editor .ProseMirror span,
+             .rich-editor .ProseMirror li,
+             .rich-editor .ProseMirror * {
+               white-space: pre-wrap !important;
+             }
+             .rich-editor [contenteditable="true"] {
+               white-space: pre-wrap !important;
+             }
+           `}} />
         </div>
     );
 };

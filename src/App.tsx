@@ -20,6 +20,7 @@ import AdminModuleDetail from "@/pages/Modules/Admin/ModuleDetail";
 import ModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
 import ModuleCreationForm from "@/pages/ModuleEditor/edit/ModuleCreationForm";
 import AnalyticsDashboard from "@/pages/Analytics/AnalyticsDashboard";
+import DepartmentPage from "@/pages/Department/Department";
 import { ErrorBoundary } from "@/lib/error-boundary";
 // import AnalyticsDashboardNew from "@/pages/Analytics/AnalyticsDashboard";
 // import H5PReactDemo from '@/pages/Test/H5PReactDemo';
@@ -101,6 +102,11 @@ function App() {
               <ProtectedRoute path="/analytics" component={() => (
                 <Layout>
                   <AnalyticsDashboard />
+                </Layout>
+              )} allowedRoles={["LMS Admin"]} />
+              <ProtectedRoute path="/department" component={() => (
+                <Layout>
+                  <DepartmentPage />
                 </Layout>
               )} allowedRoles={["LMS Admin"]} />
               {/* <ProtectedRoute path="/analytics-new" component={() => (
