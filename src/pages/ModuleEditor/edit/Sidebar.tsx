@@ -217,6 +217,7 @@ function SettingsDialog({
   };
 
   const [search, setSearch] = useState("");
+  const [currentLearnersSearch, setCurrentLearnersSearch] = useState("");
   // Assume originalModule and originalLearners are set when the sidebar opens
   const [originalModule, setOriginalModule] = useState(editState);
   const [originalLearners, setOriginalLearners] = useState(learners);
@@ -243,13 +244,28 @@ function SettingsDialog({
       }
       onOpenChange(open);
     }}>
-      <SheetContent side="right" className="w-full sm:max-w-full p-0 overflow-y-auto">
-        <div className="h-full flex flex-col overflow-y-auto">
-          <SheetHeader className="p-6 border-b">
-            <SheetTitle>Module Settings</SheetTitle>
+      <SheetContent side="right" className="w-full sm:max-w-full p-0 flex flex-col overflow-hidden" hideClose>
+        <div className="h-full flex flex-col overflow-hidden">
+          <SheetHeader className="p-6 border-b bg-background sticky top-0 z-10 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <SheetTitle>Module Settings</SheetTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => {
+                  setEditState(moduleInfo);
+                  setLearners(moduleInfo.learners || []);
+                  onOpenChange(false);
+                }}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveWithLearners} disabled={!hasChanges}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
           </SheetHeader>
-          <Tabs defaultValue="basic" className="flex-1 flex flex-col">
-            <TabsList className="mx-auto mt-4 mb-6">
+          <div className="flex-1 overflow-y-auto">
+            <Tabs defaultValue="basic" className="flex flex-col">
+              <TabsList className="mx-auto mt-4 mb-6">
               <TabsTrigger value="basic">
                 <Info className="mr-2 w-4 h-4" /> Basic Details
               </TabsTrigger>
@@ -266,6 +282,7 @@ function SettingsDialog({
                       value={editState?.name || ""}
                       onChange={(e) => handleFieldChange("name", e.target.value)}
                       placeholder="Module Name"
+                      className="border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                   <div className="space-y-2">
@@ -340,6 +357,7 @@ function SettingsDialog({
                         }
                       }}
                       disabled={uploadingImage}
+                      className="border-2 border-border/50 focus:border-primary"
                     />
                     {uploadingImage && <div className="text-sm text-muted-foreground">Uploading...</div>}
                   </div>
@@ -358,7 +376,7 @@ function SettingsDialog({
                       value={editState?.status || "Draft"}
                       onValueChange={(value) => handleFieldChange("status", value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="border-2 border-border/50 focus:border-primary">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -371,18 +389,82 @@ function SettingsDialog({
                   <div className="space-y-2">
                     <Label>Duration (days)</Label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={editState?.duration || ""}
-                      onChange={(e) => handleFieldChange("duration", e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Only allow digits (0-9), remove any special characters
+                        const numericValue = value.replace(/[^0-9]/g, '');
+                        // Limit to maximum 2 digits
+                        if (numericValue.length <= 2) {
+                          handleFieldChange("duration", numericValue);
+                        } else if (numericValue.length > 2) {
+                          handleFieldChange("duration", numericValue.slice(0, 2));
+                        }
+                      }}
+                      placeholder="Enter duration (1-99)"
+                      maxLength={2}
+                      pattern="[0-9]{1,2}"
+                      className="border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Order</Label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={editState?.order ?? 1}
-                      min={1}
-                      onChange={e => handleFieldChange("order", Number(e.target.value))}
+                      onChange={e => {
+                        const value = e.target.value;
+                        // Remove any non-digit characters (including dots and minus)
+                        const numericValue = value.replace(/[^0-9]/g, '');
+                        // Limit to maximum 2 digits
+                        const limitedValue = numericValue.slice(0, 2);
+                        if (limitedValue === '') {
+                          handleFieldChange("order", '');
+                        } else {
+                          // Store as number, but ensure it's between 1 and 99
+                          const numValue = parseInt(limitedValue, 10);
+                          if (!isNaN(numValue)) {
+                            // If the number is 0 or would exceed 99, cap it at 99
+                            if (numValue === 0) {
+                              handleFieldChange("order", '');
+                            } else if (numValue > 99) {
+                              handleFieldChange("order", 99);
+                            } else {
+                              handleFieldChange("order", numValue);
+                            }
+                          } else {
+                            handleFieldChange("order", '');
+                          }
+                        }
+                      }}
+                      onBlur={e => {
+                        // On blur, ensure we have a valid number between 1 and 99, default to 1 if empty
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        if (value === '' || value === '0') {
+                          handleFieldChange("order", 1);
+                        } else {
+                          const numValue = parseInt(value, 10);
+                          if (isNaN(numValue) || numValue < 1) {
+                            handleFieldChange("order", 1);
+                          } else if (numValue > 99) {
+                            handleFieldChange("order", 99);
+                          } else {
+                            handleFieldChange("order", numValue);
+                          }
+                        }
+                      }}
+                      onKeyDown={e => {
+                        // Prevent minus key and dot from being entered (just block them, don't clear)
+                        if (e.key === '-' || e.key === '.') {
+                          e.preventDefault();
+                        }
+                      }}
+                      maxLength={2}
+                      placeholder="Enter order (1-99)"
+                      className="border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                   <div className="space-y-2">
@@ -391,7 +473,7 @@ function SettingsDialog({
                       value={editState?.assignment_based || "Everyone"}
                       onValueChange={(value) => handleFieldChange("assignment_based", value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="border-2 border-border/50 focus:border-primary">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -408,7 +490,7 @@ function SettingsDialog({
                         value={editState?.department || ""}
                         onValueChange={val => handleFieldChange("department" as keyof ModuleInfo, val)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="border-2 border-border/50 focus:border-primary">
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -420,97 +502,132 @@ function SettingsDialog({
                     </div>
                   )}
                   {editState?.assignment_based === "Manual" && (
-                    <div className=" flex flex-col gap-2">
-                      <div>
-                        <Label className="mb-2">Learners</Label>
-                        {/* Searchable user table with Add button */}
-                        <Input
-                          placeholder="Search learners..."
-                          value={search}
-                          onChange={e => setSearch(e.target.value)}
-                          className="mb-2 w-full"
-                        />
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>Action</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {studentUsers
-                              .filter(u =>
-                                u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-                                u.email?.toLowerCase().includes(search.toLowerCase())
-                              )
-                              .map(u => {
-                                const alreadyAdded = learners.some(l => l.user === u.name);
-                                return (
-                                  <TableRow key={u.name}>
-                                    <TableCell>{u.full_name}</TableCell>
-                                    <TableCell>{u.email}</TableCell>
-                                    <TableCell>
-                                      <Button
-                                        size="sm"
-                                        variant={alreadyAdded ? "secondary" : "outline"}
-                                        disabled={alreadyAdded}
-                                        onClick={() => {
-                                          if (!alreadyAdded) setLearners([...learners, { user: u.name }]);
-                                        }}
-                                      >
-                                        {alreadyAdded ? "Added" : "Add"}
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                      {/* Current module learners list */}
-                      <div className="mt-4">
-                        <Label>Current Learners</Label>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>Action</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {learners.map((row, idx) => {
-                              const user = studentUsers.find(u => u.name === row.user);
-                              if (!user) return null;
-                              return (
-                                <TableRow key={row.user}>
-                                  <TableCell>{user.full_name}</TableCell>
-                                  <TableCell>{user.email}</TableCell>
-                                  <TableCell>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => setLearners(learners.filter((l, i) => i !== idx))}
-                                    >
-                                      Remove
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
+                    <div className="flex flex-col gap-2">
+                      <Label className="mb-2">Learners</Label>
+                      <Tabs defaultValue="search" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="search">Add Learners</TabsTrigger>
+                          <TabsTrigger value="current">Current Learners</TabsTrigger>
+                        </TabsList>
+                        <div className="mt-4 min-h-[450px]">
+                          <TabsContent value="search" className="m-0">
+                            <div className="space-y-4">
+                              <Input
+                                placeholder="Search learners..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="w-full border-2 border-border/50 focus:border-primary"
+                              />
+                              <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
+                                <Table>
+                                  <TableHeader className="sticky top-0 bg-background z-10">
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Email</TableHead>
+                                      <TableHead>Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {studentUsers
+                                      .filter(u =>
+                                        u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+                                        u.email?.toLowerCase().includes(search.toLowerCase())
+                                      )
+                                      .map(u => {
+                                        const alreadyAdded = learners.some(l => l.user === u.name);
+                                        return (
+                                          <TableRow key={u.name}>
+                                            <TableCell>{u.full_name}</TableCell>
+                                            <TableCell>{u.email}</TableCell>
+                                            <TableCell>
+                                              <Button
+                                                size="sm"
+                                                variant={alreadyAdded ? "secondary" : "outline"}
+                                                disabled={alreadyAdded}
+                                                onClick={() => {
+                                                  if (!alreadyAdded) setLearners([...learners, { user: u.name }]);
+                                                }}
+                                              >
+                                                {alreadyAdded ? "Added" : "Add"}
+                                              </Button>
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="current" className="m-0">
+                            <div className="space-y-4">
+                              <Input
+                                placeholder="Search learners..."
+                                value={currentLearnersSearch}
+                                onChange={e => setCurrentLearnersSearch(e.target.value)}
+                                className="w-full border-2 border-border/50 focus:border-primary"
+                              />
+                              <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
+                                <Table>
+                                  <TableHeader className="sticky top-0 bg-background z-10">
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Email</TableHead>
+                                      <TableHead>Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {learners.length === 0 ? (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                                          No learners added yet. Use the "Add Learners" tab to add learners.
+                                        </TableCell>
+                                      </TableRow>
+                                    ) : (
+                                      learners
+                                        .filter((row) => {
+                                          const user = studentUsers.find(u => u.name === row.user);
+                                          if (!user) return false;
+                                          const searchLower = currentLearnersSearch.toLowerCase();
+                                          return (
+                                            user.full_name?.toLowerCase().includes(searchLower) ||
+                                            user.email?.toLowerCase().includes(searchLower)
+                                          );
+                                        })
+                                        .map((row) => {
+                                          const user = studentUsers.find(u => u.name === row.user);
+                                          if (!user) return null;
+                                          const originalIndex = learners.findIndex(l => l.user === row.user);
+                                          return (
+                                            <TableRow key={row.user}>
+                                              <TableCell>{user.full_name}</TableCell>
+                                              <TableCell>{user.email}</TableCell>
+                                              <TableCell>
+                                                <Button
+                                                  size="sm"
+                                                  variant="destructive"
+                                                  onClick={() => setLearners(learners.filter((l, i) => i !== originalIndex))}
+                                                >
+                                                  Remove
+                                                </Button>
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          </TabsContent>
+                        </div>
+                      </Tabs>
                     </div>
                   )}
                 </div>
               </TabsContent>
             </div>
-          </Tabs>
-          <div className="p-6 border-t flex justify-end gap-2 max-w-3xl mx-auto w-full">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSaveWithLearners} disabled={!hasChanges}>Save Changes</Button>
+            </Tabs>
           </div>
         </div>
       </SheetContent>
@@ -864,6 +981,19 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   const handleSave = async (learnersToSave: LearnerRow[] = learners) => {
     if (!moduleInfo || !editState) return;
     
+    // Validate duration only if provided: must be between 1 and 99
+    // Treat empty string, null, undefined, 0, or "0" as optional (no duration)
+    let durationNum: number | undefined = undefined;
+    const durationValue = editState.duration;
+    const durationStr = String(durationValue || "").trim();
+    if (durationStr !== "" && durationStr !== "0") {
+      durationNum = parseInt(durationStr, 10);
+      if (isNaN(durationNum) || durationNum < 1 || durationNum > 99) {
+        toast.error("Duration must be a number between 1 and 99 days");
+        return;
+      }
+    }
+    
     try {
       // Normalize learners data for backend
       let normalizedLearners: Array<{ user: string }> = [];
@@ -879,7 +1009,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       const updateData: any = {
         name1: editState.name,
         description: editState.description,
-        duration: editState.duration,
+        duration: durationNum, // Optional: only set if provided and valid
         order: editState.order ?? 1,
         status: editState.status,
         assignment_based: editState.assignment_based,

@@ -337,15 +337,15 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
     };
 
     return (
-        <div>
+        <div className="overflow-x-auto">
 
-            <div className="flex gap-4 p-4 mb-4">
-                <div className="flex-[5] relative min-w-[550px]">
+            <div className="flex gap-4 p-4 mb-4 flex-wrap">
+                <div className="flex-[5] relative min-w-0 shrink">
                     <Input
                         placeholder="Search modules..."
                         value={searchQuery}
                         onChange={handleSearchChange}
-                        className="pr-10 w-full"
+                        className="pr-10 w-full border-2 border-border/50 focus:border-primary"
                     />
                     {searchQuery && (
                         <button
@@ -359,7 +359,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                 </div>
                 <div className="w-[180px] flex-shrink-0">
                     <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                        <SelectTrigger>
+                        <SelectTrigger className="border-2 border-border/50 focus:border-primary">
                             <SelectValue placeholder="Department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -372,19 +372,23 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="w-[180px] -ml-3 flex-shrink-0">
-                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="Published">Published</SelectItem>
-                            <SelectItem value="Draft">Draft</SelectItem>
-                            <SelectItem value="Approval Pending">Approval Pending</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+                {!showArchived ? (
+                    <div className="w-[180px] -ml-3 flex-shrink-0">
+                        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                            <SelectTrigger className="border-2 border-border/50 focus:border-primary">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="Published">Published</SelectItem>
+                                <SelectItem value="Draft">Draft</SelectItem>
+                                <SelectItem value="Approval Pending">Approval Pending</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                ) : (
+                    <div className="w-[180px] -ml-3 flex-shrink-0"></div>
+                )}
                 <div className="flex items-center gap-2 flex-shrink-0 -ml-2">
                     <Label htmlFor="archived-toggle" className="text-sm font-medium whitespace-nowrap">
                         {showArchived ? "Archived" : "Archived"}
@@ -420,7 +424,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 max-w-300 p-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 p-4">
                 {module_list?.map((module) => {
                     // Status bar color logic
                     let statusColor = "bg-gray-200 text-gray-700";
@@ -485,14 +489,14 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                                              style={{ position: 'absolute', top: 0, left: 0 }}>
                                             {module.status === "Approval Pending" ? "Pending" : module.status}
                                         </div>
-                                        {/* Duplicate Icon Button - Top Right Corner */}
+                                        {/* Duplicate Icon Button - Positioned below status bar (h-8 = 2rem, so 2rem + 0.5rem = 2.5rem = top-10) */}
                                         <button
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
                                                 handleDuplicateClick(module.name, module.name1);
                                             }}
-                                            className="absolute top-2 right-2 z-20 p-2 rounded-full bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
+                                            className="absolute top-10 right-2 z-20 p-2 rounded-full bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
                                             title="Duplicate Module"
                                         >
                                             <CopyPlus className="h-4 w-4 text-primary" />

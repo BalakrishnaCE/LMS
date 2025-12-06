@@ -18,7 +18,6 @@ import {
   PaginationPrevious 
 } from "@/components/ui/pagination";
 import { useAPI } from "@/lib/api";
-import { useFrappeCreateDoc } from "frappe-react-sdk";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
@@ -334,7 +333,7 @@ function Filters({
             placeholder="Search by name..."
             value={searchName}
             onChange={(e) => onSearchNameChange(e.target.value)}
-            className="w-full pl-8 pr-10"
+            className="w-full pl-8 pr-10 border-2 border-border/50 focus:border-primary"
           />
           {searchName && (
             <button
@@ -354,7 +353,7 @@ function Filters({
             placeholder="Search by email..."
             value={searchEmail}
             onChange={(e) => onSearchEmailChange(e.target.value)}
-            className="w-full pl-8 pr-10"
+            className="w-full pl-8 pr-10 border-2 border-border/50 focus:border-primary"
           />
           {searchEmail && (
             <button
@@ -369,7 +368,7 @@ function Filters({
       </div>
       <div className="w-full md:w-48">
         <Select value={searchStatus} onValueChange={onSearchStatusChange}>
-          <SelectTrigger>
+          <SelectTrigger className="border-2 border-border/50 focus:border-primary">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -445,13 +444,6 @@ export default function Learners() {
   });
   const [showEditPassword, setShowEditPassword] = React.useState(false);
   const [learnerToEdit, setLearnerToEdit] = React.useState<User | null>(null);
-
-  // Add Department state
-  const [addDeptOpen, setAddDeptOpen] = React.useState(false);
-  const [addDeptLoading, setAddDeptLoading] = React.useState(false);
-  const [addDeptError, setAddDeptError] = React.useState<string | null>(null);
-  const [departmentName, setDepartmentName] = React.useState('');
-  const { createDoc } = useFrappeCreateDoc();
 
   const api = useAPI();
   const [analyticsData, setAnalyticsData] = React.useState<{ message: any } | null>(null);
@@ -894,7 +886,6 @@ export default function Learners() {
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Learners</h1>
         <div className="flex gap-2">
-          <Button onClick={() => setAddDeptOpen(true)} variant="default">Add Department</Button>
           <Button onClick={() => setAddOpen(true)} variant="default">Add Learner</Button>
         </div>
       </div>
@@ -993,64 +984,6 @@ export default function Learners() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Department Dialog */}
-      <Dialog open={addDeptOpen} onOpenChange={setAddDeptOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Department</DialogTitle>
-            <DialogDescription>Create a new department in the system.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            setAddDeptError(null);
-            
-            if (!departmentName || !departmentName.trim()) {
-              setAddDeptError("Department name is required.");
-              return;
-            }
-
-            setAddDeptLoading(true);
-            try {
-              await createDoc("Department", {
-                department: departmentName.trim()
-              });
-              toast.success("Department created successfully");
-              setAddDeptOpen(false);
-              setDepartmentName('');
-              // Refresh the page data to show the new department
-              fetchLearnerData();
-            } catch (error: any) {
-              console.error("Error creating department:", error);
-              const errorMessage = error?.message || error?.exception || "Failed to create department.";
-              setAddDeptError(errorMessage);
-              toast.error("Failed to create department");
-            } finally {
-              setAddDeptLoading(false);
-            }
-          }} className="space-y-4">
-            <div>
-              <label className="block mb-1 font-medium">Department Name<span className="text-red-500">*</span></label>
-              <Input
-                value={departmentName}
-                onChange={(e) => setDepartmentName(e.target.value)}
-                placeholder="Enter department name"
-                required
-              />
-              {addDeptError && (
-                <p className="text-sm text-red-500 mt-1">{addDeptError}</p>
-              )}
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={addDeptLoading}>
-                {addDeptLoading ? "Adding..." : "Add Department"}
-              </Button>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" disabled={addDeptLoading}>Cancel</Button>
-              </DialogClose>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent>
           <DialogHeader>

@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useLayoutEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,28 +12,28 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useFrappeAuth } from "frappe-react-sdk"
 import { toast } from "sonner"
-import { navigate } from "wouter/use-browser-location"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { motion, HTMLMotionProps } from "framer-motion"
 import { ROUTES, getFullPath, LMS_API_BASE_URL } from "@/config/routes"
 import Lottie from 'lottie-react';
 import errorAnimation from '@/assets/Error.json';
-
-interface UserRole {
-  role: string;
-}
+import loadingAnimation from '@/assets/Loading.json';
 
 export function LoginForm({
   className,
-  ...props
 }: React.ComponentPropsWithoutRef<"div">) {
   const [username, setUsername] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [showPassword, setShowPassword] = React.useState(false)
   const [isLoggingIn, setIsLoggingIn] = React.useState(false)
   const { login, error: loginError, currentUser } = useFrappeAuth()
-  const [userLoading, setUserLoading] = React.useState(false)
   const [isRedirecting, setIsRedirecting] = React.useState(false)
+  const isLoggingInRef = useRef(false)
+  
+  // Keep ref in sync with state for synchronous checks
+  useLayoutEffect(() => {
+    isLoggingInRef.current = isLoggingIn || isRedirecting
+  }, [isLoggingIn, isRedirecting])
 
   // Clear error state when component mounts (e.g., after logout)
   React.useEffect(() => {
@@ -42,7 +42,6 @@ export function LoginForm({
     if (!currentUser) {
       setIsRedirecting(false)
       setIsLoggingIn(false)
-      setUserLoading(false)
     }
   }, [currentUser])
   
@@ -65,32 +64,21 @@ export function LoginForm({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Reset state for new login attempt
-    setUserLoading(false)
-    setIsRedirecting(false)
-    
+    // Set loading state immediately and synchronously to prevent form flash
+    isLoggingInRef.current = true
     setIsLoggingIn(true)
+    setIsRedirecting(false)
     try {
       // First, attempt to login
       const loginResponse = await login({ username: username, password: password })
       if (loginResponse) {
-        toast.success("Login successful")
-        setIsRedirecting(true) // Mark that we're redirecting to prevent error display
-        
-        // Remove "login" from URL immediately after successful login
-        const currentPath = window.location.pathname
-        if (currentPath.includes('/login')) {
-          // Remove /login from the path, keeping base path if it exists
-          // Preserve /lms prefix if it exists in production
-          const cleanPath = currentPath.replace(/\/login\/?$/, '') || getFullPath(ROUTES.HOME)
-          // Ensure we maintain the base path
-          const finalPath = cleanPath || getFullPath(ROUTES.HOME)
-          window.history.replaceState({}, '', finalPath)
-        }
+        // Set redirecting immediately to show loading screen and hide form
+        // Keep both states true to ensure loading screen stays visible
+        setIsLoggingIn(true)
+        setIsRedirecting(true)
         
         // Immediately fetch user data using the username to check roles
         const trimmedUsername = username.trim()
-        setUserLoading(true)
         
         try {
           // Determine API base URL
@@ -99,8 +87,6 @@ export function LoginForm({
           const apiUrl = cleanApiBaseUrl 
             ? `${cleanApiBaseUrl}/api/resource/User/${trimmedUsername}`
             : `/api/resource/User/${trimmedUsername}`;
-          
-        
           
           const res = await fetch(apiUrl, {
             method: 'GET',
@@ -159,51 +145,72 @@ export function LoginForm({
           } else {
             redirectPath = ROUTES.LOGIN; // "/login"
             toast.error("You don't have the required permissions to access this system");
+            // Reset all loading states including ref to show login form again
+            isLoggingInRef.current = false
+            setIsRedirecting(false)
+            setIsLoggingIn(false)
+            return;
           }
           
-         
-          
-          setIsLoggingIn(false)
-          setUserLoading(false)
-          
-          // Redirect immediately - use getFullPath to preserve /lms prefix in production
+          // Use window.location.href for immediate redirect to prevent flicker
+          // This causes a full page reload which prevents any component re-rendering issues
           const fullRedirectPath = getFullPath(redirectPath);
-          navigate(fullRedirectPath);
+          toast.success("Login successful")
           
-          // Fallback: if still on login page after 200ms, force redirect
+          // Small delay to ensure toast is shown, then redirect
           setTimeout(() => {
-            if (window.location.pathname.includes('/login') && redirectPath !== ROUTES.LOGIN) {
-              window.location.href = fullRedirectPath;
-            }
-          }, 200);
+            window.location.href = fullRedirectPath;
+          }, 100);
           
         } catch (fetchErr: any) {
           console.error('❌ Error fetching user data:', fetchErr);
-          setIsRedirecting(false) // Reset redirecting flag on error
+          // Reset all loading states including ref to show login form again
+          isLoggingInRef.current = false
+          setIsRedirecting(false)
           setIsLoggingIn(false)
-          setUserLoading(false)
           toast.error("Failed to load user data. Please try again.");
         }
       }
     } catch (err) {
       console.error("Login failed", err)
       toast.error("Login failed. Please check your credentials.")
+      // Reset all loading states including ref to show login form again
+      isLoggingInRef.current = false
       setIsLoggingIn(false)
-      setUserLoading(false)
+      setIsRedirecting(false)
     }
   }
 
 
+  // Show loading screen only when actively logging in or redirecting
+  // Don't show loading if login failed (isLoggingIn will be false on error)
+  // Check this FIRST before any other rendering to prevent form flash
+  if (isLoggingIn || isRedirecting) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-bg-soft fixed inset-0 z-50">
+        <div className="flex flex-col items-center gap-4">
+          <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Disable motion animation when logging in to prevent flash
   const motionProps: HTMLMotionProps<"div"> = {
     initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.5 }
+    animate: isLoggingIn || isRedirecting ? { opacity: 0 } : { opacity: 1, y: 0 },
+    transition: { duration: isLoggingIn || isRedirecting ? 0 : 0.5 }
   }
 
   return (
     <motion.div 
       {...motionProps}
-      className={cn("flex flex-col gap-6 min-w-[400px] max-w-[450px] w-full px-4", className)} 
+      className={cn(
+        "flex flex-col gap-6 min-w-[400px] max-w-[450px] w-full px-4",
+        (isLoggingIn || isRedirecting) && "opacity-0 pointer-events-none",
+        className
+      )} 
     >
       <Card className="border-2 border-border/50 shadow-lg">
         <CardHeader className="space-y-1">

@@ -1164,51 +1164,32 @@ export default function AnalyticsDashboard() {
       });
     }
 
-    // Sort by selected column if sort order is set
+    // Apply sorting (matching Department.tsx pattern)
     if (quizSortColumn && quizSortOrder) {
       return [...filtered].sort((a: any, b: any) => {
-        let valueA: any;
-        let valueB: any;
-
-        switch (quizSortColumn) {
-          case 'user':
-            valueA = (a.user || '').toLowerCase();
-            valueB = (b.user || '').toLowerCase();
-            return quizSortOrder === 'asc' 
-              ? valueA.localeCompare(valueB)
-              : valueB.localeCompare(valueA);
-          
-          case 'module':
-            valueA = (a.module?.name1 || a.module?.name || '').toLowerCase();
-            valueB = (b.module?.name1 || b.module?.name || '').toLowerCase();
-            return quizSortOrder === 'asc' 
-              ? valueA.localeCompare(valueB)
-              : valueB.localeCompare(valueA);
-          
-          case 'score':
-            valueA = a.percentage_score || 0;
-            valueB = b.percentage_score || 0;
-            return quizSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          case 'date_attended':
-            valueA = parseDateToTimestamp(a.started_on || a.date_attended);
-            valueB = parseDateToTimestamp(b.started_on || b.date_attended);
-            return quizSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          case 'time_spent':
-            valueA = parseTimeToSeconds(a.time_spent || '0');
-            valueB = parseTimeToSeconds(b.time_spent || '0');
-            return quizSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          default:
-            return 0;
+        let aValue: any;
+        let bValue: any;
+        
+        if (quizSortColumn === 'user') {
+          aValue = (a.user || '').toLowerCase();
+          bValue = (b.user || '').toLowerCase();
+        } else if (quizSortColumn === 'module') {
+          aValue = (a.module?.name1 || a.module?.name || '').toLowerCase();
+          bValue = (b.module?.name1 || b.module?.name || '').toLowerCase();
+        } else if (quizSortColumn === 'score') {
+          aValue = a.percentage_score || 0;
+          bValue = b.percentage_score || 0;
+        } else if (quizSortColumn === 'date_attended') {
+          aValue = parseDateToTimestamp(a.started_on || a.date_attended);
+          bValue = parseDateToTimestamp(b.started_on || b.date_attended);
+        } else if (quizSortColumn === 'time_spent') {
+          aValue = parseTimeToSeconds(a.time_spent || '0');
+          bValue = parseTimeToSeconds(b.time_spent || '0');
         }
+        
+        if (aValue < bValue) return quizSortOrder === "asc" ? -1 : 1;
+        if (aValue > bValue) return quizSortOrder === "asc" ? 1 : -1;
+        return 0;
       });
     }
 
@@ -1253,51 +1234,32 @@ export default function AnalyticsDashboard() {
       });
     }
 
-    // Sort by selected column if sort order is set
+    // Apply sorting (matching Department.tsx pattern)
     if (qaSortColumn && qaSortOrder) {
       return [...filtered].sort((a: any, b: any) => {
-        let valueA: any;
-        let valueB: any;
-
-        switch (qaSortColumn) {
-          case 'user':
-            valueA = (a.user || '').toLowerCase();
-            valueB = (b.user || '').toLowerCase();
-            return qaSortOrder === 'asc' 
-              ? valueA.localeCompare(valueB)
-              : valueB.localeCompare(valueA);
-          
-          case 'module':
-            valueA = (a.module?.name1 || a.module?.name || '').toLowerCase();
-            valueB = (b.module?.name1 || b.module?.name || '').toLowerCase();
-            return qaSortOrder === 'asc' 
-              ? valueA.localeCompare(valueB)
-              : valueB.localeCompare(valueA);
-          
-          case 'score':
-            valueA = a.percentage_score || 0;
-            valueB = b.percentage_score || 0;
-            return qaSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          case 'date_attended':
-            valueA = parseDateToTimestamp(a.started_on || a.date_attended);
-            valueB = parseDateToTimestamp(b.started_on || b.date_attended);
-            return qaSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          case 'time_spent':
-            valueA = parseTimeToSeconds(a.time_spent || '0');
-            valueB = parseTimeToSeconds(b.time_spent || '0');
-            return qaSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          default:
-            return 0;
+        let aValue: any;
+        let bValue: any;
+        
+        if (qaSortColumn === 'user') {
+          aValue = (a.user || '').toLowerCase();
+          bValue = (b.user || '').toLowerCase();
+        } else if (qaSortColumn === 'module') {
+          aValue = (a.module?.name1 || a.module?.name || '').toLowerCase();
+          bValue = (b.module?.name1 || b.module?.name || '').toLowerCase();
+        } else if (qaSortColumn === 'score') {
+          aValue = a.percentage_score || 0;
+          bValue = b.percentage_score || 0;
+        } else if (qaSortColumn === 'date_attended') {
+          aValue = parseDateToTimestamp(a.started_on || a.date_attended);
+          bValue = parseDateToTimestamp(b.started_on || b.date_attended);
+        } else if (qaSortColumn === 'time_spent') {
+          aValue = parseTimeToSeconds(a.time_spent || '0');
+          bValue = parseTimeToSeconds(b.time_spent || '0');
         }
+        
+        if (aValue < bValue) return qaSortOrder === "asc" ? -1 : 1;
+        if (aValue > bValue) return qaSortOrder === "asc" ? 1 : -1;
+        return 0;
       });
     }
 
@@ -1378,44 +1340,29 @@ export default function AnalyticsDashboard() {
       });
     }
 
-    // Sort by selected column if sort order is set
+    // Apply sorting (matching Department.tsx pattern)
     if (learnerSortColumn && learnerSortOrder) {
       return [...filtered].sort((a: any, b: any) => {
-        let valueA: any;
-        let valueB: any;
-
-        switch (learnerSortColumn) {
-          case 'name':
-            valueA = ((a.full_name || a.name || '') + ' ' + (a.email || '')).toLowerCase();
-            valueB = ((b.full_name || b.name || '') + ' ' + (b.email || '')).toLowerCase();
-            return learnerSortOrder === 'asc' 
-              ? valueA.localeCompare(valueB)
-              : valueB.localeCompare(valueA);
-          
-          case 'assigned':
-            valueA = a.total_modules || a.modules_enrolled || 0;
-            valueB = b.total_modules || b.modules_enrolled || 0;
-            return learnerSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          case 'completed':
-            valueA = a.completed_modules || 0;
-            valueB = b.completed_modules || 0;
-            return learnerSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          case 'completion_rate':
-            valueA = a.completion_rate || 0;
-            valueB = b.completion_rate || 0;
-            return learnerSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          default:
-            return 0;
+        let aValue: any;
+        let bValue: any;
+        
+        if (learnerSortColumn === 'name') {
+          aValue = ((a.full_name || a.name || '') + ' ' + (a.email || '')).toLowerCase();
+          bValue = ((b.full_name || b.name || '') + ' ' + (b.email || '')).toLowerCase();
+        } else if (learnerSortColumn === 'assigned') {
+          aValue = a.total_modules || a.modules_enrolled || 0;
+          bValue = b.total_modules || b.modules_enrolled || 0;
+        } else if (learnerSortColumn === 'completed') {
+          aValue = a.completed_modules || 0;
+          bValue = b.completed_modules || 0;
+        } else if (learnerSortColumn === 'completion_rate') {
+          aValue = a.completion_rate || 0;
+          bValue = b.completion_rate || 0;
         }
+        
+        if (aValue < bValue) return learnerSortOrder === "asc" ? -1 : 1;
+        if (aValue > bValue) return learnerSortOrder === "asc" ? 1 : -1;
+        return 0;
       });
     }
 
@@ -2062,44 +2009,29 @@ export default function AnalyticsDashboard() {
       return true;
     });
 
-    // Sort by selected column if sort order is set
+    // Apply sorting (matching Department.tsx pattern)
     if (moduleSortColumn && moduleSortOrder) {
       return [...filtered].sort((a: any, b: any) => {
-        let valueA: any;
-        let valueB: any;
-
-        switch (moduleSortColumn) {
-          case 'name':
-            valueA = (a.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
-            valueB = (b.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
-            return moduleSortOrder === 'asc' 
-              ? valueA.localeCompare(valueB)
-              : valueB.localeCompare(valueA);
-          
-          case 'assigned':
-            valueA = a.enrolled_count || 0;
-            valueB = b.enrolled_count || 0;
-            return moduleSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          case 'completed':
-            valueA = a.completed_count || 0;
-            valueB = b.completed_count || 0;
-            return moduleSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          case 'completion_rate':
-            valueA = a.completion_rate || 0;
-            valueB = b.completion_rate || 0;
-            return moduleSortOrder === 'asc' 
-              ? valueA - valueB
-              : valueB - valueA;
-          
-          default:
-            return 0;
+        let aValue: any;
+        let bValue: any;
+        
+        if (moduleSortColumn === 'name') {
+          aValue = (a.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
+          bValue = (b.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
+        } else if (moduleSortColumn === 'assigned') {
+          aValue = a.enrolled_count || 0;
+          bValue = b.enrolled_count || 0;
+        } else if (moduleSortColumn === 'completed') {
+          aValue = a.completed_count || 0;
+          bValue = b.completed_count || 0;
+        } else if (moduleSortColumn === 'completion_rate') {
+          aValue = a.completion_rate || 0;
+          bValue = b.completion_rate || 0;
         }
+        
+        if (aValue < bValue) return moduleSortOrder === "asc" ? -1 : 1;
+        if (aValue > bValue) return moduleSortOrder === "asc" ? 1 : -1;
+        return 0;
       });
     }
 
@@ -2110,58 +2042,70 @@ export default function AnalyticsDashboard() {
   const modulePagination = usePagination(filteredModules);
 
   // Helper function to create sort handlers
-  const createModuleSortHandler = (column: string | null, order: 'asc' | 'desc' | null) => {
-    if (!column || !order) {
-      setModuleSortColumn(null);
-      setModuleSortOrder(null);
-    } else if (moduleSortColumn === column && moduleSortOrder === order) {
-      setModuleSortColumn(null);
-      setModuleSortOrder(null);
+  const handleModuleSort = (field: 'name' | 'assigned' | 'completed' | 'completion_rate') => {
+    if (moduleSortColumn === field) {
+      // Cycle through: asc -> desc -> null (unsorted)
+      if (moduleSortOrder === "asc") {
+        setModuleSortOrder("desc");
+      } else if (moduleSortOrder === "desc") {
+        setModuleSortColumn(null);
+        setModuleSortOrder(null);
+      }
     } else {
-      setModuleSortColumn(column as 'name' | 'assigned' | 'completed' | 'completion_rate');
-      setModuleSortOrder(order);
+      // Set new sort field and default to ascending
+      setModuleSortColumn(field);
+      setModuleSortOrder("asc");
     }
     modulePagination.reset();
   };
 
-  const createQuizSortHandler = (column: string | null, order: 'asc' | 'desc' | null) => {
-    if (!column || !order) {
-      setQuizSortColumn(null);
-      setQuizSortOrder(null);
-    } else if (quizSortColumn === column && quizSortOrder === order) {
-      setQuizSortColumn(null);
-      setQuizSortOrder(null);
+  const handleQuizSort = (field: 'user' | 'module' | 'score' | 'date_attended' | 'time_spent') => {
+    if (quizSortColumn === field) {
+      // Cycle through: asc -> desc -> null (unsorted)
+      if (quizSortOrder === "asc") {
+        setQuizSortOrder("desc");
+      } else if (quizSortOrder === "desc") {
+        setQuizSortColumn(null);
+        setQuizSortOrder(null);
+      }
     } else {
-      setQuizSortColumn(column as 'user' | 'module' | 'score' | 'date_attended' | 'time_spent');
-      setQuizSortOrder(order);
+      // Set new sort field and default to ascending
+      setQuizSortColumn(field);
+      setQuizSortOrder("asc");
     }
     setQuizCurrentPage(1);
   };
 
-  const createQaSortHandler = (column: string | null, order: 'asc' | 'desc' | null) => {
-    if (!column || !order) {
-      setQaSortColumn(null);
-      setQaSortOrder(null);
-    } else if (qaSortColumn === column && qaSortOrder === order) {
-      setQaSortColumn(null);
-      setQaSortOrder(null);
+  const handleQaSort = (field: 'user' | 'module' | 'score' | 'date_attended' | 'time_spent') => {
+    if (qaSortColumn === field) {
+      // Cycle through: asc -> desc -> null (unsorted)
+      if (qaSortOrder === "asc") {
+        setQaSortOrder("desc");
+      } else if (qaSortOrder === "desc") {
+        setQaSortColumn(null);
+        setQaSortOrder(null);
+      }
     } else {
-      setQaSortColumn(column as 'user' | 'module' | 'score' | 'date_attended' | 'time_spent');
-      setQaSortOrder(order);
+      // Set new sort field and default to ascending
+      setQaSortColumn(field);
+      setQaSortOrder("asc");
     }
     setQaCurrentPage(1);
   };
 
-  const createLearnerSortHandler = (column: string | null, order: 'asc' | 'desc' | null) => {
-    if (!column || !order) {
-      setLearnerSortColumn(null);
-      setLearnerSortOrder(null);
-    } else if (learnerSortColumn === column && learnerSortOrder === order) {
-      setLearnerSortColumn(null);
-      setLearnerSortOrder(null);
+  const handleLearnerSort = (field: 'name' | 'assigned' | 'completed' | 'completion_rate') => {
+    if (learnerSortColumn === field) {
+      // Cycle through: asc -> desc -> null (unsorted)
+      if (learnerSortOrder === "asc") {
+        setLearnerSortOrder("desc");
+      } else if (learnerSortOrder === "desc") {
+        setLearnerSortColumn(null);
+        setLearnerSortOrder(null);
+      }
     } else {
-      setLearnerSortColumn(column as 'name' | 'assigned' | 'completed' | 'completion_rate');
-      setLearnerSortOrder(order);
+      // Set new sort field and default to ascending
+      setLearnerSortColumn(field);
+      setLearnerSortOrder("asc");
     }
     setLearnerCurrentPage(1);
   };
@@ -2289,7 +2233,7 @@ export default function AnalyticsDashboard() {
                     placeholder="Search modules..."
                     value={moduleSearchQuery}
                     onChange={(e) => setModuleSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 border-2 border-border/50 focus:border-primary"
                   />
                 </div>
                 
@@ -2299,7 +2243,7 @@ export default function AnalyticsDashboard() {
                     value={modulePerformanceDepartment}
                     onValueChange={setModulePerformanceDepartment}
                   >
-                    <SelectTrigger id="module-perf-department">
+                    <SelectTrigger id="module-perf-department" className="border-2 border-border/50 focus:border-primary">
                       <SelectValue placeholder="All Departments" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2329,7 +2273,7 @@ export default function AnalyticsDashboard() {
                     value={modulePerformanceAssignmentType}
                     onValueChange={setModulePerformanceAssignmentType}
                   >
-                    <SelectTrigger id="module-perf-assignment">
+                    <SelectTrigger id="module-perf-assignment" className="border-2 border-border/50 focus:border-primary">
                       <SelectValue placeholder="All Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2354,48 +2298,116 @@ export default function AnalyticsDashboard() {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse table-fixed">
+                  <colgroup>
+                    <col className="w-[40%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[20%]" />
+                  </colgroup>
                   <thead>
                     <tr className="border-b">
-                      <SortableHeader
-                        label="Module Name"
-                        column="name"
-                        sortColumn={moduleSortColumn}
-                        sortOrder={moduleSortOrder}
-                        onSortChange={createModuleSortHandler}
-                      />
-                      <SortableHeader
-                        label="Assigned"
-                        column="assigned"
-                        sortColumn={moduleSortColumn}
-                        sortOrder={moduleSortOrder}
-                        onSortChange={createModuleSortHandler}
-                      />
-                      <SortableHeader
-                        label="Completed"
-                        column="completed"
-                        sortColumn={moduleSortColumn}
-                        sortOrder={moduleSortOrder}
-                        onSortChange={createModuleSortHandler}
-                      />
-                      <SortableHeader
-                        label="Completion Rate"
-                        column="completion_rate"
-                        sortColumn={moduleSortColumn}
-                        sortOrder={moduleSortOrder}
-                        onSortChange={createModuleSortHandler}
-                      />
+                      <th className="text-left p-3 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="cursor-pointer hover:text-primary transition-colors select-none"
+                            onClick={() => handleModuleSort("name")}
+                          >
+                            Module Name
+                          </span>
+                          {moduleSortColumn === "name" ? (
+                            moduleSortOrder === "asc" ? (
+                              <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleModuleSort("name")} />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleModuleSort("name")} />
+                            )
+                          ) : (
+                            <div className="flex flex-col flex-shrink-0">
+                              <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                              <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                            </div>
+                          )}
+                        </div>
+                      </th>
+                      <th className="text-left p-3 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="cursor-pointer hover:text-primary transition-colors select-none"
+                            onClick={() => handleModuleSort("assigned")}
+                          >
+                            Assigned
+                          </span>
+                          {moduleSortColumn === "assigned" ? (
+                            moduleSortOrder === "asc" ? (
+                              <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleModuleSort("assigned")} />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleModuleSort("assigned")} />
+                            )
+                          ) : (
+                            <div className="flex flex-col flex-shrink-0">
+                              <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                              <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                            </div>
+                          )}
+                        </div>
+                      </th>
+                      <th className="text-left p-3 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="cursor-pointer hover:text-primary transition-colors select-none"
+                            onClick={() => handleModuleSort("completed")}
+                          >
+                            Completed
+                          </span>
+                          {moduleSortColumn === "completed" ? (
+                            moduleSortOrder === "asc" ? (
+                              <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleModuleSort("completed")} />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleModuleSort("completed")} />
+                            )
+                          ) : (
+                            <div className="flex flex-col flex-shrink-0">
+                              <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                              <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                            </div>
+                          )}
+                        </div>
+                      </th>
+                      <th className="text-left p-3 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="cursor-pointer hover:text-primary transition-colors select-none"
+                            onClick={() => handleModuleSort("completion_rate")}
+                          >
+                            Completion Rate
+                          </span>
+                          {moduleSortColumn === "completion_rate" ? (
+                            moduleSortOrder === "asc" ? (
+                              <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleModuleSort("completion_rate")} />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleModuleSort("completion_rate")} />
+                            )
+                          ) : (
+                            <div className="flex flex-col flex-shrink-0">
+                              <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                              <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                            </div>
+                          )}
+                        </div>
+                      </th>
                     </tr>
                   </thead>
         <tbody>
                     {modulePagination.currentData.map((module: any, index: number) => (
                       <tr 
-                        key={index} 
+                        key={module.module_id || module.name || module.module_name || `module-${index}`} 
                         className="border-b hover:bg-muted/50 cursor-pointer"
                     onClick={() => handleModuleClick(module)}
                   >
                         <td className="p-3">
-                          <div className="font-medium">{module.module_name?.replace(/<[^>]*>/g, '') || 'N/A'}</div>
+                          <div className="font-medium truncate" title={module.module_name?.replace(/<[^>]*>/g, '') || 'N/A'}>
+                            {module.module_name?.replace(/<[^>]*>/g, '') || 'N/A'}
+                          </div>
                 </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
@@ -2563,7 +2575,7 @@ export default function AnalyticsDashboard() {
                       placeholder="Search by email..."
                       value={quizSearchQuery}
                       onChange={(e) => setQuizSearchQuery(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                   
@@ -2575,49 +2587,132 @@ export default function AnalyticsDashboard() {
                       placeholder="Filter by module name..."
                       value={quizModuleFilter}
                       onChange={(e) => setQuizModuleFilter(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                  <table className="w-full border-collapse table-fixed">
+                    <colgroup>
+                      <col className="w-[20%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[15%]" />
+                      <col className="w-[15%]" />
+                    </colgroup>
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <SortableHeader
-                          label="User"
-                          column="user"
-                          sortColumn={quizSortColumn}
-                          sortOrder={quizSortOrder}
-                          onSortChange={createQuizSortHandler}
-                        />
-                        <SortableHeader
-                          label="Module"
-                          column="module"
-                          sortColumn={quizSortColumn}
-                          sortOrder={quizSortOrder}
-                          onSortChange={createQuizSortHandler}
-                        />
-                        <SortableHeader
-                          label="Score (%)"
-                          column="score"
-                          sortColumn={quizSortColumn}
-                          sortOrder={quizSortOrder}
-                          onSortChange={createQuizSortHandler}
-                        />
-                        <SortableHeader
-                          label="Date Attended"
-                          column="date_attended"
-                          sortColumn={quizSortColumn}
-                          sortOrder={quizSortOrder}
-                          onSortChange={createQuizSortHandler}
-                        />
-                        <SortableHeader
-                          label="Time Spent"
-                          column="time_spent"
-                          sortColumn={quizSortColumn}
-                          sortOrder={quizSortOrder}
-                          onSortChange={createQuizSortHandler}
-                        />
+                        <th className="text-left p-3 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="cursor-pointer hover:text-primary transition-colors select-none"
+                              onClick={() => handleQuizSort("user")}
+                            >
+                              User
+                            </span>
+                            {quizSortColumn === "user" ? (
+                              quizSortOrder === "asc" ? (
+                                <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("user")} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("user")} />
+                              )
+                            ) : (
+                              <div className="flex flex-col flex-shrink-0">
+                                <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                        <th className="text-left p-3 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="cursor-pointer hover:text-primary transition-colors select-none"
+                              onClick={() => handleQuizSort("module")}
+                            >
+                              Module
+                            </span>
+                            {quizSortColumn === "module" ? (
+                              quizSortOrder === "asc" ? (
+                                <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("module")} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("module")} />
+                              )
+                            ) : (
+                              <div className="flex flex-col flex-shrink-0">
+                                <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                        <th className="text-left p-3 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="cursor-pointer hover:text-primary transition-colors select-none"
+                              onClick={() => handleQuizSort("score")}
+                            >
+                              Score (%)
+                            </span>
+                            {quizSortColumn === "score" ? (
+                              quizSortOrder === "asc" ? (
+                                <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("score")} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("score")} />
+                              )
+                            ) : (
+                              <div className="flex flex-col flex-shrink-0">
+                                <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                        <th className="text-left p-3 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="cursor-pointer hover:text-primary transition-colors select-none"
+                              onClick={() => handleQuizSort("date_attended")}
+                            >
+                              Date Attended
+                            </span>
+                            {quizSortColumn === "date_attended" ? (
+                              quizSortOrder === "asc" ? (
+                                <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("date_attended")} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("date_attended")} />
+                              )
+                            ) : (
+                              <div className="flex flex-col flex-shrink-0">
+                                <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                        <th className="text-left p-3 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="cursor-pointer hover:text-primary transition-colors select-none"
+                              onClick={() => handleQuizSort("time_spent")}
+                            >
+                              Time Spent
+                            </span>
+                            {quizSortColumn === "time_spent" ? (
+                              quizSortOrder === "asc" ? (
+                                <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("time_spent")} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQuizSort("time_spent")} />
+                              )
+                            ) : (
+                              <div className="flex flex-col flex-shrink-0">
+                                <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                              </div>
+                            )}
+                          </div>
+                        </th>
                         <th className="text-left p-3 font-medium text-sm text-muted-foreground">Time Limit</th>
                       </tr>
                     </thead>
@@ -2634,12 +2729,20 @@ export default function AnalyticsDashboard() {
                       ) : filteredQuizData.length > 0 ? (
                         getCurrentPageData().map((quiz: any, index: number) => (
                           <tr 
-                            key={index} 
+                            key={quiz.name || `quiz-${quiz.user}-${quiz.module?.name || 'unknown'}-${index}`} 
                             className="border-b hover:bg-muted/50 cursor-pointer"
                             onClick={() => fetchQuizDetails(quiz.name)}
                           >
-                            <td className="p-3 text-sm">{quiz.user}</td>
-                            <td className="p-3 text-sm">{quiz.module?.name1 || 'N/A'}</td>
+                            <td className="p-3 text-sm">
+                              <div className="truncate" title={quiz.user}>
+                                {quiz.user}
+                              </div>
+                            </td>
+                            <td className="p-3 text-sm">
+                              <div className="truncate" title={quiz.module?.name1 || 'N/A'}>
+                                {quiz.module?.name1 || 'N/A'}
+                              </div>
+                            </td>
                             <td className="p-3 text-sm">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">
@@ -2805,7 +2908,7 @@ export default function AnalyticsDashboard() {
                       placeholder="Search by email..."
                       value={qaSearchQuery}
                       onChange={(e) => setQaSearchQuery(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                   
@@ -2817,54 +2920,138 @@ export default function AnalyticsDashboard() {
                       placeholder="Filter by module name..."
                       value={qaModuleFilter}
                       onChange={(e) => setQaModuleFilter(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                  <table className="w-full border-collapse table-fixed">
+                    <colgroup>
+                      <col className="w-[18%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[11%]" />
+                    </colgroup>
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <SortableHeader
-                          label="User"
-                          column="user"
-                          sortColumn={qaSortColumn}
-                          sortOrder={qaSortOrder}
-                          onSortChange={createQaSortHandler}
-                        />
-                        <SortableHeader
-                          label="Module"
-                          column="module"
-                          sortColumn={qaSortColumn}
-                          sortOrder={qaSortOrder}
-                          onSortChange={createQaSortHandler}
-                        />
+                        <th className="text-left p-3 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="cursor-pointer hover:text-primary transition-colors select-none"
+                              onClick={() => handleQaSort("user")}
+                            >
+                              User
+                            </span>
+                            {qaSortColumn === "user" ? (
+                              qaSortOrder === "asc" ? (
+                                <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("user")} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("user")} />
+                              )
+                            ) : (
+                              <div className="flex flex-col flex-shrink-0">
+                                <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                        <th className="text-left p-3 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="cursor-pointer hover:text-primary transition-colors select-none"
+                              onClick={() => handleQaSort("module")}
+                            >
+                              Module
+                            </span>
+                            {qaSortColumn === "module" ? (
+                              qaSortOrder === "asc" ? (
+                                <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("module")} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("module")} />
+                              )
+                            ) : (
+                              <div className="flex flex-col flex-shrink-0">
+                                <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                              </div>
+                            )}
+                          </div>
+                        </th>
                         {qaScoreFilter === 'scored' ? (
-                          <SortableHeader
-                            label="Score (%)"
-                            column="score"
-                            sortColumn={qaSortColumn}
-                            sortOrder={qaSortOrder}
-                            onSortChange={createQaSortHandler}
-                          />
+                          <th className="text-left p-3 font-semibold text-sm">
+                            <div className="flex items-center gap-2">
+                              <span 
+                                className="cursor-pointer hover:text-primary transition-colors select-none"
+                                onClick={() => handleQaSort("score")}
+                              >
+                                Score (%)
+                              </span>
+                              {qaSortColumn === "score" ? (
+                                qaSortOrder === "asc" ? (
+                                  <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("score")} />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("score")} />
+                                )
+                              ) : (
+                                <div className="flex flex-col flex-shrink-0">
+                                  <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                  <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                                </div>
+                              )}
+                            </div>
+                          </th>
                         ) : (
                           <th className="text-left p-3 font-medium text-sm text-muted-foreground">Score (%)</th>
                         )}
-                        <SortableHeader
-                          label="Date"
-                          column="date_attended"
-                          sortColumn={qaSortColumn}
-                          sortOrder={qaSortOrder}
-                          onSortChange={createQaSortHandler}
-                        />
-                        <SortableHeader
-                          label="Time Spent"
-                          column="time_spent"
-                          sortColumn={qaSortColumn}
-                          sortOrder={qaSortOrder}
-                          onSortChange={createQaSortHandler}
-                        />
+                        <th className="text-left p-3 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="cursor-pointer hover:text-primary transition-colors select-none"
+                              onClick={() => handleQaSort("date_attended")}
+                            >
+                              Date
+                            </span>
+                            {qaSortColumn === "date_attended" ? (
+                              qaSortOrder === "asc" ? (
+                                <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("date_attended")} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("date_attended")} />
+                              )
+                            ) : (
+                              <div className="flex flex-col flex-shrink-0">
+                                <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                        <th className="text-left p-3 font-semibold text-sm">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="cursor-pointer hover:text-primary transition-colors select-none"
+                              onClick={() => handleQaSort("time_spent")}
+                            >
+                              Time Spent
+                            </span>
+                            {qaSortColumn === "time_spent" ? (
+                              qaSortOrder === "asc" ? (
+                                <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("time_spent")} />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleQaSort("time_spent")} />
+                              )
+                            ) : (
+                              <div className="flex flex-col flex-shrink-0">
+                                <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                              </div>
+                            )}
+                          </div>
+                        </th>
                         <th className="text-left p-3 font-medium text-sm text-muted-foreground">Time Limit</th>
                         <th className="text-left p-3 font-medium text-sm text-muted-foreground">Actions</th>
                       </tr>
@@ -2882,12 +3069,20 @@ export default function AnalyticsDashboard() {
                       ) : filteredQaData.length > 0 ? (
                         getCurrentQaPageData().map((qa: any, index: number) => (
                           <tr 
-                            key={index} 
+                            key={qa.name || `qa-${qa.user}-${qa.module?.name || 'unknown'}-${index}`} 
                             className="border-b hover:bg-muted/50 cursor-pointer"
                             onClick={() => fetchQaDetails(qa.name)}
                           >
-                            <td className="p-3 text-sm">{qa.user}</td>
-                            <td className="p-3 text-sm">{qa.module?.name1 || 'N/A'}</td>
+                            <td className="p-3 text-sm">
+                              <div className="truncate" title={qa.user}>
+                                {qa.user}
+                              </div>
+                            </td>
+                            <td className="p-3 text-sm">
+                              <div className="truncate" title={qa.module?.name1 || 'N/A'}>
+                                {qa.module?.name1 || 'N/A'}
+                              </div>
+                            </td>
                             <td className="p-3 text-sm">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">
@@ -3060,60 +3255,126 @@ export default function AnalyticsDashboard() {
                     placeholder="Search by email or name..."
                     value={learnerSearchQuery}
                     onChange={(e) => setLearnerSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 border-2 border-border/50 focus:border-primary"
                   />
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full border-collapse table-fixed">
+                  <colgroup>
+                    <col className="w-[40%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[20%]" />
+                  </colgroup>
                   <thead>
                     <tr className="border-b">
-                      <SortableHeader
-                        label="Learner"
-                        column="name"
-                        sortColumn={learnerSortColumn}
-                        sortOrder={learnerSortOrder}
-                        onSortChange={createLearnerSortHandler}
-                        className="text-left p-4 font-medium"
-                      />
-                      <SortableHeader
-                        label="Assigned"
-                        column="assigned"
-                        sortColumn={learnerSortColumn}
-                        sortOrder={learnerSortOrder}
-                        onSortChange={createLearnerSortHandler}
-                        className="text-left p-4 font-medium"
-                      />
-                      <SortableHeader
-                        label="Completed"
-                        column="completed"
-                        sortColumn={learnerSortColumn}
-                        sortOrder={learnerSortOrder}
-                        onSortChange={createLearnerSortHandler}
-                        className="text-left p-4 font-medium"
-                      />
-                      <SortableHeader
-                        label="Completion Rate"
-                        column="completion_rate"
-                        sortColumn={learnerSortColumn}
-                        sortOrder={learnerSortOrder}
-                        onSortChange={createLearnerSortHandler}
-                        className="text-left p-4 font-medium"
-                      />
+                      <th className="text-left p-4 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="cursor-pointer hover:text-primary transition-colors select-none"
+                            onClick={() => handleLearnerSort("name")}
+                          >
+                            Learner
+                          </span>
+                          {learnerSortColumn === "name" ? (
+                            learnerSortOrder === "asc" ? (
+                              <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleLearnerSort("name")} />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleLearnerSort("name")} />
+                            )
+                          ) : (
+                            <div className="flex flex-col flex-shrink-0">
+                              <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                              <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                            </div>
+                          )}
+                        </div>
+                      </th>
+                      <th className="text-left p-4 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="cursor-pointer hover:text-primary transition-colors select-none"
+                            onClick={() => handleLearnerSort("assigned")}
+                          >
+                            Assigned
+                          </span>
+                          {learnerSortColumn === "assigned" ? (
+                            learnerSortOrder === "asc" ? (
+                              <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleLearnerSort("assigned")} />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleLearnerSort("assigned")} />
+                            )
+                          ) : (
+                            <div className="flex flex-col flex-shrink-0">
+                              <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                              <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                            </div>
+                          )}
+                        </div>
+                      </th>
+                      <th className="text-left p-4 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="cursor-pointer hover:text-primary transition-colors select-none"
+                            onClick={() => handleLearnerSort("completed")}
+                          >
+                            Completed
+                          </span>
+                          {learnerSortColumn === "completed" ? (
+                            learnerSortOrder === "asc" ? (
+                              <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleLearnerSort("completed")} />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleLearnerSort("completed")} />
+                            )
+                          ) : (
+                            <div className="flex flex-col flex-shrink-0">
+                              <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                              <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                            </div>
+                          )}
+                        </div>
+                      </th>
+                      <th className="text-left p-4 font-semibold text-sm">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="cursor-pointer hover:text-primary transition-colors select-none"
+                            onClick={() => handleLearnerSort("completion_rate")}
+                          >
+                            Completion Rate
+                          </span>
+                          {learnerSortColumn === "completion_rate" ? (
+                            learnerSortOrder === "asc" ? (
+                              <ChevronUp className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleLearnerSort("completion_rate")} />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-primary flex-shrink-0 cursor-pointer" onClick={() => handleLearnerSort("completion_rate")} />
+                            )
+                          ) : (
+                            <div className="flex flex-col flex-shrink-0">
+                              <ChevronUp className="h-3 w-3 text-muted-foreground opacity-30" />
+                              <ChevronDown className="h-3 w-3 text-muted-foreground opacity-30 -mt-1" />
+                            </div>
+                          )}
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredLearnersData.length > 0 ? (
                       getCurrentLearnerPageData().map((learner: any, index: number) => (
-                        <tr key={index} className="border-b hover:bg-secondary cursor-pointer" onClick={() => handleLearnerClick(learner)}>
+                        <tr key={learner.name || learner.email || `learner-${index}`} className="border-b hover:bg-secondary cursor-pointer" onClick={() => handleLearnerClick(learner)}>
                           <td className="p-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                                 <User className="h-4 w-4 text-primary" />
                               </div>
-                              <div>
-                                <div className="font-medium">{learner.full_name || learner.name}</div>
-                                <div className="text-sm text-muted-foreground">{learner.email}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium truncate" title={learner.full_name || learner.name}>
+                                  {learner.full_name || learner.name}
+                                </div>
+                                <div className="text-sm text-muted-foreground truncate" title={learner.email}>
+                                  {learner.email}
+                                </div>
                               </div>
                             </div>
                           </td>

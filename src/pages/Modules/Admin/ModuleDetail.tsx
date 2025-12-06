@@ -321,72 +321,87 @@ export default function AdminModuleDetail() {
                 {/* Main Content */}
                 <div className="flex-1 flex justify-center items-start p-8">
                     <div className="w-full rounded-xl shadow p-8 bg-card">
-                        {currentLesson && currentChapter && (
-                            <div className="space-y-8">
-                                {/* Admin Preview Indicator */}
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-2xl font-bold mb-2">{currentLesson.lesson_name}</h2>
-                                        <h3 className="text-xl font-semibold">{currentChapter.title}</h3>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-md">
-                                            <BookOpen className="h-4 w-4" />
-                                            <span>Admin Preview</span>
+                        <div className="space-y-8">
+                            {/* Admin Preview Indicator and Delete Button - Always Visible */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    {currentLesson && currentChapter ? (
+                                        <>
+                                            <h2 className="text-2xl font-bold mb-2">{currentLesson.lesson_name}</h2>
+                                            <h3 className="text-xl font-semibold">{currentChapter.title}</h3>
+                                        </>
+                                    ) : (
+                                        <div>
+                                            <h2 className="text-2xl font-bold mb-2">{module.name1}</h2>
+                                            <h3 className="text-xl font-semibold text-muted-foreground">
+                                                {module.lessons?.length === 0 
+                                                    ? "No lessons or chapters yet" 
+                                                    : "Select a lesson and chapter to view content"}
+                                            </h3>
                                         </div>
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => setShowDeleteDialog(true)}
-                                            className="gap-2"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                            Delete Module
-                                        </Button>
-                                    </div>
+                                    )}
                                 </div>
-                                
-                                {/* Chapter Contents */}
-                                {currentChapter.contents && currentChapter.contents.length > 0 && (
-                                    <div className="space-y-6">
-                                        {currentChapter.contents.map((content) => (
-                                            <ContentRenderer
-                                                key={content.name}
-                                                contentType={content.content_type}
-                                                contentReference={content.content_reference || content.name}
-                                                moduleId={module.name}
-                                                contentData={content.data}
-                                            />
-                                        ))}
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-md">
+                                        <BookOpen className="h-4 w-4" />
+                                        <span>Admin Preview</span>
                                     </div>
-                                )}
-                                
-                                {/* Navigation */}
-                                <div className="flex justify-between items-center mt-8 pt-6 border-t">
-                                    <Button 
-                                        onClick={handlePrevious} 
-                                        disabled={isFirst}
-                                        variant="outline"
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => setShowDeleteDialog(true)}
                                         className="gap-2"
                                     >
-                                        <ArrowLeft className="h-4 w-4" />
-                                        Previous
-                                    </Button>
-                                    <div className="text-sm text-muted-foreground">
-                                        Lesson {currentLessonIdx + 1} of {module.lessons.length} • 
-                                        Chapter {currentChapterIdx + 1} of {currentLesson.chapters.length}
-                                    </div>
-                                    <Button 
-                                        onClick={handleNext} 
-                                        disabled={isLast}
-                                        className="gap-2"
-                                    >
-                                        Next
-                                        <ArrowRight className="h-4 w-4" />
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete Module
                                     </Button>
                                 </div>
                             </div>
-                        )}
+                            
+                            {/* Chapter Contents - Only show if lesson and chapter exist */}
+                            {currentLesson && currentChapter && (
+                                <>
+                                    {currentChapter.contents && currentChapter.contents.length > 0 && (
+                                        <div className="space-y-6">
+                                            {currentChapter.contents.map((content) => (
+                                                <ContentRenderer
+                                                    key={content.name}
+                                                    contentType={content.content_type}
+                                                    contentReference={content.content_reference || content.name}
+                                                    moduleId={module.name}
+                                                    contentData={content.data}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Navigation */}
+                                    <div className="flex justify-between items-center mt-8 pt-6 border-t">
+                                        <Button 
+                                            onClick={handlePrevious} 
+                                            disabled={isFirst}
+                                            variant="outline"
+                                            className="gap-2"
+                                        >
+                                            <ArrowLeft className="h-4 w-4" />
+                                            Previous
+                                        </Button>
+                                        <div className="text-sm text-muted-foreground">
+                                            Lesson {currentLessonIdx + 1} of {module.lessons.length} • 
+                                            Chapter {currentChapterIdx + 1} of {currentLesson.chapters.length}
+                                        </div>
+                                        <Button 
+                                            onClick={handleNext} 
+                                            disabled={isLast}
+                                            className="gap-2"
+                                        >
+                                            Next
+                                            <ArrowRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

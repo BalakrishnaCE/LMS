@@ -35,6 +35,9 @@ export function NavMain({
   
   // Special handling for admin dashboard - if we're on /admin-dashboard, highlight Dashboard
   const isAdminDashboard = currentPath === ROUTES.ADMIN_DASHBOARD || currentPath === ROUTES.HOME;
+  
+  // Check if we're on the edit page to highlight Quick Create
+  const isEditPage = currentPath === ROUTES.EDIT || currentPath.startsWith(ROUTES.EDIT + '/');
 
   return (
     <SidebarGroup>
@@ -44,7 +47,12 @@ export function NavMain({
           <SidebarMenuItem className="flex items-center gap-2">
             <SidebarMenuButton
               tooltip="Quick Create"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
+              className={
+                isEditPage
+                  ? "hover:text-white text-white bg-primary/90 min-w-8 duration-200 ease-linear"
+                  : "active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear hover:text-white"
+              }
+              onClick={() => navigate(BASE_PATH + '/edit')}
             >
               <IconCirclePlusFilled />
               <span >Quick Create</span>
@@ -56,7 +64,7 @@ export function NavMain({
               onClick={() => navigate(BASE_PATH + '/edit')}
             >
               <IconPlus className="size-4" />
-              <span className="sr-only">Inbox</span>
+              <span className="sr-only">Add New Module</span>
             </Button>
           </SidebarMenuItem>
           )}
