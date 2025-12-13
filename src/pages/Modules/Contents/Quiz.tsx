@@ -507,9 +507,6 @@ function QuizDialog({
               Time Limit: {quiz.time_limit_mins} minutes
             </span>
           )}
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            ✕
-          </Button>
         </div>
         
         {/* Content */}

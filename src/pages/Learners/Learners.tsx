@@ -427,7 +427,7 @@ export default function Learners() {
     departments: [] as string[],
     mobile_no: '',
     password: '',
-    send_welcome_email: true
+    send_welcome_email: false
   });
   const [showAddPassword, setShowAddPassword] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
@@ -686,7 +686,8 @@ export default function Learners() {
         mobile_no: addForm.mobile_no,
         departments: addForm.departments,
         password: addForm.password || undefined,
-        send_welcome_email: addForm.send_welcome_email
+        // Backend forcibly disables welcome email; keep explicit false for clarity
+        send_welcome_email: false
       });
       // Check for backend error structure in response (for 200 OK with error)
       const msg = response?.message;
@@ -711,7 +712,7 @@ export default function Learners() {
         departments: [],
         mobile_no: '',
         password: '',
-        send_welcome_email: true
+        send_welcome_email: false
       });
       setShowAddPassword(false);
       toast.success("Learner added successfully");
@@ -899,16 +900,16 @@ export default function Learners() {
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="block mb-1 font-medium">First Name<span className="text-red-500">*</span></label>
-                <Input value={addForm.first_name} onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} required disabled={addLoading} />
+                <Input value={addForm.first_name} onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} required disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))}  disabled={addLoading} />
+                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))}  disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
             </div>
             <div>
               <label className="block mb-1 font-medium">Email<span className="text-red-500">*</span></label>
-              <Input type="email" value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} required disabled={addLoading} />
+              <Input type="email" value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} required disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
             </div>
             <div>
               <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
@@ -938,6 +939,7 @@ export default function Learners() {
                 disabled={addLoading}
                 placeholder="Enter 10 digit mobile number"
                 maxLength={10}
+                className="border-2 border-border/50 focus:border-primary"
               />
               {addForm.mobile_no && addForm.mobile_no.length !== 10 && (
                 <p className="text-sm text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
@@ -952,7 +954,7 @@ export default function Learners() {
                   onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} 
                   disabled={addLoading} 
                   placeholder="Leave blank to auto-generate"
-                  className="pr-10"
+                  className="pr-10 border-2 border-border/50 focus:border-primary"
                 />
                 <button
                   type="button"
@@ -994,16 +996,16 @@ export default function Learners() {
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="block mb-1 font-medium">First Name<span className="text-red-500">*</span></label>
-                <Input value={editForm.first_name} onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} required disabled={editLoading} />
+                <Input value={editForm.first_name} onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} required disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))}  disabled={editLoading} />
+                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))}  disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
             </div>
             <div>
               <label className="block mb-1 font-medium">Email<span className="text-red-500">*</span></label>
-              <Input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} required disabled={editLoading} />
+              <Input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} required disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
             </div>
             <div>
               <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
@@ -1028,6 +1030,7 @@ export default function Learners() {
                 disabled={editLoading}
                 placeholder="Enter 10 digit mobile number"
                 maxLength={10}
+                className="border-2 border-border/50 focus:border-primary"
               />
               {editForm.mobile_no && editForm.mobile_no.length !== 10 && (
                 <p className="text-sm text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
@@ -1042,7 +1045,7 @@ export default function Learners() {
                   onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} 
                   disabled={editLoading} 
                   placeholder="Leave blank to keep existing"
-                  className="pr-10"
+                  className="pr-10 border-2 border-border/50 focus:border-primary"
                 />
                 <button
                   type="button"

@@ -42,6 +42,9 @@ export function MultiSelect({
     } else {
       onSelect([...selected, item])
     }
+    // Clear the search text after each selection to avoid leftover queries
+    setInputValue("")
+    setCommandValue("")
   }
 
   const selectedItems = options.filter((option) => selected.includes(option.value))
