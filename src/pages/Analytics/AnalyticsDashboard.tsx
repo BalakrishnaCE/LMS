@@ -35,7 +35,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
-
+import novelLmsLogo from '@/assets/novel-lms-logo.png';
 
 // Import the new analytics hook
 import { useLMSAnalytics } from "@/lib/api";
@@ -1049,6 +1049,58 @@ export default function AnalyticsDashboard() {
     return hours * 3600 + minutes * 60 + seconds;
   };
 
+  // Helper function to convert logo image to white data URL for PDF
+  const convertLogoToWhiteDataUrl = async (imageSrc: string): Promise<string | null> => {
+    try {
+      // Load the image
+      const img = new Image();
+      img.src = imageSrc;
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      
+      // Create canvas to process the image
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        return null;
+      }
+      
+      // Draw the image
+      ctx.drawImage(img, 0, 0);
+      
+      // Get image data
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      
+      // Convert all non-transparent pixels to white
+      for (let i = 0; i < data.length; i += 4) {
+        const alpha = data[i + 3];
+        if (alpha > 0) {
+          // Keep alpha, but set RGB to white
+          data[i] = 255;     // R
+          data[i + 1] = 255; // G
+          data[i + 2] = 255; // B
+          // Keep original alpha: data[i + 3] = alpha;
+        }
+      }
+      
+      // Put the modified image data back
+      ctx.putImageData(imageData, 0, 0);
+      
+      // Convert canvas to data URL
+      return canvas.toDataURL('image/png');
+    } catch (error) {
+      console.error('Error converting logo to white data URL:', error);
+      return null;
+    }
+  };
+
   // Helper function to parse date strings to timestamp for sorting
   // Prioritizes DD/MM/YYYY format (day/month/year)
   // Returns timestamp in milliseconds for accurate sorting by year, month, day, hour, minute, second
@@ -1444,57 +1496,129 @@ export default function AnalyticsDashboard() {
       const moduleName = quizDetailsData.module?.name1 || quizDetailsData.module?.name || 'module';
       const filename = `${email}_${moduleName}.pdf`;
       
-      // Create new PDF document
       const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const midX = pageWidth / 2;
       
-      // Title
+      // Teal color for header and footer (RGB: 0, 128, 128 or similar teal)
+      const tealColor = [0, 128, 128] as [number, number, number];
+      const lightTealColor = [230, 245, 245] as [number, number, number];
+
+      // Load logo image and convert to white
+      const logoDataUrl = await convertLogoToWhiteDataUrl(novelLmsLogo);
+
+      // Header - Teal colored bar
+      doc.setFillColor(tealColor[0], tealColor[1], tealColor[2]);
+      doc.rect(0, 0, pageWidth, 25, 'F');
+      
+      // Add logo to header (if loaded)
+      if (logoDataUrl) {
+        try {
+          // Logo dimensions: 15x15 pixels, positioned on left with some padding
+          // Position: x=14 (left margin), y=5 (centered in 25px header bar)
+          doc.addImage(logoDataUrl, 'PNG', 14, 5, 15, 15);
+        } catch (error) {
+          console.error('Could not add logo to PDF:', error);
+        }
+      }
+      
+      // NOVEL LMS text in header (white text) - positioned after logo
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      const logoTextX = logoDataUrl ? 32 : 14; // Position text after logo if logo exists (14 + 15 logo width + 3 spacing)
+      doc.text("NOVEL LMS", logoTextX, 16);
+      
+      // Title - centered below header
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(20);
-      doc.text("Quiz Report", 14, 22);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Quiz Report", midX, 45, { align: "center" });
       
-      // Subtitle
-      doc.setFontSize(12);
-      doc.text(`Module: ${quizDetailsData.module?.name1 || quizDetailsData.module?.name || 'N/A'}`, 14, 32);
-      doc.text(`User: ${quizDetailsData.user || 'N/A'}`, 14, 40);
-      
-      // Summary information
-      let yPosition = 55;
-      doc.setFontSize(10);
-      doc.text(`Date: ${quizDetailsData.date_attended || 'N/A'}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Time Spent: ${quizDetailsData.time_spent || 'N/A'}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Score: ${quizDetailsData.score || 0} / ${quizDetailsData.max_score || 0} (${quizDetailsData.percentage_score || 0}%)`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Time Limit: ${quizDetailsData.time_limit || 'N/A'}`, 14, yPosition);
-      yPosition += 15;
-      
-      // Question Analysis section
+      // Two-column header summary
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      const leftX = 14;
+      const rightX = pageWidth / 2 + 20;
+      let topY = 55;
+
+      // Left column
+      doc.text(`Module: ${quizDetailsData.module?.name1 || quizDetailsData.module?.name || 'N/A'}`, leftX, topY);
+      topY += 7;
+      doc.text(`Date: ${quizDetailsData.date_attended || 'N/A'}`, leftX, topY);
+      topY += 7;
+      doc.text(`Time Limit: ${quizDetailsData.time_limit || 'N/A'}`, leftX, topY);
+
+      // Right column
+      let rightY = 55;
+      doc.text(`User: ${quizDetailsData.user || 'N/A'}`, rightX, rightY);
+      rightY += 7;
+      doc.text(
+        `Score: ${quizDetailsData.score || 0} / ${quizDetailsData.max_score || 0} (${quizDetailsData.percentage_score || 0}%)`,
+        rightX,
+        rightY
+      );
+      rightY += 7;
+      doc.text(`Time Spent: ${quizDetailsData.time_spent || 'N/A'}`, rightX, rightY);
+
+      // Horizontal line separator after summary (teal color)
+      const separatorY = Math.max(topY, rightY) + 8;
+      doc.setDrawColor(tealColor[0], tealColor[1], tealColor[2]);
+      doc.setLineWidth(0.5);
+      doc.line(14, separatorY, pageWidth - 14, separatorY);
+
+      // Question Analysis heading centered
+      let yPosition = separatorY + 12;
       doc.setFontSize(14);
-      doc.text("Question Analysis", 14, yPosition);
-      yPosition += 10;
+      doc.setFont('helvetica', 'bold');
+      doc.text("Question Analysis", midX, yPosition, { align: "center" });
+      
+      // Horizontal line separator after Question Analysis heading (teal color)
+      yPosition += 5;
+      doc.setDrawColor(tealColor[0], tealColor[1], tealColor[2]);
+      doc.line(14, yPosition, pageWidth - 14, yPosition);
+      yPosition += 8;
+      
+      // Helper function to clean question text (remove trailing "1" or numbers)
+      const cleanQuestionText = (text: string) => {
+        if (!text) return 'N/A';
+        // Remove HTML tags
+        let cleaned = text.replace(/<[^>]*>/g, '');
+        // Remove trailing numbers or "1" that might be appended
+        cleaned = cleaned.replace(/\s+1\s*$/, '').trim();
+        return cleaned;
+      };
       
       // Prepare table data
       const tableData = quizDetailsData.question_analysis?.map((qa: any) => [
-        (qa.question || 'N/A').replace(/<[^>]*>/g, ''), // Strip HTML tags
+        cleanQuestionText(qa.question), // Clean question text
         (qa.user_answer || 'N/A').replace(/<[^>]*>/g, ''), // Strip HTML tags
         (qa.correct_answer || 'N/A').replace(/<[^>]*>/g, ''), // Strip HTML tags
-        qa.is_correct ? 'Correct' : 'Incorrect' // Use simple text without special characters
+        qa.is_correct ? 'Correct' : 'Incorrect'
       ]) || [];
       
-      // Add table using autoTable
+      // Add table using autoTable with enhanced styling
       autoTable(doc, {
         head: [['Question', 'Your Answer', 'Correct Answer', 'Result']],
         body: tableData,
         startY: yPosition,
+        rowPageBreak: 'avoid', // Prevent rows from splitting across pages
         styles: { 
-          fontSize: 8,
-          cellPadding: 4,
-          overflow: 'linebreak'
+          fontSize: 9,
+          cellPadding: 5,
+          overflow: 'linebreak',
+          lineColor: [220, 220, 220], // Gray color for inner table lines
+          lineWidth: 0.5
         },
         headStyles: { 
-          fillColor: [240, 240, 240],
+          fillColor: lightTealColor,
           textColor: [0, 0, 0],
-          fontStyle: 'bold'
+          fontStyle: 'bold',
+          fontSize: 8 // Smaller font size for table header
+        },
+        alternateRowStyles: {
+          fillColor: [250, 250, 250]
         },
         columnStyles: {
           0: { cellWidth: 60, halign: 'left' }, // Question column
@@ -1503,18 +1627,30 @@ export default function AnalyticsDashboard() {
           3: { cellWidth: 20, halign: 'center' }  // Result column
         },
         didDrawPage: (data: any) => {
-          // Add page numbers
+          // Footer - Teal colored bar at bottom
+          const footerY = pageHeight - 15;
+          doc.setFillColor(tealColor[0], tealColor[1], tealColor[2]);
+          doc.rect(0, footerY, pageWidth, 15, 'F');
+          
+          // Footer text (white)
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'normal');
+          const footerText = "Generated by Novel LMS | For support, contact L&D Team";
+          doc.text(footerText, midX, footerY + 10, { align: "center" });
+          
+          // Page numbers (above footer, in regular text color)
+          doc.setTextColor(100, 100, 100);
+          doc.setFontSize(8);
           const pageCount = doc.getNumberOfPages();
           const currentPage = data.pageNumber;
-          doc.setFontSize(8);
-          doc.text(`Page ${currentPage} of ${pageCount}`, 14, doc.internal.pageSize.height - 10);
+          doc.text(`Page ${currentPage} of ${pageCount}`, midX, footerY - 3, { align: "center" });
         }
       });
       
       // Save the PDF
       doc.save(filename);
       
-      // console.log(`PDF generated: ${filename}`);
       toast.success('Quiz report downloaded successfully!');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1741,71 +1877,221 @@ export default function AnalyticsDashboard() {
       // Create new PDF document
       const doc = new jsPDF();
       
-      // Title
+      // Page dimensions
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 14;
+      const contentWidth = pageWidth - (margin * 2);
+      const midX = pageWidth / 2;
+      
+      // Teal color for header and footer
+      const tealColor = [0, 128, 128] as [number, number, number];
+
+      // Load logo image and convert to white
+      const logoDataUrl = await convertLogoToWhiteDataUrl(novelLmsLogo);
+
+      // Header - Teal colored bar
+      doc.setFillColor(tealColor[0], tealColor[1], tealColor[2]);
+      doc.rect(0, 0, pageWidth, 25, 'F');
+      
+      // Add logo to header (if loaded)
+      if (logoDataUrl) {
+        try {
+          doc.addImage(logoDataUrl, 'PNG', 14, 5, 15, 15);
+        } catch (error) {
+          console.error('Could not add logo to PDF:', error);
+        }
+      }
+      
+      // NOVEL LMS text in header (white text)
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      const logoTextX = logoDataUrl ? 32 : 14;
+      doc.text("NOVEL LMS", logoTextX, 16);
+      
+      // Title - Centered (adjusted for header)
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(20);
-      doc.text("Q&A Report", 14, 22);
+      doc.setFont('helvetica', 'bold');
+      const titleText = "Q&A Report";
+      doc.text(titleText, midX, 45, { align: "center" });
       
-      // Subtitle
-      doc.setFontSize(12);
-      doc.text(`Module: ${qaDetailsData.module?.name1 || qaDetailsData.module?.name || 'N/A'}`, 14, 32);
-      doc.text(`User: ${qaDetailsData.user || 'N/A'}`, 14, 40);
-      
-      // Summary information
+      // Summary Section - Two Column Layout (adjusted for header)
       let yPosition = 55;
       doc.setFontSize(10);
-      doc.text(`Date: ${qaDetailsData.date_attended || 'N/A'}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Time Spent: ${qaDetailsData.time_spent || 'N/A'}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Score: ${qaDetailsData.score || 'N/A'} / ${qaDetailsData.max_score || 'N/A'} (${qaDetailsData.percentage_score || 0}%)`, 14, yPosition);
-      yPosition += 15;
+      doc.setFont('helvetica', 'normal');
       
-      // Answer Analysis section
+      // Left Column
+      const leftX = margin;
+      doc.text(`Module: ${qaDetailsData.module?.name1 || qaDetailsData.module?.name || 'N/A'}`, leftX, yPosition);
+      yPosition += 8;
+      doc.text(`Date: ${qaDetailsData.date_attended || 'N/A'}`, leftX, yPosition);
+      yPosition += 8;
+      doc.text(`Score: ${qaDetailsData.score || 'N/A'} / ${qaDetailsData.max_score || 'N/A'} (${qaDetailsData.percentage_score || 0}%)`, leftX, yPosition);
+      
+      // Right Column
+      yPosition = 55;
+      const rightX = pageWidth / 2 + 20;
+      doc.text(`User: ${qaDetailsData.user || 'N/A'}`, rightX, yPosition);
+      yPosition += 8;
+      doc.text(`Time Spent: ${qaDetailsData.time_spent || 'N/A'}`, rightX, yPosition);
+
+      // Horizontal line separator after summary (teal color)
+      const topLineY = Math.max(yPosition, 55 + 16) + 8;
+      doc.setDrawColor(tealColor[0], tealColor[1], tealColor[2]);
+      doc.setLineWidth(0.5);
+      doc.line(14, topLineY, pageWidth - 14, topLineY);
+      
+      // Answer Analysis Section Title centered between two lines
+      const answerCenterY = topLineY + 10; // center point
       doc.setFontSize(14);
-      doc.text("Answer Analysis", 14, yPosition);
-      yPosition += 10;
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      const answerAnalysisText = "Answer Analysis";
+      doc.text(answerAnalysisText, midX, answerCenterY, { align: "center" });
+
+      // Bottom teal line, symmetric to the top line around the text
+      const bottomLineY = answerCenterY + (answerCenterY - topLineY);
+      doc.setDrawColor(tealColor[0], tealColor[1], tealColor[2]);
+      doc.setLineWidth(0.5);
+      doc.line(14, bottomLineY, pageWidth - 14, bottomLineY);
+
+      yPosition = bottomLineY + 12;
       
-      // Prepare table data
-      const tableData = qaDetailsData.question_answer_responses?.map((qa: any) => [
-        (qa.question || 'N/A').replace(/<[^>]*>/g, ''), // Strip HTML tags
-        (qa.answer || 'N/A').replace(/<[^>]*>/g, ''), // Strip HTML tags
-        (qa.alloted_marks ?? qa.marks ?? 0).toString(), // Allotted Marks
-        (qa.question_score ?? 0).toString() // Question Score
-      ]) || [];
+      // Process each question-answer pair
+      const questions = qaDetailsData.question_answer_responses || [];
       
-      // Add table using autoTable
-      autoTable(doc, {
-        head: [['Question', 'Answer', 'Allotted Marks', 'Question Score']],
-        body: tableData,
-        startY: yPosition,
-        styles: { 
-          fontSize: 8,
-          cellPadding: 4,
-          overflow: 'linebreak'
-        },
-        headStyles: { 
-          fillColor: [240, 240, 240],
-          textColor: [0, 0, 0],
-          fontStyle: 'bold'
-        },
-        columnStyles: {
-          0: { cellWidth: 50, halign: 'left' }, // Question column
-          1: { cellWidth: 50, halign: 'left' }, // Answer column
-          2: { cellWidth: 35, halign: 'center' }, // Allotted Marks column
-          3: { cellWidth: 35, halign: 'center' }  // Question Score column
-        },
-        didDrawPage: (data: any) => {
-          // Add page numbers
-          const pageCount = doc.getNumberOfPages();
-          const currentPage = data.pageNumber;
-          doc.setFontSize(8);
-          doc.text(`Page ${currentPage} of ${pageCount}`, 14, doc.internal.pageSize.height - 10);
+      for (let i = 0; i < questions.length; i++) {
+        const qa = questions[i];
+        const questionNum = i + 1;
+        
+        // Check if we need a new page (account for footer)
+        if (yPosition > pageHeight - 80) {
+          doc.addPage();
+          // No header on subsequent pages for QA report
+          yPosition = margin + 10;
         }
-      });
+        
+        // Question block: strict 3-row layout
+        const normalizeLine = (text: string) =>
+          (text || 'N/A')
+            .replace(/<[^>]*>/g, '')                 // strip HTML
+            .replace(/[\u00A0\u200B-\u200D\uFEFF]/g, ' ') // remove NBSP & zero-width chars
+            .replace(/\s+/g, ' ')                    // collapse whitespace/newlines
+            .trim();
+
+        const questionText = normalizeLine(qa.question);
+        const answerText = normalizeLine(qa.answer);
+        const allottedMarks = (qa.alloted_marks ?? qa.marks ?? 0).toString();
+        const questionScore = (qa.question_score ?? 0).toString();
+
+        const rowHeight = 8;
+        const labelWidth = 50;
+        const gap = 6;
+        const textStartX = margin + labelWidth + gap;
+        const rightX = pageWidth - margin;
+        const minBottomMargin = 30;
+
+        // Page break guard before this question
+        if (yPosition > pageHeight - minBottomMargin) {
+          doc.addPage();
+          // No header on subsequent pages for QA report
+          yPosition = margin + 10;
+        }
+
+        // --- Row 1: Header (Question number left, marks right) ---
+        doc.setFillColor(240, 240, 240);
+        doc.roundedRect(margin, yPosition - 5, labelWidth, 6, 2, 2, 'F');
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Question-${questionNum}`, margin + 2, yPosition);
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        const marksLine = `${allottedMarks} / ${questionScore}`;
+        const marksWidth = doc.getTextWidth(marksLine);
+        doc.text(marksLine, rightX - marksWidth, yPosition);
+
+        yPosition += rowHeight;
+
+        // Page break guard before question text
+        if (yPosition > pageHeight - minBottomMargin) {
+          doc.addPage();
+          // No header on subsequent pages for QA report
+          yPosition = margin + 10;
+        }
+
+        // --- Row 2: Question text (full width, wrapped) ---
+                // --- Row 2: Question text (full width, single line) ---
+        // --- Row 2: Question text (full width, single line) ---
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        const questionMaxWidth = rightX - margin;
+        const questionLines = doc.splitTextToSize(questionText || 'N/A', questionMaxWidth);
+        doc.text(questionLines, margin, yPosition, { maxWidth: questionMaxWidth, align: 'left' });
+        const questionHeight = questionLines.length * 5;
+        yPosition += Math.max(questionHeight, rowHeight);
+        // Page break guard before answer text
+        if (yPosition > pageHeight - minBottomMargin) {
+          doc.addPage();
+          // No header on subsequent pages for QA report
+          yPosition = margin + 10;
+        }
+
+        // --- Row 3: Answer text (full width, wrapped) ---
+        // --- Row 3: Answer text (full width, single line) ---
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        const answerMaxWidth = rightX - margin;
+        const answerLabel = '  Answer:';
+        const answerTextValue = answerText || 'N/A';
+
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+
+        // Label line (bold)
+        doc.setFont('helvetica', 'bold');
+        doc.text(answerLabel, margin, yPosition);
+
+        // Move to next line for the actual answer
+        const answerY = yPosition + 5;
+        doc.setFont('helvetica', 'normal');
+        const answerLines = doc.splitTextToSize(answerTextValue, answerMaxWidth);
+        doc.text(answerLines, margin, answerY, { maxWidth: answerMaxWidth, align: 'left' });
+
+        const answerHeight = answerLines.length * 5 + 5; // +5 for the label line
+        yPosition += Math.max(answerHeight, rowHeight) + 4;
+      }
+      
+      // Add footer and page numbers to all pages
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        
+        // Footer - Teal colored bar at bottom
+        const footerY = pageHeight - 15;
+        doc.setFillColor(tealColor[0], tealColor[1], tealColor[2]);
+        doc.rect(0, footerY, pageWidth, 15, 'F');
+        
+        // Footer text (white)
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        const footerText = "Generated by Novel LMS | For support, contact L&D Team";
+        doc.text(footerText, midX, footerY + 10, { align: "center" });
+        
+        // Page numbers (above footer, in regular text color)
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(8);
+        doc.text(`Page ${i} of ${pageCount}`, midX, footerY - 3, { align: "center" });
+      }
       
       // Save the PDF
       doc.save(filename);
-  
+    
       toast.success('Q&A report downloaded successfully!');
     } catch (error) {
       console.error('Error generating PDF:', error);
