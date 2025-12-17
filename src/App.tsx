@@ -16,19 +16,29 @@ import { LearnerModulePage } from "@/pages/Modules/Learner/ModulePage";
 import Profile from "@/pages/Profile/Profile";
 import NotFound from "@/pages/NotFound";
 import LearnerModuleDetail from "@/pages/Modules/Learner/ModuleDetail";
+import AdminModuleDetail from "@/pages/Modules/Admin/ModuleDetail";
 import ModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
 import ModuleCreationForm from "@/pages/ModuleEditor/edit/ModuleCreationForm";
 import AnalyticsDashboard from "@/pages/Analytics/AnalyticsDashboard";
+import DepartmentPage from "@/pages/Department/Department";
+import { ErrorBoundary } from "@/lib/error-boundary";
 // import AnalyticsDashboardNew from "@/pages/Analytics/AnalyticsDashboard";
 // import H5PReactDemo from '@/pages/Test/H5PReactDemo';
 // import TESTH5P from '@/pages/Test/TESTH5P';
 
+import { PermissionProvider } from "@/contexts/PermissionContext";
+import { NavigationProvider } from "@/contexts/NavigationContext";
+import { MediaManagerProvider } from "@/contexts/MediaManagerContext";
 function App() {
   return (
-    <ThemeProvider storageKey="novel-lms-theme" defaultTheme="light">
-      <div className="flex flex-col items-center justify-center min-h-svh">
-        <NovelLMSFrappeProvider>
-          <Router base={BASE_PATH}>
+    <ErrorBoundary>
+      <ThemeProvider storageKey="novel-lms-theme" defaultTheme="light">
+        <div className="flex flex-col items-center justify-center min-h-svh">
+          <NovelLMSFrappeProvider>
+            <PermissionProvider>
+              <NavigationProvider>
+                <MediaManagerProvider>
+                  <Router base={BASE_PATH}>
             {/* <div className="w-full flex justify-center py-2 bg-muted/30">
               <a href="/test/h5p-react-demo" className="text-primary underline font-medium mx-2">Test H5P React Demo</a>
             </div> */}
@@ -46,21 +56,27 @@ function App() {
                   <LearnerDashboard />
                 </Layout>
               )} allowedRoles={["LMS Student"]} />
-              <ProtectedRoute path="/modules" component={() => (
-                <Layout>
-                  <Module />
-                </Layout>
-              )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
-              <ProtectedRoute path="/module/:moduleName" component={() => (
-                <ModuleDetail />
-              )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} />
+              
               <ProtectedRoute path="/modules/learner" component={() => (
                 <Layout>
                   <LearnerModulePage />
                 </Layout>
               )} allowedRoles={["LMS Student"]} />
-              {/* Detailed module view with progress tracking */}
               <ProtectedRoute path="/modules/learner/:moduleName" component={LearnerModuleDetail} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
+
+
+              <ProtectedRoute path="/modules" component={() => (
+                <Layout>
+                  <Module />
+                </Layout>
+              )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
+              <ProtectedRoute path="/modules/:moduleName" component={AdminModuleDetail} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
+              <ProtectedRoute path="/module/:moduleName" component={() => (
+                <ModuleDetail />
+              )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} />
+              
+              {/* Detailed module view with progress tracking */}
+              
               <ProtectedRoute path="/learners" component={() => (
                 <Layout>
                   <Learners />
@@ -88,11 +104,18 @@ function App() {
                   <AnalyticsDashboard />
                 </Layout>
               )} allowedRoles={["LMS Admin"]} />
+              <ProtectedRoute path="/department" component={() => (
+                <Layout>
+                  <DepartmentPage />
+                </Layout>
+              )} allowedRoles={["LMS Admin"]} />
               {/* <ProtectedRoute path="/analytics-new" component={() => (
                 <Layout>
                   <AnalyticsDashboardNew />
                 </Layout>
               )} allowedRoles={["LMS Admin"]} /> */}
+              {/* Quiz route */}
+              {/* <ProtectedRoute path="/quiz" component={QuizPage} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor", "LMS TL"]} /> */}
               {/* Test H5P React Demo route */}
               {/* <Route path="/test/h5p-react-demo" component={H5PReactDemo} /> */}
               {/* Show 404 for all unrecognized routes */}
@@ -100,9 +123,13 @@ function App() {
             </Switch>
             <Toaster />
           </Router>
-        </NovelLMSFrappeProvider> 
+                </MediaManagerProvider>
+                </NavigationProvider>
+                    </PermissionProvider>
+          </NovelLMSFrappeProvider> 
       </div>
     </ThemeProvider>
+    </ErrorBoundary>
   )
 }
 export default App

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useFrappeGetCall } from "frappe-react-sdk";
 import {
   Sheet,
@@ -7,7 +7,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,10 +25,7 @@ import {
   Clock,
   Target,
   GraduationCap,
-  Calendar,
-  Award,
   AlertCircle,
-  RefreshCw,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -139,9 +135,9 @@ export function ModuleDetailsDrawer({ item, isOpen, onClose }: ModuleDetailsDraw
     isLoading,
     mutate
   } = useFrappeGetCall(
-    'getModuleAnalytics',
+    'novel_lms.novel_lms.api.analytics.getModuleAnalytics',
     isOpen && item?.module_id ? { module_id: item.module_id } : undefined,
-    'getModuleAnalytics'
+    'novel_lms.novel_lms.api.analytics.getModuleAnalytics'
   );
 
   const details = moduleDetails?.message as ModuleDetailsResponse;

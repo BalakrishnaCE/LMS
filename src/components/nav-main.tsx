@@ -1,3 +1,4 @@
+import * as React from "react"
 import { IconCirclePlusFilled, IconPlus, type Icon } from "@tabler/icons-react"
 import { useLocation } from "wouter"
 import { Button } from "@/components/ui/button"
@@ -10,24 +11,33 @@ import {
 } from "@/components/ui/sidebar"
 import { navigate } from "wouter/use-browser-location"
 import { useUser } from "@/hooks/use-user"
-import { getRelativePath, getFullPath } from "@/config/routes"
-import { BASE_PATH } from "@/config/routes"
+import { getRelativePath, getFullPath, BASE_PATH, ROUTES } from "@/config/routes"
+
+export type NavItemIcon = Icon | React.ComponentType<{ className?: string }>
+
+export type NavMainItem = {
+  title: string
+  url: string
+  icon?: NavItemIcon
+  tooltip?: string
+}
 
 export function NavMain({
   items,
 }: {
-  items: {
-    title: string
-    url: string
-    icon?: Icon
-    tooltip?: string
-  }[]
+  items: NavMainItem[]
 }) {
   const [location] = useLocation();
   const { isLMSAdmin } = useUser();
 
   // Get the current path without the base path
   const currentPath = getRelativePath(location);
+  
+  // Special handling for admin dashboard - if we're on /admin-dashboard, highlight Dashboard
+  const isAdminDashboard = currentPath === ROUTES.ADMIN_DASHBOARD || currentPath === ROUTES.HOME;
+  
+  // Check if we're on the edit page to highlight Quick Create
+  const isEditPage = currentPath === ROUTES.EDIT || currentPath.startsWith(ROUTES.EDIT + '/');
 
   return (
     <SidebarGroup>
@@ -37,7 +47,12 @@ export function NavMain({
           <SidebarMenuItem className="flex items-center gap-2">
             <SidebarMenuButton
               tooltip="Quick Create"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
+              className={
+                isEditPage
+                  ? "hover:text-white text-white bg-primary/90 min-w-8 duration-200 ease-linear"
+                  : "active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear hover:text-white"
+              }
+              onClick={() => navigate(BASE_PATH + '/edit')}
             >
               <IconCirclePlusFilled />
               <span >Quick Create</span>
@@ -49,7 +64,7 @@ export function NavMain({
               onClick={() => navigate(BASE_PATH + '/edit')}
             >
               <IconPlus className="size-4" />
-              <span className="sr-only">Inbox</span>
+              <span className="sr-only">Add New Module</span>
             </Button>
           </SidebarMenuItem>
           )}
@@ -57,7 +72,8 @@ export function NavMain({
 
         <SidebarMenu>
           {items.map((item) => {
-            const isActive = currentPath === item.url;
+            // Special case: if we're on admin dashboard and this is the Dashboard item, make it active
+            const isActive = (isAdminDashboard && item.url === ROUTES.HOME) || currentPath === item.url;
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton

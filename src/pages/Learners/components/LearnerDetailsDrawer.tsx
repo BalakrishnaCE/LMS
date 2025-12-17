@@ -4,25 +4,80 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Mail, Users, TrendingUp, BookOpen, Award } from "lucide-react";
-import { useFrappeGetCall } from "frappe-react-sdk";
-import { useFrappeGetDocList } from "frappe-react-sdk";
+import { X, Mail, Users, TrendingUp, Award } from "lucide-react";
+import { LMS_API_BASE_URL } from "@/config/routes";
 
 export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, open: boolean, onClose: () => void }) {
-  // Fetch module progress/activity for this learner
-  const { data: progressData, isLoading } = useFrappeGetCall<any>("LearnerModuleData", {
-    user: learner?.email
-  }, { enabled: !!learner });
-  const modules = progressData?.data?.modules || [];
-  // Fetch departments for mapping
-  const { data: departments } = useFrappeGetDocList("Department", { fields: ["name", "department"], limit: 150 });
+  // Fetch learner sidebar details using the same API as analytics dashboard
+  const [learnerData, setLearnerData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(false);
+  
+  React.useEffect(() => {
+    if (learner?.email && open) {
+      setLoading(true);
+      fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_learner_sidebar_details?learner_name=${learner.email}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+        credentials: 'include',
+      })
+      .then(response => response.json())
+      .then(data => {
+        setLearnerData(data.message.message);
+        setLoading(false);
+      })
+      .catch(error => {
+        console.error('Error fetching learner data:', error);
+        setLoading(false);
+      });
+    }
+  }, [learner?.email, open]);
+  
+  const modules = learnerData?.learner_modules || [];
+  
+  // Debug: Log module data to understand structure
+  React.useEffect(() => {
+    if (modules.length > 0) {
+       // console.log('=== MODULE DATA DEBUG ===');
+      // console.log('Total modules:', modules.length);
+       modules.forEach((mod: any, index: number) => {
+        // console.log(`Module ${index}:`, {
+        //   // Direct fields
+        //   name: mod.name,
+        //   name1: mod.name1,
+        //   module_name: mod.module_name,
+        //   module_id: mod.module_id,
+        //   progress: mod.progress,
+        //   // Nested module fields
+        //   module_name1: mod.module?.name1,
+        //   module_name_direct: mod.module?.name,
+        //   // All keys
+        //   all_keys: Object.keys(mod),
+        //   module_keys: mod.module ? Object.keys(mod.module) : 'No module object'
+        // });
+      });
+    }
+  }, [modules]);
+  // Fetch departments for mapping - using direct fetch since useFrappeGetDocList is not available
+  const [departments, setDepartments] = React.useState<any[]>([]);
+  
+  React.useEffect(() => {
+    if (learner) {
+      fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.departments.get_departments`, {
+        method: 'GET',
+        credentials: 'include'
+      })
+      .then(res => res.json())
+      .then(data => setDepartments(data.message || []))
+      .catch(err => console.error('Error fetching departments:', err));
+    }
+  }, [learner]);
   const departmentIdToName = React.useMemo(() => Object.fromEntries((departments || []).map(d => [d.name, d.department])), [departments]);
-  // Calculate completion rate
-  const totalModules = modules.length;
-  const completedModules = modules.filter((m: any) => m.progress?.status === "Completed").length;
-  const completionRate = totalModules ? Math.round((completedModules / totalModules) * 100) : 0;
-  // Recent activity: last 5 modules
-  const recent = modules.slice(0, 5);
+  // Calculate completion rate from API data
+  const totalModules = learnerData?.learner_info?.total_modules || 0;
+  const completedModules = learnerData?.learner_info?.completed_modules || 0;
+  const completionRate = learnerData?.learner_info?.completion_rate || 0;
   // Get learner departments as array
   const learnerDepartments = (learner?.departments && learner.departments.length > 0) ? learner.departments : (learner?.department ? [learner.department] : []);
 
@@ -93,42 +148,36 @@ export function UserDetailsDrawer({ learner, open, onClose }: { learner: any, op
               </Card>
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><BookOpen className="w-5 h-5 text-primary" /> Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {recent.length === 0 && <div className="text-muted-foreground text-sm">No recent activity.</div>}
-                    {recent.map((mod: any) => (
-                      <div key={mod.name} className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <div className="font-medium">{mod.name1}</div>
-                          <div className="text-xs text-muted-foreground">{mod.progress?.status || "Not Started"}</div>
-                        </div>
-                        <Badge variant={mod.progress?.status === "Completed" ? "default" : mod.progress?.status === "In Progress" ? "secondary" : "destructive"}>
-                          {mod.progress?.status || "Not Started"}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
                   <CardTitle className="flex items-center gap-2"><Award className="w-5 h-5 text-primary" /> Module Breakdown</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {modules.length === 0 && <div className="text-muted-foreground text-sm">No modules found.</div>}
-                    {modules.map((mod: any) => (
-                      <div key={mod.name} className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <div className="font-medium">{mod.name1}</div>
-                          <div className="text-xs text-muted-foreground">{mod.description?.replace(/<[^>]+>/g, '')}</div>
-                        </div>
-                        <Progress value={mod.progress?.progress || 0} className="w-32 h-2" />
-                        <span className="text-xs font-semibold text-primary">{mod.progress?.progress || 0}%</span>
-                      </div>
-                    ))}
+                    {loading ? (
+                      <div className="text-muted-foreground text-sm">Loading modules...</div>
+                    ) : modules.length === 0 ? (
+                      <div className="text-muted-foreground text-sm">No modules found.</div>
+                    ) : (
+                      modules.map((mod: any, index: number) => {
+                        const moduleName = mod.module_name || `Module ${index + 1}`;
+                        const progressValue = mod.progress || 0;
+                        const status = mod.status || "Not Started";
+                        
+                        return (
+                          <div key={mod.module_id || index} className="flex items-center gap-3">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm text-gray-700">
+                                {moduleName}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Status: {status}
+                              </div>
+                            </div>
+                            <Progress value={progressValue} className="w-32 h-2" />
+                            <span className="text-xs font-semibold text-primary">{progressValue}%</span>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </CardContent>
               </Card>

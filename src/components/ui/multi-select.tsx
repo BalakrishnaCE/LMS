@@ -30,6 +30,7 @@ export function MultiSelect({
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState("")
+  const [commandValue, setCommandValue] = React.useState("")
 
   const handleUnselect = (item: string) => {
     onSelect(selected.filter((i) => i !== item))
@@ -41,13 +42,20 @@ export function MultiSelect({
     } else {
       onSelect([...selected, item])
     }
+    // Clear the search text after each selection to avoid leftover queries
+    setInputValue("")
+    setCommandValue("")
   }
 
   const selectedItems = options.filter((option) => selected.includes(option.value))
 
   return (
-    <Command className={`overflow-visible bg-transparent ${className}`}>
-      <div className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+    <Command 
+      className={`overflow-visible bg-transparent ${className}`}
+      value={commandValue}
+      onValueChange={setCommandValue}
+    >
+      <div className="group border-2 border-border/50 focus-within:border-primary px-3 py-2 text-sm ring-offset-background rounded-md">
         <div className="flex gap-1 flex-wrap">
           {selectedItems.map((item) => (
             <Badge key={item.value} variant="secondary" className="hover:bg-secondary">
@@ -83,13 +91,19 @@ export function MultiSelect({
       </div>
       <div className="relative mt-2">
         {open && (
-          <div className="absolute w-full z-10 top-0 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in">
+          <div 
+            className="absolute w-full z-10 top-0 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in"
+            onMouseLeave={() => {
+              setCommandValue("")
+            }}
+          >
             <CommandGroup className="h-full overflow-auto max-h-60">
               {options.map((option) => {
                 const isSelected = selected.includes(option.value)
                 return (
                   <CommandItem
                     key={option.value}
+                    value={option.value}
                     onSelect={() => {
                       // This will be called but we'll handle the actual selection in onMouseDown
                     }}

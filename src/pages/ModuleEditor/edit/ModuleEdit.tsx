@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from "react";
-import { useLocation, useParams } from "wouter";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { useParams } from "wouter";
 import Sidebar from "./Sidebar";
 import SidebarToggle from "./SidebarToggle";
 import ContentStructureEditor from "./content-structure";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DndContext } from "@dnd-kit/core";
 import { useModuleState } from "./content-structure/useModuleState";
-import { reorderContentBlocks } from "./content-structure/MainSection";
-import { useFrappeGetCall, useFrappeGetDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
+import { reorderContentBlocks } from "./content-structure/utils";
+import { useFrappeGetCall, useFrappeUpdateDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
 import Lottie from 'lottie-react';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
+import { NavigationProvider } from "@/contexts/NavigationContext";
 
 interface Lesson {
   id: string;
@@ -41,53 +41,58 @@ export interface ModuleInfo {
 export default function ModuleEdit() {
   const params = useParams();
   const moduleId = params?.moduleId;
-  const [, setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarFullScreen, setSidebarFullScreen] = useState(false);
   const [moduleInfo, setModuleInfo] = useState<ModuleInfo | null>(null);
   const isMobile = useIsMobile();
-  const { module, addLesson, addContentToChapter, setModule } = useModuleState();
+  const { module, addContentToChapter, setModule } = useModuleState();
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
   const { updateDoc } = useFrappeUpdateDoc();
 
-  // Use the custom getModule endpoint
-  const { data: moduleData, error, isLoading, mutate } = useFrappeGetCall('getModule', { module_id: moduleId });
+  // Use the get_module_with_details endpoint
+  const { data: moduleData, error, isLoading, mutate } = useFrappeGetCall(
+    'novel_lms.novel_lms.api.module_management.get_module_with_details', 
+    { module_id: moduleId },
+    { enabled: !!moduleId }
+  );
 
   // Normalize chapter contents after module data load
   useEffect(() => {
-    const typeMap: { [key: string]: string } = {
-      text: "Text Content",
-      image: "Image Content",
-      video: "Video Content",
-      file: "File Attach",
-      pdf: "PDF",
-      checklist: "Check List",
-      steps: "Steps",
-      accordion: "Accordion",
-      slide: "Slide Content",
-      quiz: "Quiz",
-      question_answer: "Question Answer",
-      // add more as needed
-    };
     function normalizeModule(moduleDataObj: any) {
-      if (!moduleDataObj || !moduleDataObj.lessons) return moduleDataObj;
+      if (!moduleDataObj) {
+        console.warn('ModuleEdit - normalizeModule: moduleDataObj is null or undefined');
+        return null;
+      }
+      
+      // Handle case where lessons might be empty array or undefined
+      if (!moduleDataObj.lessons || !Array.isArray(moduleDataObj.lessons)) {
+        console.warn('ModuleEdit - normalizeModule: lessons is missing or not an array, using empty array');
+        return {
+          ...moduleDataObj,
+          lessons: []
+        };
+      }
       const normalizedModule = {
         ...moduleDataObj,
         lessons: moduleDataObj.lessons.map((lesson: any) => ({
           ...lesson,
+          id: lesson.name, // Use lesson.name as id (actual document name)
+          title: lesson.lesson_name, // Map lesson_name to title for UI consistency
           chapters: lesson.chapters?.map((chapter: any) => ({
             ...chapter,
+            id: chapter.name, // Use chapter.name as id (actual document name)
             contents: chapter.contents?.map((block: any) => {
               let normalizedBlock = {
-                id: block.id,
-                type: typeMap[String(block.type)] || block.type, // normalize type
-                docname: block.reference,
+                id: block.content_reference, // Use content_reference as id (actual document name)
+                type: block.content_type, // Use content_type directly
+                docname: block.content_reference, // Use content_reference
+                content_type: block.content_type,
+                content_reference: block.content_reference,
                 ...block.data,
               };
               // Special normalization for Question Answer content
               if (
-                (typeMap[String(block.type)] || block.type) === 'Question Answer' &&
+                block.content_type === 'Question Answer' &&
                 Array.isArray(block.data?.questions)
               ) {
                 normalizedBlock.questions = block.data.questions.map((q: any) => ({
@@ -104,10 +109,30 @@ export default function ModuleEdit() {
       return normalizedModule;
     }
 
-    if (moduleData && moduleData.data) {
-      const normalized = normalizeModule(moduleData.data);
-      setModule(normalized);
-      setModuleInfo(normalized);
+    if (moduleData) {
+      // Handle different response structures from frappe-react-sdk
+      // The API returns data in frappe.response["data"], which frappe-react-sdk wraps
+      let actualData = null;
+      
+      if (moduleData.message) {
+        actualData = moduleData.message;
+      } else if (moduleData.data) {
+        actualData = moduleData.data;
+      } else if (moduleData.lessons) {
+        // Direct response format
+        actualData = moduleData;
+      } else {
+        // Try to find the data in the response
+        actualData = moduleData;
+      }
+      
+      if (actualData) {
+        const normalized = normalizeModule(actualData);
+        setModule(normalized);
+        setModuleInfo(normalized);
+      } else {
+        console.error('ModuleEdit - Could not extract module data from response:', moduleData);
+      }
     }
   }, [moduleData, setModule]);
 
@@ -148,11 +173,23 @@ export default function ModuleEdit() {
   }
 
   if (error) {
-    toast.error("Failed to load module");
+    console.error('ModuleEdit - Error loading module:', error);
+    const errorMessage = error instanceof Error ? error.message : 
+                         typeof error === 'object' && error !== null ? JSON.stringify(error) : 
+                         'Unknown error';
+    toast.error(`Failed to load module: ${errorMessage}`);
     return (
       <div className="flex flex-col items-center justify-center p-8">
         <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
         <div className="mt-4 text-red-500">Error loading module</div>
+        <div className="mt-2 text-sm text-muted-foreground">
+          {errorMessage}
+        </div>
+        {moduleId && (
+          <div className="mt-2 text-xs text-muted-foreground">
+            Module ID: {moduleId}
+          </div>
+        )}
       </div>
     );
   }
@@ -162,55 +199,56 @@ export default function ModuleEdit() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        fullScreen={sidebarFullScreen}
-        moduleInfo={moduleInfo}
-        module={module}
-        isMobile={isMobile}
-        onLessonAdded={mutate}
-        activeLessonId={activeLessonId}
-        setActiveLessonId={setActiveLessonId}
-        activeChapterId={activeChapterId}
-        setActiveChapterId={setActiveChapterId}
-      />
-          <SidebarToggle isOpen={sidebarOpen} onClick={() => setSidebarOpen((v) => !v)} />
-          <DndContext onDragEnd={({ active, over }) => {
-            if (!over) return;
-        if (!activeLessonId || !activeChapterId) return;
-        const lesson = module.lessons.find(l => l.id === activeLessonId);
-            if (!lesson || !lesson.chapters || lesson.chapters.length === 0) return;
-        const chapter = lesson.chapters.find(c => c.id === activeChapterId);
-        if (!chapter) return;
-            const isExistingBlock = chapter.contents.some((c: any) => c.id === active.id);
-            if (over.id === 'content-drop-area') {
-              if (!isExistingBlock) {
-            addContentToChapter(String(active.id), activeLessonId, activeChapterId);
-              }
-            } else {
-              // Reorder content blocks
-              if (active.id !== over.id) {
-                const oldIndex = chapter.contents.findIndex((c: any) => c.id === active.id);
-                const newIndex = chapter.contents.findIndex((c: any) => c.id === over.id);
-                if (oldIndex !== -1 && newIndex !== -1) {
-              reorderContentBlocks(activeLessonId, activeChapterId, oldIndex, newIndex, setModule, updateDoc);
+    <NavigationProvider>
+      <div className="flex h-screen w-full bg-background">
+        <Sidebar
+          isOpen={sidebarOpen}
+          fullScreen={false}
+          moduleInfo={moduleInfo}
+          module={module}
+          isMobile={isMobile}
+          onLessonAdded={mutate}
+          activeLessonId={activeLessonId}
+          setActiveLessonId={setActiveLessonId}
+          activeChapterId={activeChapterId}
+          setActiveChapterId={setActiveChapterId}
+        />
+            <SidebarToggle isOpen={sidebarOpen} onClick={() => setSidebarOpen((v) => !v)} />
+            <DndContext onDragEnd={({ active, over }) => {
+              if (!over) return;
+          if (!activeLessonId || !activeChapterId) return;
+          const lesson = module.lessons.find(l => l.id === activeLessonId);
+              if (!lesson || !lesson.chapters || lesson.chapters.length === 0) return;
+          const chapter = lesson.chapters.find(c => c.id === activeChapterId);
+          if (!chapter) return;
+              const isExistingBlock = chapter.contents.some((c: any) => c.id === active.id);
+              if (over.id === 'content-drop-area') {
+                if (!isExistingBlock) {
+              addContentToChapter(String(active.id), activeLessonId, activeChapterId);
+                }
+              } else {
+                // Reorder content blocks
+                if (active.id !== over.id) {
+                  const oldIndex = chapter.contents.findIndex((c: any) => c.id === active.id);
+                  const newIndex = chapter.contents.findIndex((c: any) => c.id === over.id);
+                  if (oldIndex !== -1 && newIndex !== -1) {
+                reorderContentBlocks(activeLessonId, activeChapterId, oldIndex, newIndex, setModule, updateDoc);
+                  }
                 }
               }
-            }
-          }}>
-            <ContentStructureEditor
-              isMobile={isMobile}
-              module={module}
-              addLesson={addLesson}
-              addContentToChapter={addContentToChapter}
-              setModule={setModule}
-          moduleName={params.moduleId || ""}
-          loading={isLoading}
-          activeLessonId={activeLessonId}
-          activeChapterId={activeChapterId}
-            />
-          </DndContext>
-    </div>
+            }}>
+              <ContentStructureEditor
+                module={module}
+                addContentToChapter={addContentToChapter}
+                setModule={setModule}
+                moduleId={moduleId}
+                loading={isLoading}
+                activeLessonId={activeLessonId}
+                activeChapterId={activeChapterId}
+                onLessonAdded={mutate}
+              />
+            </DndContext>
+      </div>
+    </NavigationProvider>
   );
 } 

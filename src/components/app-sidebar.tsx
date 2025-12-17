@@ -5,9 +5,9 @@ import {
   IconBook,
   IconListDetails,
   IconUsers,
-  type Icon,
 } from "@tabler/icons-react"
-import { NavMain } from "@/components/nav-main"
+import { Building2 } from "lucide-react"
+import { NavMain, type NavMainItem } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -22,23 +22,16 @@ import { useUser } from "@/hooks/use-user"
 import { ROUTES } from "@/config/routes"
 import { Link } from 'wouter'
 
-interface NavItem {
-  title: string;
-  url: string;
-  icon: Icon;
-  tooltip: string;
-}
-
 interface NavData {
   user: {
     name: string;
     email: string;
     avatar: string;
   };
-  navMain: NavItem[];
+  navMain: NavMainItem[];
 }
 
-const adminNavItems: NavItem[] = [
+const adminNavItems: NavMainItem[] = [
   {
     title: "Dashboard",
     url: ROUTES.HOME,
@@ -63,9 +56,15 @@ const adminNavItems: NavItem[] = [
     icon: IconUsers,
     tooltip: "Learners",
   },
+  {
+    title: "Department",
+    url: ROUTES.DEPARTMENT,
+    icon: Building2,
+    tooltip: "Department",
+  },
 ];
 
-const learnerNavItems: NavItem[] = [
+const learnerNavItems: NavMainItem[] = [
   {
     title: "Dashboard",
     url: ROUTES.LEARNER_DASHBOARD,

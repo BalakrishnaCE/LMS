@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { useEffect, useCallback, useMemo } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { 
   BookOpen, 
@@ -23,6 +22,8 @@ interface InstructionDialogProps {
   maxScore?: number;
   questionCount?: number;
   loading?: boolean;
+  hasExistingProgress?: boolean;
+  onViewProgress?: () => void;
 }
 
 const InstructionDialog: React.FC<InstructionDialogProps> = ({
@@ -35,47 +36,94 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
   timeLimit,
   maxScore,
   questionCount,
-  loading = false
+  loading = false,
+  hasExistingProgress = false,
+  onViewProgress
 }) => {
+  console.log('InstructionDialog props:', { open, type, title, questionCount });
   const isQuiz = type === 'quiz';
-  const isQA = type === 'qa';
 
-  const instructions = [
+  // Handle keyboard events to prevent unwanted dialog closing
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!open) return;
+      
+      // Prevent dialog from closing on Escape, Space, or Enter
+      if (event.key === 'Escape' || event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // Only allow Escape to close the dialog if it's pressed while focused on the close button
+        if (event.key === 'Escape') {
+          const activeElement = document.activeElement;
+          const closeButton = activeElement?.closest('[data-radix-dialog-close]');
+          if (closeButton) {
+            onOpenChange(false);
+          }
+        }
+      }
+    };
+
+    if (open) {
+      document.addEventListener('keydown', handleKeyDown, true);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [open]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Prevent default keyboard behavior that closes the dialog
+    if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, []);
+
+  const instructions = useMemo(() => [
     {
-      icon: <BookOpen className="h-5 w-5 text-blue-500" />,
+      icon: <BookOpen className="h-5 w-5 text-primary" />,
       title: "Read Carefully",
       description: isQuiz 
         ? "Read each question and all answer options carefully before selecting your answer."
         : "Read each question carefully and provide detailed, thoughtful answers."
     },
     {
-      icon: <Clock className="h-5 w-5 text-orange-500" />,
+      icon: <Clock className="h-5 w-5 text-primary" />,
       title: "Time Management",
       description: timeLimit 
         ? `You have ${timeLimit} minutes to complete this ${type}. Use your time wisely.`
         : `Take your time to provide quality answers. There's no time limit.`
     },
     {
-      icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+      icon: <CheckCircle className="h-5 w-5 text-primary" />,
       title: isQuiz ? "Multiple Choice" : "Written Answers",
       description: isQuiz
         ? "Select the best answer for each question. You can only choose one option per question."
         : "Provide detailed written answers. Be thorough and demonstrate your understanding."
     },
     {
-      icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
+      icon: <AlertTriangle className="h-5 w-5 text-primary" />,
       title: "Important Notes",
       description: isQuiz
         ? "Once you submit, you cannot change your answers. Make sure you're satisfied before submitting."
         : "Your answers will be reviewed by an instructor. Ensure clarity and completeness in your responses."
     }
-  ];
+  ], [isQuiz, timeLimit, type]);
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
-        <Dialog.Content className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ outline: 'none' }}>
+        <Dialog.Content 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4" 
+          style={{ outline: 'none' }}
+          onKeyDown={handleKeyDown}
+        >
+          <Dialog.Description className="sr-only">
+            {isQuiz ? 'Quiz Instructions' : 'Question & Answer Instructions'}
+          </Dialog.Description>
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -100,9 +148,9 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
                 </div>
               </div>
               <Dialog.Close asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <button className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0">
                   <X className="h-4 w-4" />
-                </Button>
+                </button>
               </Dialog.Close>
             </div>
 
@@ -169,14 +217,14 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
               </div>
 
               {/* Additional Notes */}
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="mt-6 p-4 bg-muted/50 rounded-lg border">
                 <div className="flex gap-2">
-                  <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <AlertTriangle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
-                    <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    <p className="font-medium text-foreground mb-1">
                       Ready to begin?
                     </p>
-                    <p className="text-blue-700 dark:text-blue-300">
+                    <p className="text-muted-foreground">
                       {isQuiz 
                         ? "Make sure you have a stable internet connection and won't be interrupted during the quiz."
                         : "Take your time to provide thoughtful, well-structured answers that demonstrate your understanding."
@@ -189,17 +237,29 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
 
             {/* Footer */}
             <div className="p-6 border-t flex justify-between items-center">
-              <Button 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button 
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => onOpenChange(false)}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                >
+                  Cancel
+                </button>
+                {hasExistingProgress && onViewProgress && (
+                  <button 
+                    onClick={onViewProgress}
+                    disabled={loading}
+                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 gap-2"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    View Previous Progress
+                  </button>
+                )}
+              </div>
+              <button 
                 onClick={onStart}
                 disabled={loading}
-                className="flex items-center gap-2"
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2"
               >
                 {loading ? (
                   <>
@@ -212,7 +272,7 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
                     Start {isQuiz ? 'Quiz' : 'Q&A'}
                   </>
                 )}
-              </Button>
+              </button>
             </div>
           </motion.div>
         </Dialog.Content>

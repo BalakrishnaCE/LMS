@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/drawer";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 // import { motion } from "framer-motion";
-import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Dialog,
@@ -27,7 +27,7 @@ import { contentsList as rawContentsList } from '@/pages/ModuleEditor/contents';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 // import ChecklistContent from './ChecklistContent';
 // import StepsContent from './StepsContent';
-import AccordionContent, { AccordionPreview } from '@/pages/ModuleEditor/edit/content-structure/AccordionContent';
+import { AccordionPreview } from '@/pages/ModuleEditor/edit/content-structure/AccordionContent';
 import { useFrappeCreateDoc, useFrappeUpdateDoc, useFrappeDeleteDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
 import Lottie from 'lottie-react';
@@ -47,7 +47,9 @@ import QuestionAnswerContentEditor from '@/pages/ModuleEditor/edit/content-struc
 import SlideContentEditor from '@/pages/ModuleEditor/edit/content-structure/SlideContentEditor';
 import IframeContentEditor from '@/pages/ModuleEditor/edit/content-structure/IframeContentEditor';
 import { SlidePreview } from '@/pages/ModuleEditor/contents/slide';
+import { VideoPreview } from '@/pages/ModuleEditor/contents/video';
 import { LMS_API_BASE_URL, BASE_PATH } from "@/config/routes";
+import { reorderContentBlocks } from './utils';
 
 const contentStyles = `
     .prose ul {
@@ -122,17 +124,6 @@ const alwaysVisibleContentTypes = [
   { id: 'audio', name: 'Audio', icon: Volume2 },
 ];
 
-// Utility for file type accept
-const fileAccept = {
-  image: 'image/*',
-  video: 'video/*',
-  file: '*',
-};
-
-// Add a type guard for Preview
-function hasPreview(content: any): content is { Preview: React.ComponentType<any> } {
-  return content && typeof content === 'object' && 'Preview' in content;
-}
 
 // Type for content with Preview
 interface ContentWithPreview {
@@ -161,47 +152,6 @@ interface Chapter {
   contents?: any[];
 }
 
-// Helper to reorder content blocks in the correct chapter
-export function reorderContentBlocks(
-  lessonId: string,
-  chapterId: string,
-  oldIndex: number,
-  newIndex: number,
-  setModule: (updater: (prev: any) => any) => void,
-  updateDoc: (doctype: string, docname: string, data: any) => Promise<any>
-) {
-  setModule((prev: any) => {
-    const lessonIndex = prev.lessons.findIndex((l: any) => l.id === lessonId);
-    if (lessonIndex === -1) return prev;
-    const lesson = prev.lessons[lessonIndex];
-    const chapterIndex = lesson.chapters.findIndex((c: any) => c.id === chapterId);
-    if (chapterIndex === -1) return prev;
-    const chapter = lesson.chapters[chapterIndex];
-    const newContents = arrayMove(chapter.contents, oldIndex, newIndex);
-    // Persist to backend
-    if (chapter.id && typeof updateDoc === 'function') {
-      const backendContents = newContents.map((c: any, idx: number) => ({
-        content_type: c.type || c.content_type,
-        content_reference: c.docname || c.content_reference,
-        order: idx + 1
-      }));
-      updateDoc("Chapter", chapter.id, { contents: backendContents });
-    }
-    const updatedChapter = { ...chapter, contents: newContents };
-    const updatedChapters = [
-      ...lesson.chapters.slice(0, chapterIndex),
-      updatedChapter,
-      ...lesson.chapters.slice(chapterIndex + 1),
-    ];
-    const updatedLesson = { ...lesson, chapters: updatedChapters };
-    const updatedLessons = [
-      ...prev.lessons.slice(0, lessonIndex),
-      updatedLesson,
-      ...prev.lessons.slice(lessonIndex + 1),
-    ];
-    return { ...prev, lessons: updatedLessons };
-  });
-}
 
 // Sortable content blocks wrapper
 function SortableContentBlocks({ contents, chapter, reorderContentBlocks, setModule }: { contents: any[]; chapter: any; reorderContentBlocks: any; setModule: any }) {
@@ -224,7 +174,7 @@ function SortableContentBlocks({ contents, chapter, reorderContentBlocks, setMod
   );
 }
 
-function DroppableContentDropArea({ setDrawerOpen, addContentToChapter, activeLessonId, activeChapterId }: { setDrawerOpen: (open: boolean) => void, addContentToChapter: (type: string, lessonId: string, chapterId: string) => void, activeLessonId: string, activeChapterId: string }) {
+function DroppableContentDropArea({ setDrawerOpen }: { setDrawerOpen: (open: boolean) => void, addContentToChapter: (type: string, lessonId: string, chapterId: string) => void, activeLessonId: string, activeChapterId: string }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'content-drop-area' });
   return (
     <div
@@ -269,40 +219,34 @@ function FloatingDraggableBar() {
 
 export default function MainSection({ 
   hasLessons, 
-  onAddLesson, 
-  isMobile, 
   lessons, 
   addContentToChapter, 
   setModule,
-  moduleName,
+  moduleId,
   loading,
   activeLessonId,
-  activeChapterId
+  activeChapterId,
+  onLessonAdded
 }: {
   hasLessons: boolean;
-  onAddLesson: (lesson: { title: string; description: string; chapter: { title: string} }) => void;
-  isMobile: boolean;
   lessons: any[];
   addContentToChapter: (contentType: string, lessonId: string, chapterId: string) => void;
   setModule: any;
-  moduleName: string;
+  moduleId?: string;
   loading?: boolean;
   activeLessonId?: string | null;
   activeChapterId?: string | null;
+  onLessonAdded?: () => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [lessonTitle, setLessonTitle] = useState("");
   const [lessonDesc, setLessonDesc] = useState("");
   const [chapterTitle, setChapterTitle] = useState("");
-  const [showAddContent, setShowAddContent] = useState(false);
-  const [showContentTypes, setShowContentTypes] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [hoveredType, setHoveredType] = useState<string | null>(null);
   const [showAddChapter, setShowAddChapter] = useState(false);
   const [newChapterTitle, setNewChapterTitle] = useState('');
   const { createDoc } = useFrappeCreateDoc();
   const { updateDoc } = useFrappeUpdateDoc();
-  const { deleteDoc } = useFrappeDeleteDoc();
   const [minLoading, setMinLoading] = useState(true);
   const [editingLessonName, setEditingLessonName] = useState(false);
   const [editingLessonDesc, setEditingLessonDesc] = useState(false);
@@ -317,7 +261,12 @@ export default function MainSection({
 
   // Preview function
   const handlePreviewModule = () => {
-    const previewUrl = `${BASE_PATH}/modules/learner/${moduleName}`;
+    if (!moduleId) {
+      console.error('Module ID is required for preview');
+      return;
+    }
+// Use Admin preview route so Draft modules can be previewed too
+    const previewUrl = `${BASE_PATH}/modules/${moduleId}`;
     window.open(previewUrl, '_blank');
   };
 
@@ -369,7 +318,10 @@ export default function MainSection({
       ];
 
       // 4. Update the Module with the new lessons array
-      const moduleUpdateResponse = await updateDoc("LMS Module", moduleName, {
+      if (!moduleId) {
+        throw new Error("Module ID is required");
+      }
+      const moduleUpdateResponse = await updateDoc("LMS Module", moduleId, {
         lessons: updatedLessons
       });
 
@@ -392,11 +344,7 @@ export default function MainSection({
       }
 
       toast.success("Lesson and chapter created successfully");
-      onAddLesson({
-        title: lessonData.lesson_name, // Map lesson_name to title for UI
-        description: lessonData.description,
-        chapter: { title: lessonData.chapter.title }
-      });
+      onLessonAdded?.(); // Refresh the module data
       setLessonTitle("");
       setLessonDesc("");
       setChapterTitle("");
@@ -496,9 +444,36 @@ export default function MainSection({
       <style>{contentStyles}</style>
       <div className="flex-1 h-full flex flex-col items-center justify-start bg-background pt-8 px-10 text-center">
         {!activeLesson && !hasLessons && (
-          <div className="w-full max-w-2xl mx-auto">
+          <div className="w-full max-w-4xl mx-auto">
             <h2 className="text-2xl font-bold mb-4">Create Your First Lesson</h2>
             <p className="text-muted-foreground mb-8">Start by creating your first lesson and chapter</p>
+            
+            {/* Show drag-drop area even when no lessons exist */}
+            <div className="w-full mb-8">
+              <h3 className="text-lg font-semibold mb-4">Content Creation Area</h3>
+              <p className="text-sm text-muted-foreground mb-4">Drag content types from the right sidebar or click to select</p>
+              <DroppableContentDropArea
+                setDrawerOpen={setDrawerOpen}
+                addContentToChapter={() => {
+                  // Show message that lesson needs to be created first
+                  toast.info("Please create a lesson first before adding content");
+                }}
+                activeLessonId={''}
+                activeChapterId={''}
+              />
+              
+              {/* Demo content preview */}
+              <div className="mt-6 p-4 bg-muted/30 rounded-lg border-2 border-dashed border-muted">
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Preview: After creating a lesson, you'll see:</h4>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div>• Drag & drop content blocks here</div>
+                  <div>• Reorder content with drag handles</div>
+                  <div>• Edit content inline</div>
+                  <div>• Create additional chapters</div>
+                </div>
+              </div>
+            </div>
+            
             <Button
               onClick={() => setAdding(true)}
               className="rounded-full px-8 py-3 text-lg shadow-lg"
@@ -837,7 +812,7 @@ export default function MainSection({
             </DrawerClose>
           </DrawerContent>
         </Drawer>
-        {/* Floating draggable bar with framer-motion label animation */}
+        {/* Floating draggable bar with framer-motion label animation - always visible */}
         <FloatingDraggableBar />
       </div>
     </div>
@@ -935,35 +910,103 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
     }
   }
 
+  // Helper function to get full media URL from base URL
+  // Uses lms.noveloffice.org as base URL in both development and production
+  const getMediaUrl = (path?: string): string => {
+    if (!path) return '';
+    const trimmed = path.trim();
+    if (!trimmed) return '';
+    
+    // If already a full URL, return as is
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    
+    // Ensure path starts with / if it doesn't already
+    const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    
+    // Determine base URL
+    // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+    // In development: use http://lms.noveloffice.org
+    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+    
+    return `${cleanBaseUrl}${relativePath}`;
+  };
+
   // View mode for saved content  
   switch (content.type) {
     case 'Text Content':
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto">
           {/* <div className="font-bold mb-2">{content.title}</div> */}
-          <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: content.body }} />
+          <>
+            <style>{`
+              .editor-text-prose ol {
+                list-style-type: decimal;
+                padding-left: 1.5em;
+                margin: 1em 0;
+              }
+              .editor-text-prose ol li {
+                margin-bottom: 0.5em;
+                display: list-item;
+              }
+              .editor-text-prose ul {
+                list-style-type: disc;
+                padding-left: 1.5em;
+                margin: 1em 0;
+              }
+              .editor-text-prose ul li {
+                margin-bottom: 0.5em;
+                display: list-item;
+              }
+              .editor-text-prose p {
+                margin: 1em 0;
+              }
+            `}</style>
+            <div 
+              className="prose prose-sm dark:prose-invert prose-ol:text-foreground prose-ul:text-foreground editor-text-prose" 
+              dangerouslySetInnerHTML={{ __html: content.body }}
+            />
+          </>
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
     case 'Image Content':
-      return (
+            return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
-          {content.attach && <img src={LMS_API_BASE_URL + content.attach} alt={content.title} className="max-h-48 mx-auto rounded" />}
+          {content.attach && (
+            <img 
+              src={getMediaUrl(content.attach)} 
+              alt={content.title || 'Image'} 
+              className="max-h-48 mx-auto rounded object-contain"
+            />
+          )}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
     case 'Video Content':
-      return (
+            return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
-          {content.video && <video src={LMS_API_BASE_URL + content.video} controls className="max-h-48 mx-auto rounded" />}
+          {content.video && (
+            <div className="relative">
+              <VideoPreview src={getMediaUrl(content.video)} />
+            </div>
+          )}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
     case 'Audio Content':
-      return (
+            return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           <div className="font-bold mb-2">{content.title}</div>
-          {content.attach && <audio src={LMS_API_BASE_URL + content.attach} controls className="w-full mt-2 rounded" />}
+          {content.attach && (
+            <audio 
+              src={getMediaUrl(content.attach)} 
+              controls 
+              className="w-full mt-2 rounded"
+            />
+          )}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
@@ -971,7 +1014,17 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           <div className="font-bold mb-2">{content.title}</div>
-          {content.attachment && <div className="mt-2"><a href={content.attachment} target="_blank" rel="noopener noreferrer" className="text-primary underline">Download File</a></div>}
+          {content.attachment && (
+            <div className="mt-2">
+              <a 
+                href={content.attachment} 
+                download={content.title || 'download'} 
+                className="text-primary underline hover:text-primary/80"
+              >
+                Download File
+              </a>
+            </div>
+          )}
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setEditing(true)}>Edit</Button>
         </div>
       );
@@ -1057,7 +1110,7 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
   }
 }
 
-function SortableContentBlock({ id, index, content, chapter, reorderContentBlocks, setModule }: any) {
+function SortableContentBlock({ id, content, chapter, setModule }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
     transform: CSS.Transform.toString(transform),

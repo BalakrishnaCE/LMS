@@ -1,21 +1,22 @@
 import React, { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
-import { ROUTES } from "@/config/routes";
+import { ROUTES, getFullPath } from "@/config/routes";
 import CelebrationLottie from '@/assets/Celebration.json';
 import Lottie from 'lottie-react';
 import { Loader2 } from 'lucide-react';
 
 interface CompletionScreenProps {
   onReview: () => void;
+  onBack?: () => void;
+  moduleName?: string;
   quizQAScores?: {
     allItems: Array<{ title: string; type: string }>;
     scores: Array<{ title: string; score: number; maxScore: number; type: string }>;
   };
 }
 
-export function CompletionScreen({ onReview, quizQAScores }: CompletionScreenProps) {
+export function CompletionScreen({ onReview, onBack, moduleName, quizQAScores }: CompletionScreenProps) {
   // Focus trap for accessibility
   const modalRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -103,7 +104,28 @@ export function CompletionScreen({ onReview, quizQAScores }: CompletionScreenPro
                     );
                   }
                   // Show percentage for scored items (Quiz or QA)
-                  const percent = scoreObj && scoreObj.maxScore > 0 ? Math.round((scoreObj.score / scoreObj.maxScore) * 100) : 0;
+                  // Handle cases where maxScore might be 0 or undefined
+                  let percent = 0;
+                  if (scoreObj) {
+                    console.log('Score calculation debug:', {
+                      title: item.title,
+                      type: item.type,
+                      score: scoreObj.score,
+                      maxScore: scoreObj.maxScore,
+                      scoreObj
+                    });
+                    
+                    if (scoreObj.maxScore > 0) {
+                      percent = Math.round((scoreObj.score / scoreObj.maxScore) * 100);
+                    } else if (scoreObj.score > 0) {
+                      // If we have a score but no maxScore, assume it's already a percentage
+                      // This handles cases where the quiz system saves percentage directly
+                      percent = Math.round(scoreObj.score);
+                    } else {
+                      // If both score and maxScore are 0, show 0%
+                      percent = 0;
+                    }
+                  }
                   return (
                     <div key={item.title + idx} className="w-full flex items-center justify-between bg-muted/60 rounded-lg px-4 py-3 shadow-sm border border-border">
                       <div className="flex flex-col">
@@ -133,15 +155,28 @@ export function CompletionScreen({ onReview, quizQAScores }: CompletionScreenPro
             >
               Review Again
             </Button>
-            <Link href={ROUTES.LEARNER_MODULES} className="w-full">
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full"
-              >
-                Back to Modules
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                if (onBack) {
+                  // Use the onBack callback to close the completion screen
+                  onBack();
+                } else {
+                  // Fallback: Navigate back to module detail or modules list
+                  if (moduleName) {
+                    const targetPath = ROUTES.LEARNER_MODULE_DETAIL(moduleName);
+                    const fullPath = getFullPath(targetPath);
+                    window.location.href = fullPath;
+                  } else {
+                    window.location.href = getFullPath(ROUTES.LEARNER_MODULES);
+                  }
+                }
+              }}
+            >
+              Back to Module Detail
+            </Button>
           </motion.div>
         </motion.div>
       </motion.div>

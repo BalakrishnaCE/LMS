@@ -5,7 +5,7 @@ import {
     CardTitle,
   } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {  useFrappeGetDocList } from "frappe-react-sdk"
+import {  useFrappeGetDocList, useFrappeAuth } from "frappe-react-sdk"
 import { Link } from "wouter"
 import {
   Pagination,
@@ -16,20 +16,31 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { motion } from "framer-motion"
-import { Download } from "lucide-react"
+import { Download, X, CopyPlus } from "lucide-react"
 import { toast } from "sonner"
-import { LMS_API_BASE_URL } from "@/config/routes"
+import { LMS_API_BASE_URL, ROUTES } from "@/config/routes"
+
+// Debounce utility function
+const debounce = (fn: Function, delay: number) => {
+    let timeout: NodeJS.Timeout;
+    return (...args: any[]) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn(...args), delay);
+    };
+};
 
 interface ModulesProps {
     itemsPerPage: number;
+    showArchived?: boolean;
+    onShowArchivedChange?: (value: boolean) => void;
 }
 
-type FilterOperator = "=" | "!=" | ">" | ">=" | "<" | "<=" | "like";
-type Filter = [string, FilterOperator, string | number];
 
 // Helper function to convert module data to CSV
 function convertToCSV(modules: any[]) {
@@ -64,31 +75,101 @@ function downloadCSV(csv: string, filename: string) {
   document.body.removeChild(link);
 }
 
-function Modules({ itemsPerPage }: ModulesProps) {
+function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: ModulesProps) {
     const [page, setPage] = useState(1)
-    const [searchQuery, setSearchQuery] = useState("")
-    const [selectedDepartment, setSelectedDepartment] = useState("all")
-    const [selectedStatus, setSelectedStatus] = useState("all")
+    // Initialize search query from localStorage
+    const [searchQuery, setSearchQuery] = useState(() => {
+        return localStorage.getItem('modules_search') || "";
+    })
+
+
+
+    const [selectedDepartment, setSelectedDepartment] = useState(() => {
+        return localStorage.getItem('modules_department') || "all";
+    })
+    const [selectedStatus, setSelectedStatus] = useState(() => {
+        return localStorage.getItem('modules_status') || "all";
+    })
     const [isExporting, setIsExporting] = useState(false)
     // Add image error state for all cards
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+    // Duplicate dialog state
+    const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+    const [moduleToDuplicate, setModuleToDuplicate] = useState<{ name: string; name1: string } | null>(null);
+
+    // Add authentication check to prevent race condition
+    const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
+
+    // Debounced save function for search query
+    const saveSearchToStorage = useCallback(
+        debounce((value: string) => {
+            if (value && value.trim()) {
+                localStorage.setItem('modules_search', value.trim());
+            } else {
+                localStorage.removeItem('modules_search');
+            }
+        }, 300),
+        []
+    );
+
+    // Persist department filter
+    useEffect(() => {
+        if (selectedDepartment && selectedDepartment !== "all") {
+            localStorage.setItem('modules_department', selectedDepartment);
+        } else {
+            localStorage.removeItem('modules_department');
+        }
+    }, [selectedDepartment]);
+
+    // Persist status filter
+    useEffect(() => {
+        if (selectedStatus && selectedStatus !== "all") {
+            localStorage.setItem('modules_status', selectedStatus);
+        } else {
+            localStorage.removeItem('modules_status');
+        }
+    }, [selectedStatus]);
+
+    // Handle search query change
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        saveSearchToStorage(value);
+    };
+
+    // Handle clear search
+    const handleClearSearch = () => {
+        setSearchQuery("");
+        saveSearchToStorage("");
+    };
 
     // Get departments for filter
     const { data: departments } = useFrappeGetDocList("Department", {
         fields: ["name", "department"],
         limit: 100,
-    })
+    });
     
     // Sort departments alphabetically by department name
     const sortedDepartments = departments?.sort((a, b) => 
         (a.department || a.name).localeCompare(b.department || b.name)
     ) || [];
-    const filters: Filter[] = []
+    
+    const filters: any[] = []
     if (selectedDepartment && selectedDepartment !== "all") {
         filters.push(["department", "=", selectedDepartment])
     }
-    if (selectedStatus && selectedStatus !== "all") {
-        filters.push(["status", "=", selectedStatus])
+    // If showArchived is true, filter to show only archived modules
+    // If showArchived is false, exclude archived modules from the list
+    if (showArchived) {
+        // When showing archived, force status to Archived
+        filters.push(["status", "=", "Archived"])
+    } else {
+        // When not showing archived, exclude archived modules
+        filters.push(["status", "!=", "Archived"])
+        // Apply status filter if selected and not "all"
+        if (selectedStatus && selectedStatus !== "all") {
+            filters.push(["status", "=", selectedStatus])
+        }
     }
     if (searchQuery) {
         filters.push(["name1", "like", `%${searchQuery}%`])
@@ -130,7 +211,26 @@ function Modules({ itemsPerPage }: ModulesProps) {
     // Reset page when filters change
     useEffect(() => {
         setPage(1)
-    }, [searchQuery, selectedDepartment, selectedStatus])
+    }, [searchQuery, selectedDepartment, selectedStatus, showArchived])
+    
+    // Reset status filter when showArchived changes
+    useEffect(() => {
+        if (showArchived && selectedStatus !== "all" && selectedStatus !== "Archived") {
+            setSelectedStatus("all")
+        }
+    }, [showArchived])
+
+    // Show loading state while authentication is being determined
+    if (isAuthLoading || !currentUser) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-4 text-muted-foreground">Loading modules...</p>
+                </div>
+            </div>
+        );
+    }
 
     const handleExport = async () => {
         try {
@@ -185,19 +285,81 @@ function Modules({ itemsPerPage }: ModulesProps) {
         }
     };
 
+    const handleDuplicateClick = (moduleName: string, moduleDisplayName: string) => {
+        setModuleToDuplicate({ name: moduleName, name1: moduleDisplayName });
+        setShowDuplicateDialog(true);
+    };
+
+    const handleDuplicateConfirm = async () => {
+        if (!moduleToDuplicate) return;
+
+        setShowDuplicateDialog(false);
+
+        try {
+            toast.loading("Duplicating module...");
+
+            const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.module_management.duplicate_module`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    module_name: moduleToDuplicate.name
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to duplicate module');
+            }
+
+            const data = await response.json();
+            
+            if (data.message && data.message.success) {
+                toast.dismiss();
+                toast.success("Module duplicated successfully");
+                
+                // Refresh the page to show the new module
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                throw new Error(data.message?.error || 'Failed to duplicate module');
+            }
+        } catch (error: any) {
+            toast.dismiss();
+            toast.error(error.message || "Failed to duplicate module");
+            console.error("Duplicate error:", error);
+        } finally {
+            setModuleToDuplicate(null);
+        }
+    };
+
     return (
-        <div>
-            <div className="flex gap-4 p-4 mb-4">
-                <div className="flex-1">
+        <div className="overflow-x-auto">
+
+            <div className="flex gap-4 p-4 mb-4 flex-wrap">
+                <div className="flex-[5] relative min-w-0 shrink">
                     <Input
                         placeholder="Search modules..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={handleSearchChange}
+                        className="pr-10 w-full border-2 border-border/50 focus:border-primary"
                     />
+                    {searchQuery && (
+                        <button
+                            onClick={handleClearSearch}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                            type="button"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
                 </div>
-                <div className="w-[200px]">
+                <div className="w-[180px] flex-shrink-0">
                     <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                        <SelectTrigger>
+                        <SelectTrigger className="border-2 border-border/50 focus:border-primary">
                             <SelectValue placeholder="Department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -210,22 +372,50 @@ function Modules({ itemsPerPage }: ModulesProps) {
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="w-[200px]">
-                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="Published">Published</SelectItem>
-                            <SelectItem value="Draft">Draft</SelectItem>
-                            <SelectItem value="Approval Pending">Approval Pending</SelectItem>
-                        </SelectContent>
-                    </Select>
+                {!showArchived ? (
+                    <div className="w-[180px] -ml-3 flex-shrink-0">
+                        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                            <SelectTrigger className="border-2 border-border/50 focus:border-primary">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="Published">Published</SelectItem>
+                                <SelectItem value="Draft">Draft</SelectItem>
+                                <SelectItem value="Approval Pending">Approval Pending</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                ) : (
+                    <div className="w-[180px] -ml-3 flex-shrink-0"></div>
+                )}
+                <div className="flex items-center gap-2 flex-shrink-0 -ml-2">
+                    <Label htmlFor="archived-toggle" className="text-sm font-medium whitespace-nowrap">
+                        {showArchived ? "Archived" : "Archived"}
+                    </Label>
+                    <button
+                        id="archived-toggle"
+                        type="button"
+                        role="switch"
+                        aria-checked={showArchived}
+                        onClick={() => onShowArchivedChange?.(!showArchived)}
+                        className={`
+                            relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                            border-0 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+                            ${showArchived ? 'bg-[#018790]' : 'bg-gray-300 dark:bg-gray-600'}
+                        `}
+                    >
+                        <span
+                            className={`
+                                inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                                ${showArchived ? 'translate-x-6' : 'translate-x-1'}
+                            `}
+                        />
+                    </button>
                 </div>
                 <Button 
                     variant="outline" 
-                    className="w-auto"
+                    className="w-auto flex-shrink-0 ml-2"
                     onClick={handleExport}
                     disabled={isExporting}
                 >
@@ -234,23 +424,52 @@ function Modules({ itemsPerPage }: ModulesProps) {
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 max-w-300 p-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 p-4">
                 {module_list?.map((module) => {
                     // Status bar color logic
                     let statusColor = "bg-gray-200 text-gray-700";
                     if (module.status === "Published") statusColor = "bg-green-100 text-green-700";
                     else if (module.status === "Approval Pending") statusColor = "bg-amber-100 text-amber-700";
                     else if (module.status === "Draft") statusColor = "bg-gray-200 text-gray-700";
+                    else if (module.status === "Archived") statusColor = "bg-orange-100 text-orange-700";
 
                     let statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
                     if (module.status === "Published") statusDarkColor = "dark:bg-green-900 dark:text-green-300";
                     else if (module.status === "Approval Pending") statusDarkColor = "dark:bg-amber-900 dark:text-amber-200";
                     else if (module.status === "Draft") statusDarkColor = "dark:bg-gray-800 dark:text-gray-300";
+                    else if (module.status === "Archived") statusDarkColor = "dark:bg-orange-900 dark:text-orange-300";
 
+                    // Helper function to get full image URL
+                    const getImageUrl = (path?: string): string => {
+                        if (!path) return '';
+                        const trimmed = path.trim();
+                        if (!trimmed) return '';
+                        
+                        // If already a full URL, return as is
+                        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                            return trimmed;
+                        }
+                        
+                        // Ensure path starts with / if it doesn't already
+                        const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                        
+                        // Determine base URL
+                        // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                        // In development: use http://lms.noveloffice.org
+                        const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                        
+                        return `${cleanBaseUrl}${relativePath}`;
+                    };
+                    
                     // Use imageErrors state for this module
-                    const imageUrl = module.image
-                        ? (module.image.startsWith('http') ? module.image : `${LMS_API_BASE_URL}${module.image}`)
-                        : null;
+                    const imageUrl = module.image ? getImageUrl(module.image) : null;
+                    
+                    // Debug: Log image URL construction
+                    // if (module.image) {
+                    //     console.log(`Module ${module.name1}: image="${module.image}", imageUrl="${imageUrl}"`);
+                    // }
+                    
                     const hasError = imageErrors[module.name];
 
                     return (
@@ -270,6 +489,18 @@ function Modules({ itemsPerPage }: ModulesProps) {
                                              style={{ position: 'absolute', top: 0, left: 0 }}>
                                             {module.status === "Approval Pending" ? "Pending" : module.status}
                                         </div>
+                                        {/* Duplicate Icon Button - Positioned below status bar (h-8 = 2rem, so 2rem + 0.5rem = 2.5rem = top-10) */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                handleDuplicateClick(module.name, module.name1);
+                                            }}
+                                            className="absolute top-10 right-2 z-20 p-2 rounded-full bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
+                                            title="Duplicate Module"
+                                        >
+                                            <CopyPlus className="h-4 w-4 text-primary" />
+                                        </button>
                                         {/* Image or Letter Avatar with fallback */}
                                         {imageUrl && !hasError ? (
                                             <img
@@ -277,13 +508,18 @@ function Modules({ itemsPerPage }: ModulesProps) {
                                                 alt={module.name1}
                                                 className="w-full h-48 object-cover pb-4"
                                                 style={{ marginTop: '2rem' }}
-                                                onError={() => setImageErrors(prev => ({ ...prev, [module.name]: true }))}
+                                                onError={() => {
+                                                    console.log(`Image failed to load: ${imageUrl}`);
+                                                    setImageErrors(prev => ({ ...prev, [module.name]: true }));
+                                                }}
                                             />
                                         ) : (
                                             <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 pb-4" style={{ marginTop: '2rem' }}>
-                                                <span className="text-6xl font-semibold text-primary/60 dark:text-primary/70">
-                                                    {module.name1?.charAt(0).toUpperCase() || "M"}
-                                                </span>
+                                                <div className="text-center">
+                                                    <div className="text-6xl font-semibold text-primary/60 dark:text-primary/70">
+                                                        {module.name1?.charAt(0).toUpperCase() || "M"}
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -294,7 +530,7 @@ function Modules({ itemsPerPage }: ModulesProps) {
                                     </CardHeader>
                                 </div>
                                 <CardFooter className="pt-0 pb-4 mt-auto">
-                                    <Link href={`/modules/learner/${module.name}`} className="w-full">
+                                    <Link href={ROUTES.ADMIN_MODULE_DETAIL(module.name)} className="w-full">
                                         <Button 
                                             variant="outline"
                                             className="w-full transition-all duration-200 dark:text-foreground dark:hover:bg-primary dark:hover:text-primary-foreground dark:border-primary/50 hover:scale-[1.02] active:scale-[0.98]"
@@ -391,6 +627,62 @@ function Modules({ itemsPerPage }: ModulesProps) {
                     </PaginationContent>
                 </Pagination>
             </div>
+
+            {/* Duplicate Confirmation Dialog */}
+            <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <CopyPlus className="h-5 w-5 text-primary" />
+                            Duplicate Module
+                        </DialogTitle>
+                        <DialogDescription className="pt-2">
+                            Are you sure you want to duplicate all lessons, chapters and contents from this module?
+                        </DialogDescription>
+                    </DialogHeader>
+                    {moduleToDuplicate && (
+                        <div className="py-4">
+                            <div className="rounded-lg bg-muted p-4">
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Module Name:</p>
+                                <p className="text-base font-semibold">{moduleToDuplicate.name1}</p>
+                            </div>
+                            <div className="mt-4 space-y-2">
+                                <p className="text-sm text-muted-foreground">
+                                    This will create a duplicate module with:
+                                </p>
+                                <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1 ml-2">
+                                    <li>All lessons</li>
+                                    <li>All chapters</li>
+                                    <li>All contents (including Audio,video,image etc.)</li>
+                                    <li>Quiz questions and answers</li>
+                                    <li>Question Answer questions</li>
+                                </ul>
+                                <p className="text-sm font-medium mt-3">
+                                    The new module will be named: <span className="text-primary">{moduleToDuplicate.name1} (copy)</span>
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowDuplicateDialog(false);
+                                setModuleToDuplicate(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleDuplicateConfirm}
+                            className="bg-primary hover:bg-primary/90"
+                        >
+                            <CopyPlus className="mr-2 h-4 w-4" />
+                            Confirm Duplicate
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

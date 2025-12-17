@@ -1,28 +1,25 @@
-import React from "react";
 import MainSection from "./MainSection";
 
-import type { Module, Lesson } from "./types";
+import type { Module } from "./types";
 
 export default function ContentStructureEditor({
-  isMobile,
   module,
-  addLesson,
   addContentToChapter,
   setModule,
-  moduleName,
+  moduleId,
   loading,
   activeLessonId,
-  activeChapterId
+  activeChapterId,
+  onLessonAdded
 }: {
-  isMobile: boolean;
   module: Module;
-  addLesson: (lesson: { title: string; description: string; chapter: { title: string } }) => void;
   addContentToChapter: (contentType: string, lessonId: string, chapterId: string) => void;
   setModule: any;
-  moduleName: string;
+  moduleId?: string;
   loading?: boolean;
   activeLessonId?: string | null;
   activeChapterId?: string | null;
+  onLessonAdded?: () => void;
 }) {
   if (!module || !Array.isArray(module.lessons)) {
     return null;
@@ -32,15 +29,14 @@ export default function ContentStructureEditor({
       {/* Sidebar and other UI can go here */}
       <MainSection
         hasLessons={module.lessons.length > 0}
-        onAddLesson={addLesson}
-        isMobile={isMobile}
         lessons={module.lessons}
         addContentToChapter={addContentToChapter}
         setModule={setModule}
-        moduleName={moduleName}
+        moduleId={moduleId}
         loading={loading}
         activeLessonId={activeLessonId}
         activeChapterId={activeChapterId}
+        onLessonAdded={onLessonAdded}
       />
     </div>
   );

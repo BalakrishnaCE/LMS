@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ModuleInfo } from "./ModuleEdit";
 import { useLocation } from "wouter";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { ArrowLeftIcon, X, Pencil } from "lucide-react";
-import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc, useFrappeGetDoc } from "frappe-react-sdk";
+import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc, useFrappeGetCall } from "frappe-react-sdk";
 import { toast } from "sonner";
 import {
   Select,
@@ -216,6 +217,7 @@ function SettingsDialog({
   };
 
   const [search, setSearch] = useState("");
+  const [currentLearnersSearch, setCurrentLearnersSearch] = useState("");
   // Assume originalModule and originalLearners are set when the sidebar opens
   const [originalModule, setOriginalModule] = useState(editState);
   const [originalLearners, setOriginalLearners] = useState(learners);
@@ -242,13 +244,28 @@ function SettingsDialog({
       }
       onOpenChange(open);
     }}>
-      <SheetContent side="right" className="w-full sm:max-w-full p-0 overflow-y-auto">
-        <div className="h-full flex flex-col overflow-y-auto">
-          <SheetHeader className="p-6 border-b">
-            <SheetTitle>Module Settings</SheetTitle>
+      <SheetContent side="right" className="w-full sm:max-w-full p-0 flex flex-col overflow-hidden" hideClose>
+        <div className="h-full flex flex-col overflow-hidden">
+          <SheetHeader className="p-6 border-b bg-background sticky top-0 z-10 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <SheetTitle>Module Settings</SheetTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => {
+                  setEditState(moduleInfo);
+                  setLearners(moduleInfo.learners || []);
+                  onOpenChange(false);
+                }}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveWithLearners} disabled={!hasChanges}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
           </SheetHeader>
-          <Tabs defaultValue="basic" className="flex-1 flex flex-col">
-            <TabsList className="mx-auto mt-4 mb-6">
+          <div className="flex-1 overflow-y-auto">
+            <Tabs defaultValue="basic" className="flex flex-col">
+              <TabsList className="mx-auto mt-4 mb-6">
               <TabsTrigger value="basic">
                 <Info className="mr-2 w-4 h-4" /> Basic Details
               </TabsTrigger>
@@ -265,16 +282,61 @@ function SettingsDialog({
                       value={editState?.name || ""}
                       onChange={(e) => handleFieldChange("name", e.target.value)}
                       placeholder="Module Name"
+                      className="border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Module Image</Label>
                     {editState?.image && (
-                      <img
-                        src={editState.image.startsWith('http') ? editState.image : `${LMS_API_BASE_URL}${editState.image}`}
-                        alt="Module"
-                        className="mb-2 max-h-32 rounded"
-                      />
+                      <div className="relative inline-block mb-2">
+                        <img
+                          src={(() => {
+                            // Helper function to get full image URL
+                            const getImageUrl = (path: string): string => {
+                              if (!path) return '';
+                              const trimmed = path.trim();
+                              if (!trimmed) return '';
+                              
+                              // If already a full URL, return as is
+                              if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                return trimmed;
+                              }
+                              
+                              // Ensure path starts with / if it doesn't already
+                              const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                              
+                              // Determine base URL
+                              // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                              // In development: use http://lms.noveloffice.org
+                              const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                              const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                              
+                              return `${cleanBaseUrl}${relativePath}`;
+                            };
+                            return getImageUrl(editState.image);
+                          })()}
+                          alt="Module"
+                          className="max-h-32 rounded"
+                          onError={(e) => {
+                            console.error('Failed to load module image:', editState.image);
+                            // Hide broken image
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-8 w-8"
+                          onClick={() => {
+                            handleFieldChange("image", "");
+                            toast.success("Image removed");
+                          }}
+                          disabled={uploadingImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
                     <Input
                       type="file"
@@ -285,8 +347,8 @@ function SettingsDialog({
                         setUploadingImage(true);
                         try {
                           const url = await uploadFileToFrappe(file);
-                          const fullUrl = url.startsWith('http') ? url : `${LMS_API_BASE_URL}${url}`;
-                          handleFieldChange("image", fullUrl);
+                          // Store only the relative path, not the full URL
+                          handleFieldChange("image", url);
                           toast.success("Image uploaded successfully");
                         } catch (err) {
                           toast.error("Failed to upload image");
@@ -295,6 +357,7 @@ function SettingsDialog({
                         }
                       }}
                       disabled={uploadingImage}
+                      className="border-2 border-border/50 focus:border-primary"
                     />
                     {uploadingImage && <div className="text-sm text-muted-foreground">Uploading...</div>}
                   </div>
@@ -313,7 +376,7 @@ function SettingsDialog({
                       value={editState?.status || "Draft"}
                       onValueChange={(value) => handleFieldChange("status", value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="border-2 border-border/50 focus:border-primary">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -326,18 +389,82 @@ function SettingsDialog({
                   <div className="space-y-2">
                     <Label>Duration (days)</Label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={editState?.duration || ""}
-                      onChange={(e) => handleFieldChange("duration", e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Only allow digits (0-9), remove any special characters
+                        const numericValue = value.replace(/[^0-9]/g, '');
+                        // Limit to maximum 2 digits
+                        if (numericValue.length <= 2) {
+                          handleFieldChange("duration", numericValue);
+                        } else if (numericValue.length > 2) {
+                          handleFieldChange("duration", numericValue.slice(0, 2));
+                        }
+                      }}
+                      placeholder="Enter duration (1-99)"
+                      maxLength={2}
+                      pattern="[0-9]{1,2}"
+                      className="border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Order</Label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={editState?.order ?? 1}
-                      min={1}
-                      onChange={e => handleFieldChange("order", Number(e.target.value))}
+                      onChange={e => {
+                        const value = e.target.value;
+                        // Remove any non-digit characters (including dots and minus)
+                        const numericValue = value.replace(/[^0-9]/g, '');
+                        // Limit to maximum 2 digits
+                        const limitedValue = numericValue.slice(0, 2);
+                        if (limitedValue === '') {
+                          handleFieldChange("order", '');
+                        } else {
+                          // Store as number, but ensure it's between 1 and 99
+                          const numValue = parseInt(limitedValue, 10);
+                          if (!isNaN(numValue)) {
+                            // If the number is 0 or would exceed 99, cap it at 99
+                            if (numValue === 0) {
+                              handleFieldChange("order", '');
+                            } else if (numValue > 99) {
+                              handleFieldChange("order", 99);
+                            } else {
+                              handleFieldChange("order", numValue);
+                            }
+                          } else {
+                            handleFieldChange("order", '');
+                          }
+                        }
+                      }}
+                      onBlur={e => {
+                        // On blur, ensure we have a valid number between 1 and 99, default to 1 if empty
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        if (value === '' || value === '0') {
+                          handleFieldChange("order", 1);
+                        } else {
+                          const numValue = parseInt(value, 10);
+                          if (isNaN(numValue) || numValue < 1) {
+                            handleFieldChange("order", 1);
+                          } else if (numValue > 99) {
+                            handleFieldChange("order", 99);
+                          } else {
+                            handleFieldChange("order", numValue);
+                          }
+                        }
+                      }}
+                      onKeyDown={e => {
+                        // Prevent minus key and dot from being entered (just block them, don't clear)
+                        if (e.key === '-' || e.key === '.') {
+                          e.preventDefault();
+                        }
+                      }}
+                      maxLength={2}
+                      placeholder="Enter order (1-99)"
+                      className="border-2 border-border/50 focus:border-primary"
                     />
                   </div>
                   <div className="space-y-2">
@@ -346,7 +473,7 @@ function SettingsDialog({
                       value={editState?.assignment_based || "Everyone"}
                       onValueChange={(value) => handleFieldChange("assignment_based", value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="border-2 border-border/50 focus:border-primary">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -363,7 +490,7 @@ function SettingsDialog({
                         value={editState?.department || ""}
                         onValueChange={val => handleFieldChange("department" as keyof ModuleInfo, val)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="border-2 border-border/50 focus:border-primary">
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
@@ -375,97 +502,132 @@ function SettingsDialog({
                     </div>
                   )}
                   {editState?.assignment_based === "Manual" && (
-                    <div className=" flex flex-col gap-2">
-                      <div>
-                        <Label className="mb-2">Learners</Label>
-                        {/* Searchable user table with Add button */}
-                        <Input
-                          placeholder="Search learners..."
-                          value={search}
-                          onChange={e => setSearch(e.target.value)}
-                          className="mb-2 w-full"
-                        />
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>Action</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {studentUsers
-                              .filter(u =>
-                                u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-                                u.email?.toLowerCase().includes(search.toLowerCase())
-                              )
-                              .map(u => {
-                                const alreadyAdded = learners.some(l => l.user === u.name);
-                                return (
-                                  <TableRow key={u.name}>
-                                    <TableCell>{u.full_name}</TableCell>
-                                    <TableCell>{u.email}</TableCell>
-                                    <TableCell>
-                                      <Button
-                                        size="sm"
-                                        variant={alreadyAdded ? "secondary" : "outline"}
-                                        disabled={alreadyAdded}
-                                        onClick={() => {
-                                          if (!alreadyAdded) setLearners([...learners, { user: u.name }]);
-                                        }}
-                                      >
-                                        {alreadyAdded ? "Added" : "Add"}
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                      {/* Current module learners list */}
-                      <div className="mt-4">
-                        <Label>Current Learners</Label>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>Action</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {learners.map((row, idx) => {
-                              const user = studentUsers.find(u => u.name === row.user);
-                              if (!user) return null;
-                              return (
-                                <TableRow key={row.user}>
-                                  <TableCell>{user.full_name}</TableCell>
-                                  <TableCell>{user.email}</TableCell>
-                                  <TableCell>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => setLearners(learners.filter((l, i) => i !== idx))}
-                                    >
-                                      Remove
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
+                    <div className="flex flex-col gap-2">
+                      <Label className="mb-2">Learners</Label>
+                      <Tabs defaultValue="search" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="search">Add Learners</TabsTrigger>
+                          <TabsTrigger value="current">Current Learners</TabsTrigger>
+                        </TabsList>
+                        <div className="mt-4 min-h-[450px]">
+                          <TabsContent value="search" className="m-0">
+                            <div className="space-y-4">
+                              <Input
+                                placeholder="Search learners..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="w-full border-2 border-border/50 focus:border-primary"
+                              />
+                              <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
+                                <Table>
+                                  <TableHeader className="sticky top-0 bg-background z-10">
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Email</TableHead>
+                                      <TableHead>Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {studentUsers
+                                      .filter(u =>
+                                        u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+                                        u.email?.toLowerCase().includes(search.toLowerCase())
+                                      )
+                                      .map(u => {
+                                        const alreadyAdded = learners.some(l => l.user === u.name);
+                                        return (
+                                          <TableRow key={u.name}>
+                                            <TableCell>{u.full_name}</TableCell>
+                                            <TableCell>{u.email}</TableCell>
+                                            <TableCell>
+                                              <Button
+                                                size="sm"
+                                                variant={alreadyAdded ? "secondary" : "outline"}
+                                                disabled={alreadyAdded}
+                                                onClick={() => {
+                                                  if (!alreadyAdded) setLearners([...learners, { user: u.name }]);
+                                                }}
+                                              >
+                                                {alreadyAdded ? "Added" : "Add"}
+                                              </Button>
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="current" className="m-0">
+                            <div className="space-y-4">
+                              <Input
+                                placeholder="Search learners..."
+                                value={currentLearnersSearch}
+                                onChange={e => setCurrentLearnersSearch(e.target.value)}
+                                className="w-full border-2 border-border/50 focus:border-primary"
+                              />
+                              <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
+                                <Table>
+                                  <TableHeader className="sticky top-0 bg-background z-10">
+                                    <TableRow>
+                                      <TableHead>Name</TableHead>
+                                      <TableHead>Email</TableHead>
+                                      <TableHead>Action</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {learners.length === 0 ? (
+                                      <TableRow>
+                                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                                          No learners added yet. Use the "Add Learners" tab to add learners.
+                                        </TableCell>
+                                      </TableRow>
+                                    ) : (
+                                      learners
+                                        .filter((row) => {
+                                          const user = studentUsers.find(u => u.name === row.user);
+                                          if (!user) return false;
+                                          const searchLower = currentLearnersSearch.toLowerCase();
+                                          return (
+                                            user.full_name?.toLowerCase().includes(searchLower) ||
+                                            user.email?.toLowerCase().includes(searchLower)
+                                          );
+                                        })
+                                        .map((row) => {
+                                          const user = studentUsers.find(u => u.name === row.user);
+                                          if (!user) return null;
+                                          const originalIndex = learners.findIndex(l => l.user === row.user);
+                                          return (
+                                            <TableRow key={row.user}>
+                                              <TableCell>{user.full_name}</TableCell>
+                                              <TableCell>{user.email}</TableCell>
+                                              <TableCell>
+                                                <Button
+                                                  size="sm"
+                                                  variant="destructive"
+                                                  onClick={() => setLearners(learners.filter((l, i) => i !== originalIndex))}
+                                                >
+                                                  Remove
+                                                </Button>
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          </TabsContent>
+                        </div>
+                      </Tabs>
                     </div>
                   )}
                 </div>
               </TabsContent>
             </div>
-          </Tabs>
-          <div className="p-6 border-t flex justify-end gap-2 max-w-3xl mx-auto w-full">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSaveWithLearners} disabled={!hasChanges}>Save Changes</Button>
+            </Tabs>
           </div>
         </div>
       </SheetContent>
@@ -713,7 +875,7 @@ function SortableLesson({ lesson, activeLessonId, setActiveLessonId, setActiveCh
             <ul className="ml-6 mt-1 space-y-1">
               {lesson.chapters.map((chapter: any, chapterIndex: number) => (
                 <SortableChapter
-                  key={chapter.id || `chapter-${lesson.id}-${chapterIndex}`}
+                  key={chapter.id || `chapter-${lesson.id}-${chapterIndex}-${chapter.title || 'untitled'}`}
                   chapter={chapter}
                   index={chapterIndex}
                   activeChapterId={activeChapterId}
@@ -733,6 +895,7 @@ function SortableLesson({ lesson, activeLessonId, setActiveLessonId, setActiveCh
 
 export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFinishSetup, isMobile, onLessonAdded, activeLessonId, setActiveLessonId, activeChapterId, setActiveChapterId }: ModuleSidebarProps) {
   const [, setLocation] = useLocation();
+  const { getPreviousModulePath } = useNavigation();
   const { updateDoc, loading: saving } = useFrappeUpdateDoc();
   const [editState, setEditState] = useState<ModuleInfo | null>(null);
   const [learners, setLearners] = useState<LearnerRow[]>([]); // Add learners state
@@ -759,12 +922,18 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   });
 
   // In Sidebar component, add a refetch function for moduleInfo
-  type LMSModule = ModuleInfo; // or import the correct type if available
-  const { data: freshModuleInfo, mutate: refetchModuleInfo } = useFrappeGetDoc<LMSModule>(
-    "LMS Module",
-    moduleInfo?.id || "",
-    { swrConfig: { revalidateOnFocus: false } }
+  // Use the same API endpoint as ModuleEdit to avoid CORS issues
+  const { data: freshModuleData, mutate: refetchModuleInfo, error: refetchError } = useFrappeGetCall(
+    'novel_lms.novel_lms.api.module_management.get_module_with_details',
+    { module_id: moduleInfo?.id || "" },
+    { 
+      swrConfig: { revalidateOnFocus: false },
+      enabled: !!moduleInfo?.id // Only fetch if we have a valid module ID
+    }
   );
+  
+  // Extract the module info from the API response
+  const freshModuleInfo = freshModuleData?.data || freshModuleData?.message || freshModuleData;
 
   // Initialize edit state and learners when moduleInfo changes
   useEffect(() => {
@@ -783,6 +952,14 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       setHasChanges(false);
     }
   }, [moduleInfo]);
+
+  // Handle refetch errors
+  useEffect(() => {
+    if (refetchError) {
+      console.warn("Failed to refetch module info:", refetchError);
+      // Don't show error to user as this is just a background refresh
+    }
+  }, [refetchError]);
 
   // Check for changes in module info and content structure
   useEffect(() => {
@@ -804,20 +981,43 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   const handleSave = async (learnersToSave: LearnerRow[] = learners) => {
     if (!moduleInfo || !editState) return;
     
+    // Validate duration only if provided: must be between 1 and 99
+    // Treat empty string, null, undefined, 0, or "0" as optional (no duration)
+    let durationNum: number | undefined = undefined;
+    const durationValue = editState.duration;
+    const durationStr = String(durationValue || "").trim();
+    if (durationStr !== "" && durationStr !== "0") {
+      durationNum = parseInt(durationStr, 10);
+      if (isNaN(durationNum) || durationNum < 1 || durationNum > 99) {
+        toast.error("Duration must be a number between 1 and 99 days");
+        return;
+      }
+    }
+    
     try {
+      // Normalize learners data for backend
+      let normalizedLearners: Array<{ user: string }> = [];
+      
+      if (editState.assignment_based === "Manual") {
+        // Filter out empty learners and ensure proper format
+        normalizedLearners = learnersToSave
+          .filter(learner => learner && learner.user && learner.user.trim() !== "")
+          .map(learner => ({ user: learner.user }));
+      }
+
       // Prepare the update data
       const updateData: any = {
         name1: editState.name,
         description: editState.description,
-        duration: editState.duration,
+        duration: durationNum, // Optional: only set if provided and valid
         order: editState.order ?? 1,
         status: editState.status,
         assignment_based: editState.assignment_based,
         // Send department as simple string
         department: editState.department || "",
         image: editState.image,
-        // Always update learners based on current assignment method
-        learners: editState.assignment_based === "Manual" ? learnersToSave : []
+        // Send properly formatted learners array
+        learners: normalizedLearners
       };
 
       // Only include lessons if they exist in the current module state
@@ -829,6 +1029,12 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         updateData.lessons = formattedLessons;
       }
 
+      console.log("DEBUG: Saving module with data:", {
+        assignment_based: editState.assignment_based,
+        learners: normalizedLearners,
+        learnersCount: normalizedLearners.length
+      });
+
       // Update module info
       await updateDoc("LMS Module", moduleInfo.id, updateData);     
       toast.success("Module saved successfully");
@@ -838,10 +1044,15 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       setHasChanges(false);
       setShowSettings(false);
       // Refetch the latest module info from backend
-      await refetchModuleInfo();
-      if (freshModuleInfo) {
-        setEditState({ ...freshModuleInfo });
-        setLearners(freshModuleInfo.learners || []);
+      try {
+        await refetchModuleInfo();
+        if (freshModuleInfo) {
+          setEditState({ ...freshModuleInfo });
+          setLearners(freshModuleInfo.learners || []);
+        }
+      } catch (refetchErr) {
+        console.warn("Failed to refetch module info after save:", refetchErr);
+        // Continue without updating the state - the save was successful
       }
       onFinishSetup?.(editState);
     } catch (err) {
@@ -907,18 +1118,82 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   // Delete lesson handler
   const handleDeleteLesson = async () => {
     if (!lessonToDelete || !moduleInfo || !module) return;
+    
     try {
-      // 1. Remove the lesson from the module's lessons array
+      // Find the lesson to get its chapters
+      const lessonToDeleteData = (module.lessons || []).find(l => l.id === lessonToDelete);
+      
+      // 1. Remove the lesson from the module's lessons array FIRST
       const updatedLessons = (module.lessons || []).filter(l => l.id !== lessonToDelete);
       await updateDoc("LMS Module", moduleInfo.id, {
         lessons: updatedLessons.map((l, idx) => ({ lesson: l.id, order: idx + 1 }))
       });
-      // 2. Delete the lesson doc
+      
+      // 2. Remove chapter references from the lesson FIRST (breaks the link)
+      if (lessonToDeleteData?.chapters && lessonToDeleteData.chapters.length > 0) {
+        await updateDoc("Lesson", lessonToDelete, {
+          chapters: [] // Clear all chapter references
+        });
+      }
+      
+      // 3. COMPLETE CASCADE DELETION - Delete all content and chapters
+      if (lessonToDeleteData?.chapters) {
+        for (const chapter of lessonToDeleteData.chapters) {
+          
+          // 3a. Clear content references from chapter FIRST (breaks the links)
+          try {
+            await updateDoc("Chapter", chapter.id, {
+              contents: [] // Clear all content references
+            });
+          } catch (updateErr) {
+            console.warn(`Failed to clear content references from chapter ${chapter.id}:`, updateErr);
+          }
+          
+          // 3b. Now delete all content types (safe to delete after removing links)
+          if (chapter.contents && chapter.contents.length > 0) {
+            for (const content of chapter.contents) {
+              const contentDocname = content.docname || content.content_reference;
+              const contentType = content.type || content.content_type;
+              
+              if (contentDocname && contentType) {
+                try {
+                  await deleteDoc(contentType, contentDocname);
+                } catch (contentErr) {
+                  console.warn(`Failed to delete ${contentType} ${contentDocname}:`, contentErr);
+                  // Continue with other content even if one fails
+                }
+              }
+            }
+          }
+          
+          // 3c. Delete the chapter
+          try {
+            await deleteDoc("Chapter", chapter.id);
+          } catch (chapterErr) {
+            console.warn(`Failed to delete chapter ${chapter.id}:`, chapterErr);
+          }
+        }
+      }
+      
+      // 4. Finally delete the lesson document (now that all links are broken)
       await deleteDoc("Lesson", lessonToDelete);
-      toast.success("Lesson deleted successfully");
-      onLessonAdded?.();
+      
+      toast.success("Lesson, chapters, and all content deleted successfully");
+      
+      // Reset active states since the lesson is deleted
+      if (activeLessonId === lessonToDelete) {
+        setActiveLessonId?.("");
+        setActiveChapterId?.("");
+      }
+      
+      // Force refresh the module data with a small delay to ensure backend operations complete
+      setTimeout(() => {
+        onLessonAdded?.();
+      }, 500);
     } catch (err) {
-      toast.error("Failed to delete lesson");
+      console.error("Error deleting lesson:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      toast.error("Failed to delete lesson: " + errorMessage);
     } finally {
       setShowDeleteLessonDialog(false);
       setLessonToDelete(null);
@@ -993,6 +1268,13 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     if (!editState) return;
     if (field === "department") {
       setEditState({ ...editState, department: value });
+    } else if (field === "assignment_based") {
+      // When switching from Everyone or Department to Manual, clear learners
+      const previousAssignment = editState.assignment_based;
+      if (previousAssignment && ["Everyone", "Department"].includes(previousAssignment) && value === "Manual") {
+        setLearners([]); // Clear learners when switching to Manual
+      }
+      setEditState({ ...editState, [field]: value });
     } else {
       setEditState({ ...editState, [field]: value });
     }
@@ -1016,9 +1298,12 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                 variant="outline"
                 size="sm"
                 className="mb-4 w-full hover:bg-accent hover:text-primary"
-                onClick={() => setLocation('/modules')}
+                onClick={() => {
+                  // Navigate to the modules list page
+                  setLocation('/modules');
+                }}
               >
-                <ArrowLeftIcon className="w-4 h-4" /> Back to Modules
+                <ArrowLeftIcon className="w-4 h-4" /> Back to Module
               </Button>
 
               <AnimatePresence mode="wait">
@@ -1049,9 +1334,38 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                       <Label>Module Image</Label>
                       {moduleInfo?.image && (
                         <img
-                          src={moduleInfo.image.startsWith('http') ? moduleInfo.image : `${LMS_API_BASE_URL}${moduleInfo.image}`}
+                          src={(() => {
+                            // Helper function to get full image URL
+                            const getImageUrl = (path: string): string => {
+                              if (!path) return '';
+                              const trimmed = path.trim();
+                              if (!trimmed) return '';
+                              
+                              // If already a full URL, return as is
+                              if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                return trimmed;
+                              }
+                              
+                              // Ensure path starts with / if it doesn't already
+                              const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                              
+                              // Determine base URL
+                              // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                              // In development: use http://lms.noveloffice.org
+                              const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                              const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                              
+                              return `${cleanBaseUrl}${relativePath}`;
+                            };
+                            return getImageUrl(moduleInfo.image);
+                          })()}
                           alt="Module"
                           className="mb-2 max-h-32 rounded"
+                          onError={(e) => {
+                            console.error('Failed to load module image:', moduleInfo.image);
+                            // Hide broken image
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
                       )}
                     </div>
@@ -1079,7 +1393,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                               <ul className="space-y-2">
                                 {module.lessons.map((lesson, lessonIndex) => (
                                   <SortableLesson
-                                    key={lesson.id || `lesson-${lessonIndex}`}
+                                    key={lesson.id || `lesson-${lessonIndex}-${lesson.title || 'untitled'}`}
                                     lesson={lesson}
                                     activeLessonId={activeLessonId}
                                     setActiveLessonId={setActiveLessonId}

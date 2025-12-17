@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Presentation, Play, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LMS_API_BASE_URL } from "@/config/routes";
 
@@ -20,6 +20,7 @@ export default function SlidePreview({
 }) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const hasSlides = slide_show_items && slide_show_items.length > 0;
+
 
   const nextSlide = () => {
     if (hasSlides) {
@@ -75,14 +76,44 @@ export default function SlidePreview({
                     slide_show_items[currentSlide]?.heading || `Slide ${currentSlide + 1}`
                   )}
                 </h4>
-                {slide_show_items[currentSlide]?.image && (
-                  <img
-                    src={`${LMS_API_BASE_URL}/${slide_show_items[currentSlide].image}`}
-                    alt={slide_show_items[currentSlide].heading || `Slide ${currentSlide + 1}`}
-                    className="max-h-56 md:max-h-72 rounded-lg shadow mb-4 object-contain"
-                    style={{ maxWidth: 400, width: '100%' }}
-                  />
-                )}
+                {slide_show_items[currentSlide]?.image && (() => {
+                  // Normalize image URL - use lms.noveloffice.org as base URL
+                  const getImageUrl = (url: string) => {
+                    if (!url) return '';
+                    const trimmed = url.trim();
+                    if (!trimmed) return '';
+                    
+                    // If already a full URL, return as is
+                    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                      return trimmed;
+                    }
+                    
+                    // Ensure path starts with / if it doesn't already
+                    const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+                    
+                    // Determine base URL
+                    // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
+                    // In development: use http://lms.noveloffice.org
+                    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                    const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+                    
+                    return `${cleanBaseUrl}${relativePath}`;
+                  };
+                  
+                  const imageUrl = getImageUrl(slide_show_items[currentSlide].image);
+                  
+                  return (
+                    <img
+                      src={imageUrl}
+                      alt={slide_show_items[currentSlide].heading || `Slide ${currentSlide + 1}`}
+                      className="max-h-56 md:max-h-72 rounded-lg shadow mb-4 object-contain"
+                      style={{ maxWidth: 400, width: '100%' }}
+                      onError={(e) => {
+                        console.error('❌ Failed to load slide image:', imageUrl, 'Original:', slide_show_items[currentSlide].image);
+                      }}
+                    />
+                  );
+                })()}
                 
                 <div
                   className="text-base text-muted-foreground prose dark:prose-invert max-w-none text-center"

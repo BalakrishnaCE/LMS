@@ -1,8 +1,7 @@
-import React from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ContentRenderer } from "@/pages/Modules/Learner/components/ContentRenderer";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import ContentRenderer from "@/pages/Modules/Learner/components/ContentRenderer";
 
 interface ModuleContentProps {
   currentLesson: any;
@@ -16,6 +15,8 @@ interface ModuleContentProps {
   isUpdating: boolean;
   showHeader?: boolean;
   showNavigation?: boolean;
+  moduleId?: string;
+  onContentProgressUpdate?: (contentRef: string, progress: any) => void;
 }
 
 export function ModuleContent({
@@ -29,8 +30,17 @@ export function ModuleContent({
   onComplete,
   isUpdating,
   showHeader = true,
-  showNavigation = true
+  showNavigation = true,
+  moduleId,
+  onContentProgressUpdate
 }: ModuleContentProps) {
+  const handleContentProgressUpdate = (contentRef: string, progress: any) => {
+    onContentProgressUpdate?.(contentRef, progress);
+  };
+
+  const handleContentComplete = (contentRef: string) => {
+    // Content completed
+  };
   return (
     <motion.div
       key={currentLesson.name + currentContent.name}
@@ -57,6 +67,9 @@ export function ModuleContent({
       <ContentRenderer
         contentType={currentContent.content_type}
         contentReference={currentContent.name}
+        moduleId={moduleId}
+        onProgressUpdate={(progress) => handleContentProgressUpdate(currentContent.name, progress)}
+        onContentComplete={handleContentComplete}
       />
       {showNavigation && (
         <motion.div 
@@ -83,7 +96,13 @@ export function ModuleContent({
             </Button>
           ) : (
             <Button
-              onClick={onNext}
+              onClick={() => {
+                if (onNext) {
+                  onNext();
+                } else {
+                  console.error("🔍 onNext function is undefined!");
+                }
+              }}
               className="gap-2 hover:bg-primary/10"
             >
               Next
