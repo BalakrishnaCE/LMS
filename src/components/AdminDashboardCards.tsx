@@ -179,7 +179,7 @@ export function AdminDashboardCards() {
                     <IconComponent className={`h-5 w-5 ${config.iconColor}`} />
                   </motion.div>
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">
+                    <h3 className="text-m font-medium text-foreground/95">
                       {config.title}
                     </h3>
                   </div>
@@ -224,7 +224,7 @@ export function AdminDashboardCards() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 + index * 0.1 }}
               >
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-foreground/90">
                   {data.description}
                 </p>
               </motion.div>

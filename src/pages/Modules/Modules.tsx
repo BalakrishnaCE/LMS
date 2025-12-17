@@ -401,8 +401,8 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                         onClick={() => onShowArchivedChange?.(!showArchived)}
                         className={`
                             relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                            focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-                            ${showArchived ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}
+                            border-0 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+                            ${showArchived ? 'bg-[#018790]' : 'bg-gray-300 dark:bg-gray-600'}
                         `}
                     >
                         <span
