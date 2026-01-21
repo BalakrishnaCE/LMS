@@ -9,7 +9,7 @@ export const getRelativePath = (fullPath: string) => fullPath.replace(BASE_PATH,
 
 // LMS API base URL
 // export const LMS_API_BASE_URL =  "http://10.80.4.72";
-export const LMS_API_BASE_URL =  process.env.NODE_ENV === 'production' ? "https://lms.noveloffice.in" : "http://10.80.4.85/";
+export const LMS_API_BASE_URL = process.env.NODE_ENV === 'production' ? "https://lms.noveloffice.in" : "http://10.80.4.85/";
 
 // Common routes
 export const ROUTES = {
@@ -26,4 +26,9 @@ export const ROUTES = {
   PROJECTS: '/projects',
   PROFILE: '/profile',
   NEW_MODULE: '/module/new',
+  EDIT: '/edit',
+  EDIT_MODULE: (moduleId: string) => `/edit/${moduleId}`,
+  QUIZ: '/quiz',
+  QUIZ_QUESTIONS: '/quiz-questions',
+  AI: '/ai',
 } as const; 

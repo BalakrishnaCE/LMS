@@ -184,51 +184,51 @@ const ErrorAlert = ({ error, onRetry }: { error: any; onRetry: () => void }) => 
   </Alert>
 );
 
-const PaginatedTable = ({ 
-  columns, 
-    data, 
-    onRowClick,
-    emptyMessage = "No data available." 
-}: { 
-    columns: { key: string; header: string; render?: (item: any) => React.ReactNode }[];
-  data: any[]; 
-    onRowClick: (item: any) => void;
+const PaginatedTable = ({
+  columns,
+  data,
+  onRowClick,
+  emptyMessage = "No data available."
+}: {
+  columns: { key: string; header: string; render?: (item: any) => React.ReactNode }[];
+  data: any[];
+  onRowClick: (item: any) => void;
   emptyMessage?: string;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
-    const totalPages = Math.ceil(data.length / itemsPerPage);
-    const currentData = data.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(data.length / itemsPerPage);
+  const currentData = data.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
-        <>
+    <>
       <div className="border rounded-md">
         <Table>
           <TableHeader>
             <TableRow>
-                            {columns.map(col => <TableHead key={col.key}>{col.header}</TableHead>)}
+              {columns.map(col => <TableHead key={col.key}>{col.header}</TableHead>)}
             </TableRow>
           </TableHeader>
           <TableBody>
-                        {currentData.length > 0 ? (
-                            currentData.map((item, index) => (
-                                <TableRow key={item.user + item.quiz_id || index} onClick={() => onRowClick(item)} className="cursor-pointer">
-                                    {columns.map(col => (
-                                        <TableCell key={col.key}>
-                                            {col.render ? col.render(item) : item[col.key]}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    {emptyMessage}
-                                </TableCell>
-                            </TableRow>
+            {currentData.length > 0 ? (
+              currentData.map((item, index) => (
+                <TableRow key={item.user + item.quiz_id || index} onClick={() => onRowClick(item)} className="cursor-pointer">
+                  {columns.map(col => (
+                    <TableCell key={col.key}>
+                      {col.render ? col.render(item) : item[col.key]}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  {emptyMessage}
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
@@ -237,18 +237,18 @@ const PaginatedTable = ({
         <Pagination className="mt-4">
           <PaginationContent>
             <PaginationItem>
-                            <PaginationPrevious onClick={() => setCurrentPage(p => Math.max(1, p - 1))} />
-            </PaginationItem>
-                        <PaginationItem>
-                            <PaginationLink>{currentPage}</PaginationLink>
+              <PaginationPrevious onClick={() => setCurrentPage(p => Math.max(1, p - 1))} />
             </PaginationItem>
             <PaginationItem>
-                            <PaginationNext onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} />
+              <PaginationLink>{currentPage}</PaginationLink>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} />
             </PaginationItem>
           </PaginationContent>
         </Pagination>
       )}
-        </>
+    </>
   );
 };
 
@@ -259,13 +259,13 @@ export default function AnalyticsDashboard() {
   const [activeTab, setActiveTab] = useState<'quiz' | 'qa' | 'modules'>('quiz');
   const [activeQATab, setActiveQATab] = useState<'scored' | 'pending'>('scored');
   const { data, error, isLoading, mutate: mutateAnalytics } = useFrappeGetCall('QA&QuizAnalytics', {}, 'QA&QuizAnalytics');
-  
+
   // Module Analytics data
-  const { 
-    data: moduleData, 
-    error: moduleError, 
-    isLoading: moduleLoading, 
-    mutate: mutateModuleAnalytics 
+  const {
+    data: moduleData,
+    error: moduleError,
+    isLoading: moduleLoading,
+    mutate: mutateModuleAnalytics
   } = useFrappeGetCall('getModuleAnalytics', { limit: 20, offset: 0 }, 'getModuleAnalytics');
 
   const [selectedQuizItem, setSelectedQuizItem] = useState<QuizProgress | null>(null);
@@ -293,7 +293,7 @@ export default function AnalyticsDashboard() {
       toast.error(`Score cannot be greater than max score (${item.max_score})`);
       return;
     }
-    
+
     updateDoc('Question Answer Progress', item.name, { score })
       .then(() => {
         toast.success('Score added successfully');
@@ -365,66 +365,82 @@ export default function AnalyticsDashboard() {
   const quizColumns = [
     { key: 'user', header: 'User' },
     { key: 'module', header: 'Module', render: (item: QuizProgress) => item.module?.name1 || 'N/A' },
-    { key: 'score', header: 'Score (%)', render: (item: QuizProgress) => {
-      const percentage = Math.round((item.score / item.max_score) * 100);
-      return (
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{percentage}%</span>
-          <Progress value={percentage} className="w-20 h-2" />
-        </div>
-      );
-    }},
-    { key: 'date_attended', header: 'Date Attended', render: (item: QuizProgress) => {
-      return item.ended_on ? new Date(item.ended_on).toLocaleDateString() : 'N/A';
-    }},
-    { key: 'time_spent', header: 'Time Spent', render: (item: QuizProgress) => {
-      if (!item.started_on || !item.ended_on) return 'N/A';
-      const duration = new Date(item.ended_on).getTime() - new Date(item.started_on).getTime();
-      const seconds = Math.floor((duration / 1000) % 60);
-      const minutes = Math.floor((duration / (1000 * 60)) % 60);
-      const hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+    {
+      key: 'score', header: 'Score (%)', render: (item: QuizProgress) => {
+        const percentage = Math.round((item.score / item.max_score) * 100);
+        return (
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{percentage}%</span>
+            <Progress value={percentage} className="w-20 h-2" />
+          </div>
+        );
+      }
+    },
+    {
+      key: 'date_attended', header: 'Date Attended', render: (item: QuizProgress) => {
+        return item.ended_on ? new Date(item.ended_on).toLocaleDateString() : 'N/A';
+      }
+    },
+    {
+      key: 'time_spent', header: 'Time Spent', render: (item: QuizProgress) => {
+        if (!item.started_on || !item.ended_on) return 'N/A';
+        const duration = new Date(item.ended_on).getTime() - new Date(item.started_on).getTime();
+        const seconds = Math.floor((duration / 1000) % 60);
+        const minutes = Math.floor((duration / (1000 * 60)) % 60);
+        const hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
 
-      let timeString = '';
-      if (hours > 0) timeString += `${hours}h `;
-      if (minutes > 0) timeString += `${minutes}m `;
-      if (seconds > 0 || (hours === 0 && minutes === 0)) timeString += `${seconds}s`;
-      
-      return timeString.trim();
-    }},
-    { key: 'time_limit_mins', header: 'Time Limit', render: (item: QuizProgress) => {
-      return item.time_limit_mins ? item.time_limit_mins + ' mins' : 'N/A';
-    }},
+        let timeString = '';
+        if (hours > 0) timeString += `${hours}h `;
+        if (minutes > 0) timeString += `${minutes}m `;
+        if (seconds > 0 || (hours === 0 && minutes === 0)) timeString += `${seconds}s`;
+
+        return timeString.trim();
+      }
+    },
+    {
+      key: 'time_limit_mins', header: 'Time Limit', render: (item: QuizProgress) => {
+        return item.time_limit_mins ? item.time_limit_mins + ' mins' : 'N/A';
+      }
+    },
 
   ];
-  
+
   const qaColumns = [
     { key: 'user', header: 'User' },
     { key: 'module', header: 'Module', render: (item: QuestionAnswerProgress) => item.module?.name1 || 'N/A' },
-    { key: 'score', header: 'Score (%)', render: (item: QuestionAnswerProgress) => {
-      if (!item.score || !item.max_score) return 'N/A';
-      const percentage = Math.round((item.score / item.max_score) * 100);
-      return `${item.score}/${item.max_score} (${percentage}%)`;
-    }},
-    { key: 'date', header: 'Date', render: (item: QuestionAnswerProgress) => {
-      return item.end_time ? new Date(item.end_time).toLocaleDateString() : 'N/A';
-    }},
-    { key: 'time_spent', header: 'Time Spent', render: (item: QuestionAnswerProgress) => {
-      if (!item.start_time || !item.end_time) return 'N/A';
-      const duration = new Date(item.end_time).getTime() - new Date(item.start_time).getTime();
-      const seconds = Math.floor((duration / 1000) % 60);
-      const minutes = Math.floor((duration / (1000 * 60)) % 60);
-      const hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+    {
+      key: 'score', header: 'Score (%)', render: (item: QuestionAnswerProgress) => {
+        if (!item.score || !item.max_score) return 'N/A';
+        const percentage = Math.round((item.score / item.max_score) * 100);
+        return `${item.score}/${item.max_score} (${percentage}%)`;
+      }
+    },
+    {
+      key: 'date', header: 'Date', render: (item: QuestionAnswerProgress) => {
+        return item.end_time ? new Date(item.end_time).toLocaleDateString() : 'N/A';
+      }
+    },
+    {
+      key: 'time_spent', header: 'Time Spent', render: (item: QuestionAnswerProgress) => {
+        if (!item.start_time || !item.end_time) return 'N/A';
+        const duration = new Date(item.end_time).getTime() - new Date(item.start_time).getTime();
+        const seconds = Math.floor((duration / 1000) % 60);
+        const minutes = Math.floor((duration / (1000 * 60)) % 60);
+        const hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
 
-      let timeString = '';
-      if (hours > 0) timeString += `${hours}h `;
-      if (minutes > 0) timeString += `${minutes}m `;
-      if (seconds > 0 || (hours === 0 && minutes === 0)) timeString += `${seconds}s`;
-      
-      return timeString.trim();
-    }},
-    {key: 'time_limit_mins', header: 'Time Limit', render: (item: QuestionAnswerProgress) => {
+        let timeString = '';
+        if (hours > 0) timeString += `${hours}h `;
+        if (minutes > 0) timeString += `${minutes}m `;
+        if (seconds > 0 || (hours === 0 && minutes === 0)) timeString += `${seconds}s`;
+
+        return timeString.trim();
+      }
+    },
+    {
+      key: 'time_limit_mins', header: 'Time Limit', render: (item: QuestionAnswerProgress) => {
         return item.time_limit_mins ? item.time_limit_mins + ' mins' : 'N/A';
-      }},
+      }
+    },
     {
       key: 'actions',
       header: 'Actions',
@@ -433,7 +449,7 @@ export default function AnalyticsDashboard() {
           <Button variant="outline" size="sm" onClick={() => { setSelectedQAItem(item); setIsQADrawerOpen(true); }}>View</Button>
           {item.status === 'Pending' && (
             <Popover onOpenChange={(isOpen) => {
-              if(!isOpen) {
+              if (!isOpen) {
                 setScoreInput(prev => {
                   const newState = { ...prev };
                   delete newState[item.name];
@@ -446,16 +462,16 @@ export default function AnalyticsDashboard() {
               </PopoverTrigger>
               <PopoverContent className="w-48 p-2">
                 <div className="flex flex-col space-y-2">
-                  <Input 
-                    type="number" 
-                    placeholder={`Max: ${item.max_score}`} 
+                  <Input
+                    type="number"
+                    placeholder={`Max: ${item.max_score}`}
                     value={scoreInput[item.name] || ''}
                     onChange={(e) => handleScoreInputChange(item.name, e.target.valueAsNumber)}
                     max={item.max_score}
                     min={0}
                   />
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     onClick={() => handleAddScore(item)}
                     disabled={isUpdating}
                   >
@@ -479,35 +495,45 @@ export default function AnalyticsDashboard() {
   const moduleColumns = [
     { key: 'module_name', header: 'Module Name' },
     { key: 'department', header: 'Department' },
-    { key: 'assignment_type', header: 'Assignment Type', render: (item: ModuleAnalytics) => (
-      <Badge variant={item.assignment_type === 'Department' ? 'default' : item.assignment_type === 'Manual' ? 'secondary' : 'outline'}>
-        {item.assignment_type}
-      </Badge>
-    )},
-    { key: 'assigned', header: 'Assigned', render: (item: ModuleAnalytics) => (
-      <div className="flex items-center gap-2">
-        <Users className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium">{item.assigned}</span>
-      </div>
-    )},
-    { key: 'attended', header: 'Attended', render: (item: ModuleAnalytics) => (
-      <div className="flex items-center gap-2">
-        <GraduationCap className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium">{item.attended}</span>
-      </div>
-    )},
-    { key: 'completion_rate', header: 'Completion Rate', render: (item: ModuleAnalytics) => (
-      <div className="flex items-center gap-2">
-        <span className="font-medium">{item.completion_rate.toFixed(1)}%</span>
-        <Progress value={item.completion_rate} className="w-20 h-2" />
-      </div>
-    )},
-    { key: 'duration', header: 'Duration', render: (item: ModuleAnalytics) => (
-      <div className="flex items-center gap-1">
-        <Clock className="h-4 w-4 text-muted-foreground" />
-        <span>{item.duration} days</span>
-      </div>
-    )},
+    {
+      key: 'assignment_type', header: 'Assignment Type', render: (item: ModuleAnalytics) => (
+        <Badge variant={item.assignment_type === 'Department' ? 'default' : item.assignment_type === 'Manual' ? 'secondary' : 'outline'}>
+          {item.assignment_type}
+        </Badge>
+      )
+    },
+    {
+      key: 'assigned', header: 'Assigned', render: (item: ModuleAnalytics) => (
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{item.assigned}</span>
+        </div>
+      )
+    },
+    {
+      key: 'attended', header: 'Attended', render: (item: ModuleAnalytics) => (
+        <div className="flex items-center gap-2">
+          <GraduationCap className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{item.attended}</span>
+        </div>
+      )
+    },
+    {
+      key: 'completion_rate', header: 'Completion Rate', render: (item: ModuleAnalytics) => (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{item.completion_rate.toFixed(1)}%</span>
+          <Progress value={item.completion_rate} className="w-20 h-2" />
+        </div>
+      )
+    },
+    {
+      key: 'duration', header: 'Duration', render: (item: ModuleAnalytics) => (
+        <div className="flex items-center gap-1">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <span>{item.duration} days</span>
+        </div>
+      )
+    },
   ];
 
   return (
@@ -618,66 +644,66 @@ export default function AnalyticsDashboard() {
               )}
             </TabsContent>
             <TabsContent value="quiz_analytics">
-                {isLoading ? (
-                    <Skeleton className="h-64 w-full" />
-                ) : (
-            <PaginatedTable
-                        columns={quizColumns}
-                        data={data?.data.quiz_progress || []}
-                        onRowClick={setSelectedQuizItem}
-                        emptyMessage="No quiz submissions found."
-                    />
-                )}
+              {isLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : (
+                <PaginatedTable
+                  columns={quizColumns}
+                  data={data?.data.quiz_progress || []}
+                  onRowClick={setSelectedQuizItem}
+                  emptyMessage="No quiz submissions found."
+                />
+              )}
             </TabsContent>
             <TabsContent value="qa_analytics">
-                {isLoading ? (
-                    <Skeleton className="h-64 w-full" />
-                ) : (
-                    <Tabs defaultValue="scored" className="w-full">
-                        <TabsList>
-                            <TabsTrigger value="scored">Scored ({scoredQAData.length})</TabsTrigger>
-                            <TabsTrigger value="pending">Pending Score ({pendingQAData.length})</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="scored">
-                            <PaginatedTable
-                                columns={qaColumns}
-                                data={scoredQAData}
-                                onRowClick={setSelectedQAItem}
-                                emptyMessage="No scored Q&A submissions found."
-                            />
-                        </TabsContent>
-                        <TabsContent value="pending">
-            <PaginatedTable
-                                columns={qaColumns}
-                                data={pendingQAData}
-                                onRowClick={setSelectedQAItem}
-                                emptyMessage="No pending Q&A submissions found."
-                            />
-                        </TabsContent>
-                    </Tabs>
-                )}
+              {isLoading ? (
+                <Skeleton className="h-64 w-full" />
+              ) : (
+                <Tabs defaultValue="scored" className="w-full">
+                  <TabsList>
+                    <TabsTrigger value="scored">Scored ({scoredQAData.length})</TabsTrigger>
+                    <TabsTrigger value="pending">Pending Score ({pendingQAData.length})</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="scored">
+                    <PaginatedTable
+                      columns={qaColumns}
+                      data={scoredQAData}
+                      onRowClick={setSelectedQAItem}
+                      emptyMessage="No scored Q&A submissions found."
+                    />
+                  </TabsContent>
+                  <TabsContent value="pending">
+                    <PaginatedTable
+                      columns={qaColumns}
+                      data={pendingQAData}
+                      onRowClick={setSelectedQAItem}
+                      emptyMessage="No pending Q&A submissions found."
+                    />
+                  </TabsContent>
+                </Tabs>
+              )}
             </TabsContent>
           </CardContent>
         </Tabs>
-        </Card>
+      </Card>
 
       <QuizDetailsDrawer
-          item={selectedQuizItem}
-          isOpen={!!selectedQuizItem}
-          onClose={() => setSelectedQuizItem(null)}
+        item={selectedQuizItem}
+        isOpen={!!selectedQuizItem}
+        onClose={() => setSelectedQuizItem(null)}
       />
 
       <QADetailsDrawer
-          item={selectedQAItem}
-          isOpen={!!selectedQAItem}
-          onClose={() => setSelectedQAItem(null)}
+        item={selectedQAItem}
+        isOpen={!!selectedQAItem}
+        onClose={() => setSelectedQAItem(null)}
       />
 
       <ModuleDetailsDrawer
-          key={selectedModuleItem?.module_id}
-          item={selectedModuleItem}
-          isOpen={!!selectedModuleItem}
-          onClose={() => setSelectedModuleItem(null)}
+        key={selectedModuleItem?.module_id}
+        item={selectedModuleItem}
+        isOpen={!!selectedModuleItem}
+        onClose={() => setSelectedModuleItem(null)}
       />
     </div>
   );

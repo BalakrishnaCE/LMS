@@ -10,13 +10,13 @@ import { toast } from "sonner";
 import { UserDetailsDrawer } from "./components/LearnerDetailsDrawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious 
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
 } from "@/components/ui/pagination";
 
 interface User {
@@ -45,13 +45,27 @@ interface ApiData {
 
 // Helper function to convert data to CSV
 function convertToCSV(data: User[]) {
-  const headers = ["Name", "Email", "Status"];
+  const headers = [
+    "Name",
+    "Email",
+    "Status",
+    "Department",
+    "Mobile No",
+    "Modules Enrolled",
+    "Modules Completed",
+    "Completion Rate (%)",
+    "Avg Progress (%)",
+    "Avg Score (%)",
+    "Total Time Spent (min)",
+    "Achievements Count",
+    "Last Activity"
+  ];
   const rows = data.map(user => [
     user.full_name,
     user.email,
     user.enabled === 1 ? "Active" : "Inactive"
   ]);
-  
+
   return [
     headers.join(","),
     ...rows.map(row => row.join(","))
@@ -63,11 +77,11 @@ function downloadCSV(csv: string, filename: string) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
-  
+
   link.setAttribute("href", url);
   link.setAttribute("download", filename);
   link.style.visibility = "hidden";
-  
+
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -85,16 +99,7 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
       {/* Total Learners */}
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Total Learners</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {stats.total}
-          </CardTitle>
-          <CardAction>
-            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${isPositive ? 'border-green-300 text-green-700 bg-green-50' : 'border-red-300 text-red-700 bg-red-50'}`}> 
-              {isPositive ? <TrendingUp className="w-4 h-4 text-green-500" /> : <TrendingUp className="w-4 h-4 text-red-500 rotate-180" />} 
-              {`${Math.abs(percentageChange).toFixed(1)}%`}
-            </span>
-          </CardAction>
+          <CardTitle className="text-xl font-semibold text-card-foreground">Learner Statistics</CardTitle>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="text-muted-foreground">
@@ -140,39 +145,21 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
           <div className="text-muted-foreground">
             {stats.inactive} of {stats.total} learners inactive
           </div>
-        </CardFooter>
-      </Card>
-      {/* Growth Rate */}
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Growth Rate</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {stats.percentage_change}%
-          </CardTitle>
-          <CardAction>
-            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${isPositive ? 'border-green-300 text-green-700 bg-green-50' : 'border-red-300 text-red-700 bg-red-50'}`}> 
-              {isPositive ? <TrendingUp className="w-4 h-4 text-green-500" /> : <TrendingUp className="w-4 h-4 text-red-500 rotate-180" />} 
-              {isPositive ? '+' : '-'}{Math.abs(percentageChange)}%
-            </span>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="text-muted-foreground">Monthly growth rate</div>
-        </CardFooter>
+        </CardContent>
       </Card>
     </div>
   );
 }
 
 // Filters Component
-function Filters({ 
-  searchName, 
-  searchEmail, 
-  searchStatus, 
+function Filters({
+  searchName,
+  searchEmail,
+  searchStatus,
   departmentFilter,
   departmentOptions,
-  onSearchNameChange, 
-  onSearchEmailChange, 
+  onSearchNameChange,
+  onSearchEmailChange,
   onSearchStatusChange,
   onDepartmentChange,
   onExport
@@ -234,8 +221,8 @@ function Filters({
           className="w-full md:w-48"
         />
       </div>
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         className="w-full md:w-auto"
         onClick={onExport}
       >
@@ -280,27 +267,159 @@ export default function Learners() {
   });
   const [learnerToEdit, setLearnerToEdit] = React.useState<User | null>(null);
 
-  const { call: addLearnerPost } = useFrappePostCall("addLMSUser");
-  const { call: updateLearnerPost } = useFrappePostCall("updateLearner");
-  const { data: analyticsData, error, isValidating, mutate } = useFrappeGetCall<{ message: ApiData }>("getLearnerAnalytics", {
-    limit: 1000, // Increase limit to handle large datasets
-    page_length: 1000
-  });
-  const message = analyticsData?.message;
-  const users = message?.users || [];
-  const stats = message?.stats;
-  // Log on every update for more accurate debugging
-  React.useEffect(() => {
-    console.log('Learner stats (effect):', stats);
-    console.log('Learner users (effect):', users);
-    console.log('Total users fetched:', users.length);
-    if (stats && users && typeof stats.total === 'number' && stats.total !== users.length) {
-      console.warn('Mismatch: stats.total does not match users.length', stats.total, users.length);
-    }
-  }, [stats, users]);
+  const api = useAPI();
+  const [analyticsData, setAnalyticsData] = React.useState<{ message: any } | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isValidating, setIsValidating] = React.useState(false);
 
-  // Fetch all departments for filter and selection (limit 150)
-  const { data: allDepartmentsData } = useFrappeGetDocList("Department", { fields: ["name", "department"], limit: 150 });
+  // Fetch learner data from departments API
+  const fetchLearnerData = React.useCallback(async () => {
+    setIsValidating(true);
+    setError(null);
+    try {
+
+
+      const response = await api.getLearnersData();
+
+
+      if (response.message) {
+
+      }
+
+      setAnalyticsData(response);
+    } catch (err: any) {
+      console.error("=== API ERROR ===");
+      console.error("Error details:", err);
+      console.error("Error message:", err.message);
+      console.error("Error stack:", err.stack);
+      setError(err.message || "Failed to fetch learner data");
+    } finally {
+      setIsValidating(false);
+    }
+  }, [api]);
+
+  React.useEffect(() => {
+    fetchLearnerData();
+  }, [fetchLearnerData]);
+
+  const mutate = fetchLearnerData;
+  const message = analyticsData?.message;
+
+  // Get departments from the learners data API response
+  const [allDepartmentsData, setAllDepartmentsData] = React.useState<any[]>([]);
+  const [userDepartmentMapping, setUserDepartmentMapping] = React.useState<Record<string, any>>({});
+  const [departmentDataLoaded, setDepartmentDataLoaded] = React.useState(false);
+
+  React.useEffect(() => {
+    if (message?.departments) {
+      setAllDepartmentsData(message.departments);
+      setDepartmentDataLoaded(true);
+    }
+  }, [message?.departments]);
+
+  // Create fallback department mapping when users data is available
+  React.useEffect(() => {
+    if (message?.users && Object.keys(userDepartmentMapping).length === 0) {
+      const fallbackMapping: Record<string, any> = {};
+      message.users.forEach((user: any) => {
+        if (user.department) {
+          const userKey = user.email || user.name;
+          if (!fallbackMapping[userKey]) {
+            fallbackMapping[userKey] = {
+              departments: [],
+              department_ids: []
+            };
+          }
+          fallbackMapping[userKey].departments.push(user.department);
+          fallbackMapping[userKey].department_ids.push(""); // No ID available
+        }
+      });
+      setUserDepartmentMapping(fallbackMapping);
+    }
+  }, [message?.users]); // Removed userDepartmentMapping from dependencies to prevent infinite loop
+
+  // Transform LearnersData to expected format
+  const transformedData = React.useMemo(() => {
+
+
+    if (!message) {
+
+      return { users: [], stats: null };
+    }
+
+    // Get users data from the new departments API
+    const users = message.users || [];
+    const learnerStats = message.learner_analytics || [];
+    const stats = message.users_stats || {};
+
+
+
+    // Debug: Log if no users found
+    if (users.length === 0) {
+
+    } else {
+
+    }
+
+    // Transform users to match frontend expectations
+    const mergedUsers = users.map((user: any) => ({
+      name: user.name || "",
+      full_name: user.full_name || "",
+      email: user.email || "",
+      enabled: user.enabled || 0,
+      department: user.department || "",
+      department_id: user.department_id || "",
+      departments: user.departments || [],
+      department_ids: user.department_ids || [],
+      mobile_no: user.mobile_no || "",
+      creation: user.creation || "",
+      last_login: user.last_login || "",
+      user_image: user.user_image || "",
+      // Convert single role to roles array for frontend compatibility
+      roles: user.role ? [user.role] : [],
+      role: user.role || "",
+      // Learner analytics fields (already merged by the API)
+      learner_name: user.learner_name || user.full_name || "",
+      modules_enrolled: user.modules_enrolled || 0,
+      modules_completed: user.modules_completed || 0,
+      completion_rate: user.completion_rate || 0,
+      avg_progress: user.avg_progress || 0,
+      avg_score: user.avg_score || 0,
+      total_time_spent: user.total_time_spent || 0,
+      achievements_count: user.achievements_count || 0,
+      last_activity: user.last_activity || user.last_login || "",
+      progress_trackers: user.progress_trackers || []
+    }));
+
+    // Use stats from the API or calculate from merged users
+    const finalStats = stats.total !== undefined ? stats : {
+      total: mergedUsers.length,
+      active: mergedUsers.filter((user: User) => user.enabled === 1).length,
+      inactive: mergedUsers.filter((user: User) => user.enabled === 0).length,
+      percentage_change: 0
+    };
+
+    // console.log("=== FINAL TRANSFORMED DATA ===");
+    // console.log("Merged users:", mergedUsers);
+    // console.log("Merged users length:", mergedUsers.length);
+    // console.log("Final stats:", finalStats);
+
+    const result = {
+      users: mergedUsers,
+      stats: finalStats
+    };
+
+    // console.log("=== FINAL RESULT ===");
+    // console.log("Result:", result);
+
+    return result;
+  }, [message?.users, message?.learner_analytics, message?.users_stats, userDepartmentMapping]);
+
+  const users = transformedData.users;
+  const stats = transformedData.stats;
+
+
+
   const allDepartmentOptions = allDepartmentsData || [];
   const departmentIdToName = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map(dep => [dep.name, dep.department])), [allDepartmentOptions]);
 
@@ -309,32 +428,36 @@ export default function Learners() {
   // Filter users based on search criteria with improved logic
   const filteredUsers = React.useMemo(() => {
     if (!users || users.length === 0) return [];
-    
+
     return users.filter((user: User) => {
       // Handle null/undefined values safely
       const fullName = user.full_name || '';
       const email = user.email || '';
-      const userDepartments = (user.departments && user.departments.length > 0) 
-        ? user.departments 
+      const userDepartments = (user.departments && user.departments.length > 0)
+        ? user.departments
         : (user.department ? [user.department] : []);
-      
+
       // Name filter - case insensitive
-      const nameMatch = searchName === '' || 
+      const nameMatch = searchName === '' ||
         fullName.toLowerCase().includes(searchName.toLowerCase());
-      
+
       // Email filter - case insensitive
-      const emailMatch = searchEmail === '' || 
+      const emailMatch = searchEmail === '' ||
         email.toLowerCase().includes(searchEmail.toLowerCase());
-      
+
       // Status filter
-      const statusMatch = searchStatus === "all" || 
-        (searchStatus === "active" && user.enabled === 1) || 
+      const statusMatch = searchStatus === "all" ||
+        (searchStatus === "active" && user.enabled === 1) ||
         (searchStatus === "inactive" && user.enabled === 0);
-      
+
       // Department filter - check if any selected department matches user's departments
-      const departmentMatch = departmentFilter.length === 0 || 
-        departmentFilter.some(dep => userDepartments.includes(dep));
-      
+      // Also check against department names (not just IDs)
+      const departmentMatch = departmentFilter.length === 0 ||
+        departmentFilter.some(depId => {
+          const depName = departmentIdToName[depId] || depId;
+          return userDepartments.includes(depId) || userDepartments.includes(depName);
+        });
+
       return nameMatch && emailMatch && statusMatch && departmentMatch;
     });
   }, [users, searchName, searchEmail, searchStatus, departmentFilter]);
@@ -384,8 +507,8 @@ export default function Learners() {
         mobile_no: addForm.mobile_no,
         departments: addForm.departments,
         password: addForm.password || undefined,
-        send_welcome_email: addForm.send_welcome_email ? 1 : 0,
-        role: "LMS Student"
+        // Auto-send welcome email by default
+        send_welcome_email: true
       });
       // Check for backend error structure in response (for 200 OK with error)
       const msg = response?.message;
@@ -461,8 +584,8 @@ export default function Learners() {
         updateData.password = editForm.password;
       }
 
-      const response = await updateLearnerPost(updateData);
-      
+      const response = await api.updateLearner(updateData);
+
       // Check for backend error structure in response
       const msg = response?.message;
       if (msg && msg.success === false) {
@@ -531,7 +654,21 @@ export default function Learners() {
     const nameParts = learner.full_name?.split(' ') || [];
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
-    
+
+    // Convert department names to department IDs for pre-selection
+    const getDepartmentIds = (learner: User) => {
+      const departments = learner.departments || [];
+      const singleDepartment = learner.department ? [learner.department] : [];
+      const allDepartmentNames = [...departments, ...singleDepartment].filter(Boolean);
+
+      // Convert department names to IDs
+      const departmentIds = allDepartmentNames
+        .map(deptName => departmentNameToId[deptName] || deptName) // Use ID if mapping exists, otherwise use as-is
+        .filter(Boolean);
+
+      return departmentIds;
+    };
+
     setEditForm({
       first_name: firstName,
       last_name: lastName,
@@ -572,7 +709,7 @@ export default function Learners() {
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} required disabled={addLoading} />
+                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
             </div>
             <div>
@@ -581,13 +718,13 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
-                             <MultiSelect
-                 options={allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }))}
-                 selected={addForm.departments}
-                 onSelect={(selected) => setAddForm(f => ({ ...f, departments: selected }))}
-                 placeholder="Select departments"
-                 disabled={addLoading}
-               />
+              <MultiSelect
+                options={allDepartmentOptions.map((dep: any) => ({ value: dep.name, label: dep.department || dep.name }))}
+                selected={addForm.departments}
+                onSelect={(selected) => setAddForm(f => ({ ...f, departments: selected }))}
+                placeholder="Select departments"
+                disabled={addLoading}
+              />
               {addForm.departments && addForm.departments.length === 0 && (
                 <div className="mt-2 text-xs text-destructive">
                   Please select at least one department.
@@ -601,16 +738,45 @@ export default function Learners() {
             )}
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
-              <Input value={addForm.mobile_no} onChange={e => setAddForm(f => ({ ...f, mobile_no: e.target.value }))} disabled={addLoading} />
+              <Input
+                type="tel"
+                value={addForm.mobile_no}
+                onChange={e => {
+                  // Only allow digits and limit to 10 characters
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setAddForm(f => ({ ...f, mobile_no: value }));
+                }}
+                disabled={addLoading}
+                placeholder="Enter 10 digit mobile number"
+                maxLength={10}
+                className="border-2 border-border/50 focus:border-primary"
+              />
+              {addForm.mobile_no && addForm.mobile_no.length !== 10 && (
+                <p className="text-sm text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
+              )}
             </div>
             <div>
               <label className="block mb-1 font-medium">Password</label>
-              <Input type="password" value={addForm.password} onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} disabled={addLoading} placeholder="Leave blank to auto-generate" />
+              <div className="relative">
+                <Input
+                  type={showAddPassword ? "text" : "password"}
+                  value={addForm.password}
+                  onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))}
+                  disabled={addLoading}
+                  placeholder="Leave blank to auto-generate"
+                  className="pr-10 border-2 border-border/50 focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAddPassword(!showAddPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  disabled={addLoading}
+                >
+                  {showAddPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="send_welcome_email" checked={addForm.send_welcome_email} onChange={e => setAddForm(f => ({ ...f, send_welcome_email: e.target.checked }))} disabled={addLoading} />
-              <label htmlFor="send_welcome_email" className="font-medium">Send Welcome Email</label>
-            </div>
+
             {addError && (
               <div className="flex items-center gap-2 p-3 mt-2 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /></svg>
@@ -640,7 +806,7 @@ export default function Learners() {
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} required disabled={editLoading} />
+                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
             </div>
             <div>
@@ -649,26 +815,53 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Departments<span className="text-red-500">*</span></label>
-                             <MultiSelect
-                 options={allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }))}
-                 selected={editForm.departments}
-                 onSelect={(selected) => setEditForm(f => ({ ...f, departments: selected }))}
-                 placeholder="Select departments"
-                 disabled={editLoading}
-               />
-              {editForm.departments && editForm.departments.length > 0 && (
-                <div className="mt-2 text-xs text-muted-foreground">
-                  Selected: {editForm.departments.map(depId => departmentIdToName[depId] || depId).join(', ')}
-                </div>
-              )}
+              <MultiSelect
+                options={departmentOptions}
+                selected={editForm.departments}
+                onSelect={(selected) => setEditForm(f => ({ ...f, departments: selected }))}
+                placeholder="Select departments"
+                disabled={editLoading}
+              />
             </div>
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
-              <Input value={editForm.mobile_no} onChange={e => setEditForm(f => ({ ...f, mobile_no: e.target.value }))} disabled={editLoading} />
+              <Input
+                type="tel"
+                value={editForm.mobile_no}
+                onChange={e => {
+                  // Only allow digits and limit to 10 characters
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setEditForm(f => ({ ...f, mobile_no: value }));
+                }}
+                disabled={editLoading}
+                placeholder="Enter 10 digit mobile number"
+                maxLength={10}
+                className="border-2 border-border/50 focus:border-primary"
+              />
+              {editForm.mobile_no && editForm.mobile_no.length !== 10 && (
+                <p className="text-sm text-red-500 mt-1">Mobile number must be exactly 10 digits</p>
+              )}
             </div>
             <div>
               <label className="block mb-1 font-medium">Password</label>
-              <Input type="password" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} disabled={editLoading} placeholder="Leave blank to keep existing" />
+              <div className="relative">
+                <Input
+                  type={showEditPassword ? "text" : "password"}
+                  value={editForm.password}
+                  onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))}
+                  disabled={editLoading}
+                  placeholder="Leave blank to keep existing"
+                  className="pr-10 border-2 border-border/50 focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditPassword(!showEditPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  disabled={editLoading}
+                >
+                  {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="enabled" checked={editForm.enabled === 1} onChange={e => setEditForm(f => ({ ...f, enabled: e.target.checked ? 1 : 0 }))} disabled={editLoading} />
@@ -695,16 +888,12 @@ export default function Learners() {
           <strong>Warning:</strong> Learner stats total ({stats.total}) does not match number of users ({users.length}). This may indicate an API limit issue. Try refreshing the page.
         </div>
       )}
-      
-      {/* Show loading state */}
-      {isValidating && (
-        <div className="mb-4 p-3 rounded bg-blue-100 text-blue-800 border border-blue-300">
-          <strong>Loading:</strong> Fetching learner data... ({users.length} users loaded so far)
-        </div>
-      )}
-      
+
+
+
+
       {stats && <StatsCards stats={stats} />}
-      
+
       <Filters
         searchName={searchName}
         searchEmail={searchEmail}
@@ -736,27 +925,105 @@ export default function Learners() {
           <Pagination>
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious 
+                <PaginationPrevious
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />
               </PaginationItem>
-              
-              {/* Page numbers */}
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    isActive={currentPage === page}
-                    onClick={() => setCurrentPage(page)}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-              
+
+              {/* Page numbers with ellipsis */}
+              {(() => {
+                const pages = [];
+                const maxVisiblePages = 7; // Show max 7 page numbers
+
+                if (totalPages <= maxVisiblePages) {
+                  // Show all pages if total is small
+                  for (let i = 1; i <= totalPages; i++) {
+                    pages.push(
+                      <PaginationItem key={i}>
+                        <PaginationLink
+                          isActive={currentPage === i}
+                          onClick={() => setCurrentPage(i)}
+                          className="cursor-pointer"
+                        >
+                          {i}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  }
+                } else {
+                  // Show first page
+                  pages.push(
+                    <PaginationItem key={1}>
+                      <PaginationLink
+                        isActive={currentPage === 1}
+                        onClick={() => setCurrentPage(1)}
+                        className="cursor-pointer"
+                      >
+                        1
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+
+                  // Show ellipsis after first page if needed
+                  if (currentPage > 4) {
+                    pages.push(
+                      <PaginationItem key="ellipsis1">
+                        <span className="px-2 text-muted-foreground">...</span>
+                      </PaginationItem>
+                    );
+                  }
+
+                  // Show pages around current page
+                  const startPage = Math.max(2, currentPage - 1);
+                  const endPage = Math.min(totalPages - 1, currentPage + 1);
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    if (i !== 1 && i !== totalPages) {
+                      pages.push(
+                        <PaginationItem key={i}>
+                          <PaginationLink
+                            isActive={currentPage === i}
+                            onClick={() => setCurrentPage(i)}
+                            className="cursor-pointer"
+                          >
+                            {i}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    }
+                  }
+
+                  // Show ellipsis before last page if needed
+                  if (currentPage < totalPages - 3) {
+                    pages.push(
+                      <PaginationItem key="ellipsis2">
+                        <span className="px-2 text-muted-foreground">...</span>
+                      </PaginationItem>
+                    );
+                  }
+
+                  // Show last page
+                  if (totalPages > 1) {
+                    pages.push(
+                      <PaginationItem key={totalPages}>
+                        <PaginationLink
+                          isActive={currentPage === totalPages}
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="cursor-pointer"
+                        >
+                          {totalPages}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  }
+                }
+
+                return pages;
+              })()}
+
               <PaginationItem>
-                <PaginationNext 
+                <PaginationNext
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />
