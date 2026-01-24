@@ -1,15 +1,15 @@
 import * as React from "react";
-import { useFrappeGetCall, useFrappeGetDocList, useFrappePostCall } from "frappe-react-sdk";
 import { Card, CardHeader, CardTitle, CardDescription, CardAction, CardFooter } from "@/components/ui/card";
 import { LearnersTable } from "@/pages/Learners/LearnersTable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Download, CheckCircle, PauseCircle, TrendingUp } from "lucide-react";
+import { Search, Download, CheckCircle, PauseCircle, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { UserDetailsDrawer } from "./components/LearnerDetailsDrawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { useAPI } from "@/hooks/useAPI";
 import {
   Pagination,
   PaginationContent,
@@ -145,7 +145,7 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
           <div className="text-muted-foreground">
             {stats.inactive} of {stats.total} learners inactive
           </div>
-        </CardContent>
+        </CardFooter>
       </Card>
     </div>
   );
@@ -266,6 +266,8 @@ export default function Learners() {
     departments: [] as string[] // Multi-department selection
   });
   const [learnerToEdit, setLearnerToEdit] = React.useState<User | null>(null);
+  const [showAddPassword, setShowAddPassword] = React.useState(false);
+  const [showEditPassword, setShowEditPassword] = React.useState(false);
 
   const api = useAPI();
   const [analyticsData, setAnalyticsData] = React.useState<{ message: any } | null>(null);
@@ -422,6 +424,7 @@ export default function Learners() {
 
   const allDepartmentOptions = allDepartmentsData || [];
   const departmentIdToName = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map(dep => [dep.name, dep.department])), [allDepartmentOptions]);
+  const departmentNameToId = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map(dep => [dep.department || dep.name, dep.name])), [allDepartmentOptions]);
 
   const departmentOptions = allDepartmentOptions.map(dep => ({ value: dep.name, label: dep.department || dep.name }));
 
@@ -499,7 +502,7 @@ export default function Learners() {
     }
     setAddLoading(true);
     try {
-      const response = await addLearnerPost({
+      const response = await api.addLearner({
         email: addForm.email,
         full_name: `${addForm.first_name} ${addForm.last_name}`.trim(),
         first_name: addForm.first_name,

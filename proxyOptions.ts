@@ -8,6 +8,9 @@ export default {
 		secure: true,
 		configure: (proxy: any) => {
 			proxy.on('proxyReq', (proxyReq: any, req: any) => {
+				// Set Host header to production domain so Frappe knows which site to use
+				proxyReq.setHeader('Host', 'lms.local');
+
 				// Forward cookies from the request
 				if (req.headers.cookie) {
 					proxyReq.setHeader('gitrCookie', req.headers.cookie);
@@ -31,6 +34,10 @@ export default {
 				}
 			});
 		}
+	},
+	'/chatbot': {
+		target: 'http://10.80.4.84',
+		changeOrigin: true,
 	},
 	'^/(app|assets|files|private)': {
 		target: `http://127.0.0.1:${webserver_port}`,

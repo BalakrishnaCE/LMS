@@ -27,7 +27,7 @@ const STATIC_DEPARTMENTS: Department[] = [
 ];
 
 // API Base URL (via Nginx proxy)
-const API_BASE_URL = "http://10.80.4.84/chatbot";
+const API_BASE_URL = "/chatbot";
 
 interface Message {
     id: string;
@@ -176,8 +176,8 @@ const AiChat = () => {
         // Call the API
         setIsLoading(true);
         try {
-            // Pass current messages to include conversation history
-            const aiResponseText = await sendQueryToAPI(userQuery, selectedDepartment, [...messages, newMessage]);
+            // Pass current messages (excluding the new one) to use as history
+            const aiResponseText = await sendQueryToAPI(userQuery, selectedDepartment, messages);
             const aiResponse: Message = {
                 id: (Date.now() + 1).toString(),
                 text: aiResponseText,
@@ -279,9 +279,9 @@ const AiChat = () => {
         // Call the API with the edited message
         setIsLoading(true);
         try {
-            // Get updated messages after edit (slice to the edited message)
-            const updatedMessages = messages.slice(0, messageIndex).concat([{ ...messages[messageIndex], text: editedQuery }]);
-            const aiResponseText = await sendQueryToAPI(editedQuery, selectedDepartment, updatedMessages);
+            // Get history messages only (exclude the edited one and future ones)
+            const historyMessages = messages.slice(0, messageIndex);
+            const aiResponseText = await sendQueryToAPI(editedQuery, selectedDepartment, historyMessages);
             const aiResponse: Message = {
                 id: Date.now().toString(),
                 text: aiResponseText,
