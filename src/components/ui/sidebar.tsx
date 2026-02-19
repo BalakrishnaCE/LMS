@@ -4,7 +4,7 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
-
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -265,6 +265,8 @@ function Sidebar({
   )
 }
 
+
+
 function SidebarTrigger({
   className,
   onClick,
@@ -382,15 +384,14 @@ function SidebarSeparator({
 
 function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div
-      data-slot="sidebar-content"
-      data-sidebar="content"
-      className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
-        className
-      )}
-      {...props}
-    />
+    <ScrollArea className={cn("flex min-h-0 flex-1 flex-col pr-4 group-data-[collapsible=icon]:overflow-hidden", className)}>
+      <div
+        data-slot="sidebar-content"
+        data-sidebar="content"
+        className="flex flex-col gap-2 p-2"
+        {...props}
+      />
+    </ScrollArea>
   )
 }
 
@@ -581,7 +582,7 @@ function SidebarMenuAction({
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
-          "peer-data-[active=true]/menu-button:text-sidebar-accent-foreground group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 md:opacity-0",
+        "peer-data-[active=true]/menu-button:text-sidebar-accent-foreground group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 md:opacity-0",
         className
       )}
       {...props}

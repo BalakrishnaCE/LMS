@@ -1,9 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import * as React from "react";
+import { useState, useRef, useEffect, memo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, Loader2, ChevronRight, Copy, Check, Info, Minimize2, Plus, ArrowLeft } from 'lucide-react';
 import CssRobot from "@/components/CssRobot";
+import "./AIchat.css";
 import { useUser } from "@/hooks/use-user";
 import {
     Tooltip,
@@ -11,6 +13,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Textarea } from "@/components/ui/textarea";
 
 // API Base URL (via Nginx proxy)
 const API_BASE_URL = "http://10.80.4.84:8090/chatbot";
@@ -62,6 +65,98 @@ interface ChatContext {
     lesson?: Lesson;
     chapter?: Chapter;
 }
+
+const formatMessageText = (text: string) => {
+    const formatInline = (str: string, lineIndex: number) => {
+        const parts: React.ReactNode[] = [];
+        let currentIndex = 0;
+        const regex = /(\*\*.*?\*\*|\[Source:.*?\])/g;
+        let match;
+
+        while ((match = regex.exec(str)) !== null) {
+            if (match.index > currentIndex) {
+                parts.push(str.substring(currentIndex, match.index));
+            }
+            const matchedText = match[0];
+            if (matchedText.startsWith('**') && matchedText.endsWith('**')) {
+                parts.push(<strong key={`${lineIndex}-${match.index}`}>{matchedText.slice(2, -2)}</strong>);
+            } else if (matchedText.startsWith('[Source:')) {
+                parts.push(<em key={`${lineIndex}-${match.index}`} className="text-xs opacity-80">{matchedText}</em>);
+            }
+            currentIndex = match.index + matchedText.length;
+        }
+        if (currentIndex < str.length) {
+            parts.push(str.substring(currentIndex));
+        }
+        return parts.length > 0 ? parts : str;
+    };
+
+    const formattedText = text.replace(/([^\n])\s*(###)/g, '$1\n$2');
+
+    const lines = formattedText.split('\n');
+    return lines.map((line, index) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('###')) {
+            const headingText = line.replace(/^###\s*/, '');
+            return (
+                <h3 key={index} className="messageHeading">
+                    {formatInline(headingText, index)}
+                </h3>
+            );
+        }
+
+        if (trimmed === '') {
+            return <div key={index} className="messageSpacer" />;
+        }
+
+        return (
+            <div key={index} className="messageParagraph">
+                {formatInline(line, index)}
+            </div>
+        );
+    });
+};
+
+const MessageBubble = memo(({ message, onCopy, copiedId }: { message: Message, onCopy: (text: string, id: string) => void, copiedId: string | null }) => {
+    return (
+        <div className={`flex w-full ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`flex flex-col max-w-[80%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                {message.sender === 'ai' && (
+                    <span className="text-[10px] text-muted-foreground mb-1 px-1">
+                        AI • {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                )}
+                {message.sender === 'user' && (
+                    <span className="text-[10px] text-muted-foreground mb-1 px-1">
+                        You • {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                )}
+                <div className="relative mb-2">
+                    <div className={`chat-bubble ${message.sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'}`}>
+                        <div className="text-sm leading-relaxed break-words whitespace-pre-wrap">
+                            {formatMessageText(message.text)}
+                        </div>
+                    </div>
+                </div>
+                {message.sender === 'ai' && (
+                    <div className="flex items-center gap-1 mt-1 px-1">
+                        <button
+                            onClick={() => onCopy(message.text, message.id)}
+                            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            {copiedId === message.id ? (
+                                <Check className="h-3.5 w-3.5" />
+                            ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                            )}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+});
+MessageBubble.displayName = "MessageBubble";
 
 const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating = false, onMinimize, extraHeaderButtons, shouldRestoreSession = false }: { initialModuleName?: string; initialChatId?: string; sidebarControl?: React.ReactNode; isFloating?: boolean; onMinimize?: () => void; extraHeaderButtons?: React.ReactNode; shouldRestoreSession?: boolean }) => {
     const { user, isLoading: isUserLoading } = useUser();
@@ -678,7 +773,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         }
     };
 
-    const handleCopy = async (text: string, id: string) => {
+    const handleCopy = useCallback(async (text: string, id: string) => {
         try {
             await navigator.clipboard.writeText(text);
             setCopiedId(id);
@@ -699,7 +794,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 console.error("Fallback copy failed:", fallbackErr);
             }
         }
-    };
+    }, []);
 
     const handleReset = () => {
         // Clear state
@@ -736,87 +831,31 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         }
     };
 
-    // Helper function to format message text
-    // Handles **bold**, [Source: ...], and ### Headings
-    const formatMessageText = (text: string) => {
-        // Function to process inline formatting (bold, source) within a string
-        const formatInline = (str: string, lineIndex: number) => {
-            const parts: React.ReactNode[] = [];
-            let currentIndex = 0;
-            const regex = /(\*\*.*?\*\*|\[Source:.*?\])/g;
-            let match;
 
-            while ((match = regex.exec(str)) !== null) {
-                if (match.index > currentIndex) {
-                    parts.push(str.substring(currentIndex, match.index));
-                }
-                const matchedText = match[0];
-                if (matchedText.startsWith('**') && matchedText.endsWith('**')) {
-                    parts.push(<strong key={`${lineIndex}-${match.index}`}>{matchedText.slice(2, -2)}</strong>);
-                } else if (matchedText.startsWith('[Source:')) {
-                    parts.push(<em key={`${lineIndex}-${match.index}`} className="text-xs opacity-80">{matchedText}</em>);
-                }
-                currentIndex = match.index + matchedText.length;
-            }
-            if (currentIndex < str.length) {
-                parts.push(str.substring(currentIndex));
-            }
-            return parts.length > 0 ? parts : str;
-        };
-
-        // Pre-process text: specific fix for when backend sends "text ### Heading" without newline
-        // We insert a newline before ### to ensure it gets treated as a header line
-        const formattedText = text.replace(/([^\n])\s*(###)/g, '$1\n$2');
-
-        const lines = formattedText.split('\n');
-        return lines.map((line, index) => {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('###')) {
-                const headingText = line.replace(/^###\s*/, '');
-                return (
-                    <h3 key={index} className="text-base font-bold text-foreground mt-4 mb-2 first:mt-0">
-                        {formatInline(headingText, index)}
-                    </h3>
-                );
-            }
-
-            // Render empty lines as spacers
-            if (trimmed === '') {
-                return <div key={index} className="h-2" />;
-            }
-
-            // Render regular paragraphs
-            return (
-                <div key={index} className="min-h-[1.5em] mb-1.5 last:mb-0">
-                    {formatInline(line, index)}
-                </div>
-            );
-        });
-    };
 
     const renderGreeting = (): React.ReactNode => {
         switch (currentStep) {
             case 'department':
             case 'department':
                 return (
-                    <div className="relative w-full max-w-sm mx-auto mb-4">
-                        <div className="relative overflow-hidden rounded-3xl bg-white/40 dark:bg-black/40 backdrop-blur-md border border-white/50 dark:border-white/10 shadow-lg transition-all duration-300">
+                    <div className="greeting-wrapper">
+                        <div className="greeting-card">
 
                             {/* Card Header Content */}
-                            <div className="relative p-5 space-y-3">
+                            <div className="greeting-content">
                                 {/* Header - clickable */}
-                                <div className="w-full text-left">
-                                    <div className="flex items-start justify-between">
-                                        <div className="space-y-1 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-400">
+                                <div className="greeting-header">
+                                    <div className="greeting-header-inner">
+                                        <div className="greeting-title-wrapper">
+                                            <div className="greeting-title-row">
+                                                <div className="bot-icon-wrapper">
                                                     <Bot className="w-5 h-5" />
                                                 </div>
-                                                <h3 className="text-lg font-semibold text-teal-900 dark:text-white">
+                                                <h3 className="greeting-title">
                                                     Hi {user?.full_name || 'there'}!
                                                 </h3>
                                             </div>
-                                            <p className="text-sm text-teal-700/70 dark:text-gray-400 pl-11">
+                                            <p className="greeting-subtitle">
                                                 Please select department to start conversation
                                             </p>
                                         </div>
@@ -824,25 +863,25 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 </div>
 
                                 {/* Dropdown Options - Always Show */}
-                                <div className="space-y-3 pl-2">
+                                <div className="options-container">
                                     {isLoading ? (
-                                        <div className="flex items-center justify-center p-4">
-                                            <Loader2 className="h-6 w-6 animate-spin text-teal-600 dark:text-teal-400" />
+                                        <div className="state-container">
+                                            <Loader2 className="spinner" />
                                         </div>
                                     ) : departments.length === 0 ? (
-                                        <div className="p-4 text-center text-sm text-muted-foreground">
+                                        <div className="empty-message">
                                             No departments assigned to you yet.
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col gap-2">
+                                        <div className="options-list">
                                             {departments.map((dept) => (
                                                 <button
                                                     key={dept.id}
                                                     onClick={() => handleDepartmentSelect(dept)}
-                                                    className="group relative overflow-hidden bg-white/60 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 border border-white/50 dark:border-white/10 text-teal-900 dark:text-white px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-between shadow-sm hover:scale-[1.02]"
+                                                    className="option-button group"
                                                 >
                                                     <span>{dept.name}</span>
-                                                    <ChevronRight className="h-4 w-4 text-teal-600/70 dark:text-gray-400 group-hover:text-teal-600 dark:group-hover:text-white group-hover:translate-x-1 transition-all" />
+                                                    <ChevronRight className="option-icon" />
                                                 </button>
                                             ))}
                                         </div>
@@ -856,24 +895,24 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             case 'module':
             case 'module':
                 return (
-                    <div className="relative w-full max-w-sm mx-auto mb-4">
-                        <div className="relative overflow-hidden rounded-3xl bg-white/40 dark:bg-black/40 backdrop-blur-md border border-white/50 dark:border-white/10 shadow-lg transition-all duration-300">
+                    <div className="greeting-wrapper">
+                        <div className="greeting-card">
 
                             {/* Content */}
-                            <div className="relative p-5 space-y-3">
+                            <div className="greeting-content">
                                 {/* Header - clickable */}
-                                <div className="w-full text-left">
-                                    <div className="flex items-start justify-between">
-                                        <div className="space-y-1 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-400">
+                                <div className="greeting-header">
+                                    <div className="greeting-header-inner">
+                                        <div className="greeting-title-wrapper">
+                                            <div className="greeting-title-row">
+                                                <div className="bot-icon-wrapper">
                                                     <Bot className="w-5 h-5" />
                                                 </div>
-                                                <h3 className="text-lg font-semibold text-teal-900 dark:text-white">
+                                                <h3 className="greeting-title">
                                                     Hi I'm your {context.department?.name} Assistant!
                                                 </h3>
                                             </div>
-                                            <p className="text-sm text-teal-700/70 dark:text-gray-400 pl-11">
+                                            <p className="greeting-subtitle">
                                                 Please select Module to start conversation
                                             </p>
                                         </div>
@@ -881,25 +920,25 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 </div>
 
                                 {/* Dropdown Options - Always Show */}
-                                <div className="space-y-3 pl-2">
+                                <div className="options-container">
                                     {isLoading ? (
-                                        <div className="flex items-center justify-center p-4">
-                                            <Loader2 className="h-6 w-6 animate-spin text-teal-600 dark:text-teal-400" />
+                                        <div className="state-container">
+                                            <Loader2 className="spinner" />
                                         </div>
                                     ) : modules.length === 0 ? (
-                                        <div className="p-4 text-center text-sm text-muted-foreground">
+                                        <div className="empty-message">
                                             No modules available in this department.
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col gap-2">
+                                        <div className="options-list">
                                             {modules.map((mod) => (
                                                 <button
                                                     key={mod.id}
                                                     onClick={() => handleModuleSelect(mod)}
-                                                    className="group relative overflow-hidden bg-white/60 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 border border-white/50 dark:border-white/10 text-teal-900 dark:text-white px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-between shadow-sm hover:scale-[1.02]"
+                                                    className="option-button group"
                                                 >
                                                     <span>{mod.name}</span>
-                                                    <ChevronRight className="h-4 w-4 text-teal-600/70 dark:text-gray-400 group-hover:text-teal-600 dark:group-hover:text-white group-hover:translate-x-1 transition-all" />
+                                                    <ChevronRight className="option-icon" />
                                                 </button>
                                             ))}
                                         </div>
@@ -912,24 +951,24 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
             case 'lesson':
                 return (
-                    <div className="relative w-full max-w-sm mx-auto mb-4">
-                        <div className="relative overflow-hidden rounded-3xl bg-white/40 dark:bg-black/40 backdrop-blur-md border border-white/50 dark:border-white/10 shadow-lg transition-all duration-300">
+                    <div className="greeting-wrapper">
+                        <div className="greeting-card">
 
                             {/* Content */}
-                            <div className="relative p-5 space-y-3">
+                            <div className="greeting-content">
                                 {/* Header */}
-                                <div className="w-full text-left">
-                                    <div className="flex items-start justify-between">
-                                        <div className="space-y-1 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-400">
+                                <div className="greeting-header">
+                                    <div className="greeting-header-inner">
+                                        <div className="greeting-title-wrapper">
+                                            <div className="greeting-title-row">
+                                                <div className="bot-icon-wrapper">
                                                     <Bot className="w-5 h-5" />
                                                 </div>
-                                                <h3 className="text-lg font-semibold text-teal-900 dark:text-white">
+                                                <h3 className="greeting-title">
                                                     Great! 👍
                                                 </h3>
                                             </div>
-                                            <p className="text-sm text-teal-700/70 dark:text-gray-400 pl-11">
+                                            <p className="greeting-subtitle">
                                                 Select a Lesson under {context.module?.name} to explore.
                                             </p>
                                         </div>
@@ -937,25 +976,25 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 </div>
 
                                 {/* Dropdown Options - Always Show */}
-                                <div className="space-y-3 pl-2">
+                                <div className="options-container">
                                     {isLoading ? (
-                                        <div className="flex items-center justify-center p-4">
-                                            <Loader2 className="h-6 w-6 animate-spin text-teal-600 dark:text-teal-400" />
+                                        <div className="state-container">
+                                            <Loader2 className="spinner" />
                                         </div>
                                     ) : lessons.length === 0 ? (
-                                        <div className="p-4 text-center text-sm text-muted-foreground">
+                                        <div className="empty-message">
                                             No lessons available in this module.
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col gap-2">
+                                        <div className="options-list">
                                             {lessons.map((lesson) => (
                                                 <button
                                                     key={lesson.id}
                                                     onClick={() => handleLessonSelect(lesson)}
-                                                    className="group relative overflow-hidden bg-white/60 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 border border-white/50 dark:border-white/10 text-teal-900 dark:text-white px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-between shadow-sm hover:scale-[1.02]"
+                                                    className="option-button group"
                                                 >
                                                     <span>{lesson.name}</span>
-                                                    <ChevronRight className="h-4 w-4 text-teal-600/70 dark:text-gray-400 group-hover:text-teal-600 dark:group-hover:text-white group-hover:translate-x-1 transition-all" />
+                                                    <ChevronRight className="option-icon" />
                                                 </button>
                                             ))}
                                         </div>
@@ -968,24 +1007,24 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
             case 'chapter':
                 return (
-                    <div className="relative w-full max-w-sm mx-auto mb-4">
-                        <div className="relative overflow-hidden rounded-3xl bg-white/40 dark:bg-black/40 backdrop-blur-md border border-white/50 dark:border-white/10 shadow-lg transition-all duration-300">
+                    <div className="greeting-wrapper">
+                        <div className="greeting-card">
 
                             {/* Content */}
-                            <div className="relative p-5 space-y-3">
+                            <div className="greeting-content">
                                 {/* Header */}
-                                <div className="w-full text-left">
-                                    <div className="flex items-start justify-between">
-                                        <div className="space-y-1 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-400">
+                                <div className="greeting-header">
+                                    <div className="greeting-header-inner">
+                                        <div className="greeting-title-wrapper">
+                                            <div className="greeting-title-row">
+                                                <div className="bot-icon-wrapper">
                                                     <Bot className="w-5 h-5" />
                                                 </div>
-                                                <h3 className="text-lg font-semibold text-teal-900 dark:text-white">
+                                                <h3 className="greeting-title">
                                                     Okay! 👍
                                                 </h3>
                                             </div>
-                                            <p className="text-sm text-teal-700/70 dark:text-gray-400 pl-11">
+                                            <p className="greeting-subtitle">
                                                 Select a Chapter in {context.lesson?.name} to explore.
                                             </p>
                                         </div>
@@ -993,25 +1032,25 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 </div>
 
                                 {/* Dropdown Options - Always Show */}
-                                <div className="space-y-3 pl-2">
+                                <div className="options-container">
                                     {isLoading ? (
-                                        <div className="flex items-center justify-center p-4">
-                                            <Loader2 className="h-6 w-6 animate-spin text-teal-600 dark:text-teal-400" />
+                                        <div className="state-container">
+                                            <Loader2 className="spinner" />
                                         </div>
                                     ) : chapters.length === 0 ? (
-                                        <div className="p-4 text-center text-sm text-muted-foreground">
+                                        <div className="empty-message">
                                             No chapters available.
                                         </div>
                                     ) : (
-                                        <div className="flex flex-col gap-2">
+                                        <div className="options-list">
                                             {chapters.map((chapter) => (
                                                 <button
                                                     key={chapter.id}
                                                     onClick={() => handleChapterSelect(chapter)}
-                                                    className="group relative overflow-hidden bg-white/60 dark:bg-white/5 hover:bg-white/80 dark:hover:bg-white/10 border border-white/50 dark:border-white/10 text-teal-900 dark:text-white px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-between shadow-sm hover:scale-[1.02]"
+                                                    className="option-button group"
                                                 >
                                                     <span>{chapter.name}</span>
-                                                    <ChevronRight className="h-4 w-4 text-teal-600/70 dark:text-gray-400 group-hover:text-teal-600 dark:group-hover:text-white group-hover:translate-x-1 transition-all" />
+                                                    <ChevronRight className="option-icon" />
                                                 </button>
                                             ))}
                                         </div>
@@ -1028,10 +1067,10 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
     };
 
     return (
-        <div className="flex flex-col h-full w-full overflow-hidden">
-            <Card className={`relative flex flex-col h-full w-full shadow-2xl overflow-hidden border-0 ${isFloating ? 'rounded-[30px]' : 'rounded-none'} bg-gradient-to-br from-[#129090] to-[#E9FBF9] dark:from-[#18181b] dark:to-[#115e59] transition-all duration-300`}>
+        <div className="flex flex-col h-[calc(100vh-1rem)] w-full overflow-hidden">
+            <Card className={`relative flex flex-col h-full w-full shadow-2xl overflow-hidden border-0 ${isFloating ? 'rounded-[30px]' : 'rounded-none'} bg-background`}>
                 {/* Custom Glass Header - Absolutely positioned, never scrolls */}
-                <div className="absolute top-0 left-0 right-0 z-20 flex items-center gap-2.5 px-4 py-2.5 border-b border-white/20 bg-white/25 dark:bg-black/30 backdrop-blur-md">
+                <div className="ai-chat-header">
                     {sidebarControl}
 
                     {/* Back Button */}
@@ -1057,13 +1096,13 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         <h3 className="text-sm font-bold text-teal-900 dark:text-teal-50 leading-none mb-0.5" title="NIA">
                             NIA
                         </h3>
-                        <span className="text-[10px] text-teal-800/70 dark:text-teal-200/60 font-medium leading-none mb-1">
+                        <span className="nia-subtitle">
                             Novel Intelligent Assistant
                         </span>
                         <TooltipProvider delayDuration={100}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <span className="text-[10px] text-white/90 dark:text-teal-100/80 font-medium leading-tight truncate cursor-help drop-shadow-sm">
+                                    <span className="text-[10px] text-white font-medium leading-tight truncate cursor-help drop-shadow-sm">
                                         {[
                                             context.department?.name,
                                             context.module?.name,
@@ -1123,7 +1162,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                             variant="ghost"
                             size="icon"
                             onClick={handleReset}
-                            className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-teal-900/20 dark:hover:bg-teal-100/20 backdrop-blur-md border border-teal-900/10 dark:border-teal-100/10 text-teal-900 dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 h-auto w-auto"
+                            className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-teal-900/20 dark:hover:bg-teal-100/20 backdrop-blur-md border border-teal-900/10 dark:border-teal-100/10 text-teal-100 dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 h-auto w-auto"
                             title="Start New Chat"
                         >
                             <Plus className="w-4 h-4" strokeWidth={2.5} />
@@ -1138,7 +1177,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                     saveState();
                                     onMinimize();
                                 }}
-                                className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-teal-900/20 dark:hover:bg-teal-100/20 backdrop-blur-md border border-teal-900/10 dark:border-teal-100/10 text-teal-900 dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 h-auto w-auto"
+                                className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-teal-900/20 dark:hover:bg-teal-100/20 backdrop-blur-md border border-teal-900/10 dark:border-teal-100/10 text-teal-100 dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 h-auto w-auto"
                                 title="Minimize / Close Window"
                             >
                                 <Minimize2 className="w-4 h-4" strokeWidth={2.5} />
@@ -1158,49 +1197,12 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                             {currentStep === 'qa' && messages.length > 0 && (
                                 <>
                                     {messages.map((message) => (
-                                        <div
+                                        <MessageBubble
                                             key={message.id}
-                                            className={`flex w-full ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                                        >
-                                            <div className={`flex flex-col max-w-[80%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                                                {message.sender === 'ai' && (
-                                                    <span className="text-[10px] text-muted-foreground mb-1 px-1">
-                                                        AI • {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                )}
-                                                {message.sender === 'user' && (
-                                                    <span className="text-[10px] text-muted-foreground mb-1 px-1">
-                                                        You • {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                )}
-                                                <div className="relative mb-2">
-                                                    <div
-                                                        className={`px-4 py-2.5 shadow-sm backdrop-blur-sm border transition-all duration-300 ${message.sender === 'user'
-                                                            ? 'bg-teal-700/90 dark:bg-teal-600/60 border-teal-600/50 dark:border-teal-500/30 text-white rounded-2xl rounded-tr-none shadow-[0_4px_12px_rgba(13,148,136,0.2)]'
-                                                            : 'bg-emerald-50/80 dark:bg-white/10 border-white/60 dark:border-white/10 text-teal-900 dark:text-teal-50 rounded-2xl rounded-tl-none font-medium shadow-[0_2px_8px_rgba(0,0,0,0.05)]'
-                                                            }`}
-                                                    >
-                                                        <div className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-                                                            {formatMessageText(message.text)}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {message.sender === 'ai' && (
-                                                    <div className="flex items-center gap-1 mt-1 px-1">
-                                                        <button
-                                                            onClick={() => handleCopy(message.text, message.id)}
-                                                            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                                                        >
-                                                            {copiedId === message.id ? (
-                                                                <Check className="h-3.5 w-3.5" />
-                                                            ) : (
-                                                                <Copy className="h-3.5 w-3.5" />
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
+                                            message={message}
+                                            onCopy={handleCopy}
+                                            copiedId={copiedId}
+                                        />
                                     ))}
                                     {isLoading && (
                                         <div className="flex w-full justify-start">
@@ -1229,40 +1231,38 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         <CardFooter className="p-2 bg-transparent">
                             <div className="relative w-full">
                                 {/* Input Container */}
-                                <div className="relative flex w-full items-center gap-2 bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-xl pl-3 pr-1 py-1 shadow-md z-10 transition-all duration-300 hover:bg-white/80 dark:hover:bg-white/10 hover:border-white/70 dark:hover:border-white/20 focus-within:bg-white/95 dark:focus-within:bg-black/60 focus-within:border-teal-400/50 dark:focus-within:border-teal-500/50">
-                                    <textarea
+                                <div className="relative flex w-full items-end gap-2 bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-xl p-2 shadow-md z-10 transition-all duration-300 hover:bg-white/80 dark:hover:bg-white/10 hover:border-white/70 dark:hover:border-white/20 focus-within:bg-white/95 dark:focus-within:bg-black/60 focus-within:border-teal-400/50 dark:focus-within:border-teal-500/50">
+                                    <Textarea
                                         ref={textareaRef}
                                         placeholder="Type your message here..."
                                         value={inputValue}
-                                        onChange={(e) => setInputValue(e.target.value)}
+                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInputValue(e.target.value)}
                                         onKeyDown={handleKeyPress}
                                         rows={1}
-                                        className="flex-1 bg-transparent border-0 focus:outline-none text-teal-900 dark:text-white placeholder:text-teal-700/30 dark:placeholder:text-white/30 resize-none min-h-[34px] max-h-[80px] overflow-y-auto py-2 text-sm ml-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+                                        className="flex-1 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-teal-900 dark:text-white placeholder:text-teal-700/30 dark:placeholder:text-white/30 resize-none min-h-[34px] max-h-[80px] overflow-y-auto py-2 text-sm [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] shadow-none"
                                         disabled={isLoading}
                                         style={{ height: 'auto' }}
-                                        onInput={(e) => {
-                                            const target = e.target as HTMLTextAreaElement;
+                                        onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+                                            const target = e.currentTarget;
                                             target.style.height = 'auto';
                                             target.style.height = Math.min(target.scrollHeight, 80) + 'px';
                                         }}
                                     />
-                                    <div className="shrink-0">
-                                        <Button
-                                            onClick={handleSendMessage}
-                                            size="icon"
-                                            disabled={isLoading || !inputValue.trim()}
-                                            className={`h-8 w-8 rounded-lg shrink-0 transition-all duration-300 flex items-center justify-center ${!inputValue.trim()
-                                                ? 'bg-teal-600/20 text-teal-700/60 cursor-not-allowed border border-teal-500/30'
-                                                : 'bg-teal-600 text-white hover:bg-teal-700 shadow-md hover:scale-105 active:scale-95'
-                                                }`}
-                                        >
-                                            {isLoading ? (
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                            ) : (
-                                                <Send className="h-3.5 w-3.5 ml-0.5" />
-                                            )}
-                                        </Button>
-                                    </div>
+                                    <Button
+                                        onClick={handleSendMessage}
+                                        size="icon"
+                                        disabled={isLoading || !inputValue.trim()}
+                                        className={`h-8 w-8 rounded-lg shrink-0 transition-all duration-300 ${!inputValue.trim()
+                                            ? 'bg-teal-600/20 text-teal-700/60 cursor-not-allowed hover:bg-teal-600/20'
+                                            : 'bg-teal-600 text-white hover:bg-teal-700 shadow-md hover:scale-105 active:scale-95'
+                                            }`}
+                                    >
+                                        {isLoading ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Send className="h-3.5 w-3.5 ml-0.5" />
+                                        )}
+                                    </Button>
                                 </div>
                             </div>
                         </CardFooter>

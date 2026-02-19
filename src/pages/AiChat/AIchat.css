@@ -1,0 +1,320 @@
+.ai-chat-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    height: 85px;
+    /* Light Mode: Light background, visible border */
+    background-color: rgba(4, 91, 97, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1rem;
+}
+
+
+/* Dark Mode Override */
+.dark .ai-chat-header {
+    /* Dark Mode: Dark transparent background, subtle border */
+    background-color: #018790;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nia-subtitle {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+    line-height: 1;
+    margin-bottom: 4px;
+    margin-bottom: 0.5rem;
+}
+
+/* Chat Bubbles */
+.chat-bubble {
+    padding: 0.625rem 1rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(4px);
+    border: 1px solid;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+    border-radius: 1rem;
+}
+
+.chat-bubble-user {
+    /* bg-teal-700/90 */
+    background-color: rgba(15, 118, 110, 0.9);
+    /* border-teal-600/50 */
+    border-color: rgba(13, 148, 136, 0.5);
+    color: #ffffff;
+    border-top-right-radius: 0;
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);
+}
+
+.dark .chat-bubble-user {
+    /* dark:bg-teal-600/60 */
+    background-color: #012E31;
+    /* dark:border-teal-500/30 */
+    border-color: rgba(51, 65, 85, 0.5);
+}
+
+.chat-bubble-ai {
+    /* bg-emerald-50/80 */
+    background-color: rgba(236, 253, 245, 0.8);
+    /* border-white/60 */
+    border-color: rgba(255, 255, 255, 0.6);
+    /* text-teal-900 */
+    color: #134e4a;
+    border-top-left-radius: 0;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.dark .chat-bubble-ai {
+    /* dark:bg-white/10 */
+    background-color: rgba(255, 255, 255, 0.1);
+    /* dark:border-white/10 */
+    border-color: rgba(255, 255, 255, 0.1);
+    /* dark:text-teal-50 */
+    color: #f0fdfa;
+}
+
+/* Message formatting */
+.messageHeading {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--foreground);
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.messageHeading:first-child {
+    margin-top: 0;
+}
+
+.messageSpacer {
+    height: 0.5rem;
+}
+
+.messageParagraph {
+    min-height: 1.5em;
+    margin-bottom: 0.375rem;
+}
+
+.messageParagraph:last-child {
+    margin-bottom: 0;
+}
+
+/* Greeting Card Structure */
+.greeting-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 24rem;
+    margin: 0 auto 1rem auto;
+}
+
+.greeting-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    /* Light Mode Default */
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Dark mode handling via .dark ancestor */
+.dark .greeting-card {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.greeting-content {
+    position: relative;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Header Section */
+.greeting-header {
+    width: 100%;
+    text-align: left;
+}
+
+.greeting-header-inner {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.greeting-title-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.greeting-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bot-icon-wrapper {
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    background-color: #ccfbf1;
+    /* teal-100 */
+    color: #0d9488;
+    /* teal-600 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dark .bot-icon-wrapper {
+    background-color: rgba(19, 78, 74, 0.5);
+    /* teal-900/50 */
+    color: #2dd4bf;
+    /* teal-400 */
+}
+
+.greeting-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #134e4a;
+    /* teal-900 */
+    margin: 0;
+}
+
+.dark .greeting-title {
+    color: #ffffff;
+}
+
+.greeting-subtitle {
+    font-size: 0.875rem;
+    color: rgba(15, 118, 110, 0.7);
+    /* teal-700/70 */
+    padding-left: 2.75rem;
+    /* ~11 * 0.25rem */
+    margin: 0;
+}
+
+.dark .greeting-subtitle {
+    color: #9ca3af;
+    /* gray-400 */
+}
+
+/* Options List */
+.options-container {
+    padding-left: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.option-button {
+    position: relative;
+    overflow: hidden;
+    background-color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: #134e4a;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    width: 100%;
+    cursor: pointer;
+    text-align: left;
+}
+
+.dark .option-button {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.option-button:hover {
+    background-color: rgba(255, 255, 255, 0.8);
+    transform: scale(1.02);
+}
+
+.dark .option-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.option-button span {
+    flex: 1;
+}
+
+.option-icon {
+    height: 1rem;
+    width: 1rem;
+    color: rgba(13, 148, 136, 0.7);
+    transition: all 0.2s ease;
+}
+
+.dark .option-icon {
+    color: #9ca3af;
+}
+
+.option-button:hover .option-icon {
+    color: #0d9488;
+    transform: translateX(0.25rem);
+}
+
+.dark .option-button:hover .option-icon {
+    color: #ffffff;
+}
+
+/* Loading / Empty States */
+.state-container {
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-message {
+    padding: 1rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+}
+
+.spinner {
+    height: 1.5rem;
+    width: 1.5rem;
+    animation: spin 1s linear infinite;
+    color: #0d9488;
+}
+
+.dark .spinner {
+    color: #2dd4bf;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
