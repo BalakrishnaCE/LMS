@@ -53,7 +53,7 @@ function getLockState(module: any, allModules: any[]) {
   const isCompleted = module.progress?.status === "Completed";
   let isLocked = false;
   let lockReason = "";
-  
+
   // Only Department-based modules can be locked
   if (module.assignment_based !== "Department") {
     isLocked = false;
@@ -65,12 +65,12 @@ function getLockState(module: any, allModules: any[]) {
     // Backend returns false for unlocked modules, true for locked modules
     // IMPORTANT: false is a valid value, so we must check !== undefined && !== null
     isLocked = Boolean(module.is_locked);
-    
+
     if (isLocked) {
       lockReason = "Complete previous modules to unlock this module.";
-      
+
     } else {
-      
+
     }
   } else {
     // is_locked is undefined or null - use fallback calculation
@@ -79,18 +79,18 @@ function getLockState(module: any, allModules: any[]) {
     // IMPORTANT: Filter by department to ensure independent locking per department
     if (module.assignment_based === "Department" && module.order && module.order > 0) {
       const moduleDepartment = (module.department || "").trim().toLowerCase();
-      
+
       // Find all Department-based ordered modules from the SAME department only
       const deptOrdered = allModules.filter((m: any) => {
         const mDept = (m.department || "").trim().toLowerCase();
-        return m.assignment_based === "Department" 
+        return m.assignment_based === "Department"
           && m.order && m.order > 0
           && mDept === moduleDepartment; // SAME DEPARTMENT ONLY
       });
-      
+
       // Find all previous Department-based modules (lower order) from SAME department
       const previous = deptOrdered.filter((m: any) => m.order < module.order);
-      
+
       // If any previous Department-based module from SAME department is not completed, lock this module
       if (previous.some((m: any) => m.progress?.status !== "Completed")) {
         isLocked = true;
@@ -112,11 +112,11 @@ export default function LearnerDashboard() {
   }, { enabled: !userLoading && !!user?.email && user?.email.trim() !== "" });
 
   const { data: DeadlineData, error: deadlineError, isLoading: deadlinesLoading } = useLearnerDashboard(user?.email || "", { enabled: !!user?.email && user?.email.trim() !== "" });
-  
+
   if (error) {
     console.error('API Error details:', error);
   }
-  
+
   if (deadlineError) {
     console.error('Deadline API Error details:', deadlineError);
   }
@@ -151,10 +151,10 @@ export default function LearnerDashboard() {
   // Fetch achievements using direct API call to avoid conflicts
   const [dashboardAchievements, setDashboardAchievements] = React.useState<any[]>([]);
   const [achievementsLoading, setAchievementsLoading] = React.useState(true);
-  
+
   const fetchAchievements = React.useCallback(async () => {
     if (!user?.name) return;
-    
+
     try {
       setAchievementsLoading(true);
       const response = await fetch(`${LMS_API_BASE_URL}api/resource/User Achievement?filters=[["user","=","${user.name}"]]&fields=["name","achievement","created_on","user","achievement.icon_name","achievement.text","achievement.description"]`, {
@@ -165,10 +165,10 @@ export default function LearnerDashboard() {
         credentials: 'include'
       });
       const data = await response.json();
-      
+
       if (data.data) {
         setDashboardAchievements(data.data);
- 
+
       }
     } catch (error) {
       console.error('Error fetching achievements:', error);
@@ -177,7 +177,7 @@ export default function LearnerDashboard() {
       setAchievementsLoading(false);
     }
   }, [user?.name]);
-  
+
   React.useEffect(() => {
     fetchAchievements();
   }, [fetchAchievements]);
@@ -186,21 +186,21 @@ export default function LearnerDashboard() {
   // CRITICAL: get_learner_module_data includes is_locked field which is essential for proper locking
   // useLearnerModuleData returns data directly: { modules: [...], meta: {...} }
   // useLearnerDashboard returns data under message: [{ module: {...}, progress: {...} }]
-  
+
   let modules: any[] = [];
   let meta: any = {};
-  
+
   // PRIORITY 1: Use useLearnerModuleData (has is_locked field) - this is the primary source
   if (data?.message?.modules && Array.isArray(data.message.modules)) {
     // Response format: { message: { modules: [...], meta: {...} } }
     modules = data.message.modules || [];
     meta = data.message.meta || {};
-    
+
   } else if (data?.modules && Array.isArray(data.modules)) {
     // Direct structure: { modules: [...], meta: {...} }
     modules = data.modules || [];
     meta = data.meta || {};
-    
+
   } else if (data?.message && Array.isArray(data.message)) {
     // Array format: { message: [{ module: {...}, progress: {...} }] }
     modules = data.message.map((item: any) => ({
@@ -216,11 +216,11 @@ export default function LearnerDashboard() {
       in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
       not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
       overdue_modules: 0,
-      average_progress: modules.length > 0 ? 
+      average_progress: modules.length > 0 ?
         Math.round(modules.reduce((sum: number, m: any) => sum + (m.progress?.progress || 0), 0) / modules.length) : 0,
       total_count: modules.length
     };
-   
+
   }
   // FALLBACK: Use get_learner_dashboard only if useLearnerModuleData is not available
   else if (DeadlineData?.message && Array.isArray(DeadlineData.message) && DeadlineData.message.length > 0) {
@@ -235,13 +235,13 @@ export default function LearnerDashboard() {
       };
       // Debug logging for is_locked
       if (item.module?.is_locked !== undefined) {
-        
+
       } else {
         console.warn(`⚠️ [DASHBOARD] Module ${item.module?.name} (${item.module?.name1}) - is_locked is MISSING from dashboard API, will use fallback logic`);
       }
       return moduleData;
     });
-    
+
     // Calculate meta from modules
     meta = {
       total_modules: modules.length,
@@ -249,13 +249,13 @@ export default function LearnerDashboard() {
       in_progress_modules: modules.filter((m: any) => m.progress?.status === "In Progress").length,
       not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
       overdue_modules: 0,
-      average_progress: modules.length > 0 ? 
+      average_progress: modules.length > 0 ?
         Math.round(modules.reduce((sum: number, m: any) => sum + (m.progress?.progress || 0), 0) / modules.length) : 0,
       total_count: modules.length
     };
-    
+
   }
-  
+
   // Check if modules have the nested structure (module.module, module.progress)
   if (modules.length > 0 && modules[0].module) {
     modules = modules.map((item: any) => {
@@ -265,11 +265,11 @@ export default function LearnerDashboard() {
         // CRITICAL: Preserve is_locked field if it exists
         is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : item.is_locked
       };
-      
+
       return moduleData;
     });
   }
-  
+
   // Check if modules are empty and add fallback
   if (modules.length > 0 && Object.keys(modules[0]).length === 0) {
     // Try to get modules from the fallback API
@@ -282,7 +282,7 @@ export default function LearnerDashboard() {
       }));
     }
   }
-  
+
   // Final check: Log all modules and their is_locked status for debugging
   React.useEffect(() => {
     if (modules.length > 0) {
@@ -298,11 +298,11 @@ export default function LearnerDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(modules.map((m: any) => ({ name: m.name, is_locked: m.is_locked })))]);
-  
+
   // If useLearnerModuleData doesn't have data, use useLearnerDashboard data (final fallback)
   if (modules.length === 0 && DeadlineData?.message && !deadlineError) {
     const deadlineModules = DeadlineData.message;
-    
+
     // Ensure deadlineModules is an array before calling map
     if (Array.isArray(deadlineModules)) {
       // Transform the data to match expected format
@@ -332,7 +332,7 @@ export default function LearnerDashboard() {
         }));
       }
     }
-    
+
     // Calculate meta from the transformed data using shared utility
     const stats = calculateProgressStats(modules);
     meta = {
@@ -348,7 +348,7 @@ export default function LearnerDashboard() {
   // Calculate stats (fallback to 0 if not present)
   // Calculate stats directly from modules if meta is not available
   const stats = calculateProgressStats(modules);
-  
+
   const totalModules = meta.total_count || meta.total_modules || stats.totalModules || 0;
   const completedModules = meta.completed_modules || stats.completedModules || 0;
   const inProgressModules = meta.in_progress_modules || stats.inProgressModules || 0;
@@ -365,15 +365,15 @@ export default function LearnerDashboard() {
 
   // Refresh achievements when component mounts or modules change
   React.useEffect(() => {
-    
+
     fetchAchievements();
   }, [modules.length, fetchAchievements]);
 
   // Map API data to AchievementShowcase props
   let achievements: Achievement[] = [];
-  
+
   if (dashboardAchievements && Array.isArray(dashboardAchievements)) {
-    
+
     achievements = dashboardAchievements.map((ua: any) => ({
       id: ua.name,
       icon_name: ua.icon_name,
@@ -381,9 +381,9 @@ export default function LearnerDashboard() {
       description: ua.description,
       created_on: ua.created_on,
     }));
-    
+
   } else {
-   
+
   }
 
   // Loading and error states
@@ -407,7 +407,7 @@ export default function LearnerDashboard() {
   return (
     <div className="flex flex-1 flex-col">
       <AnimatePresence mode="wait">
-        <motion.div 
+        <motion.div
           key="content"
           variants={containerVariants}
           initial="hidden"
@@ -421,14 +421,14 @@ export default function LearnerDashboard() {
           </motion.div>
 
           {/* Enhanced Stats Cards */}
-          <motion.div 
+          <motion.div
             variants={itemVariants}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4"
           >
             {/* Total Modules Card */}
             <motion.div
-              whileHover={{ 
-                y: -8, 
+              whileHover={{
+                y: -8,
                 scale: 1.02,
                 transition: { duration: 0.2, ease: "easeOut" }
               }}
@@ -447,7 +447,7 @@ export default function LearnerDashboard() {
                 whileHover={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
               />
-              
+
               {/* Content */}
               <div className="relative z-10">
                 <div className="flex items-start justify-between mb-4">
@@ -467,7 +467,7 @@ export default function LearnerDashboard() {
                     </div>
                   </div>
                 </div>
-                
+
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -478,7 +478,7 @@ export default function LearnerDashboard() {
                     {totalModules}
                   </div>
                 </motion.div>
-                
+
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -489,7 +489,7 @@ export default function LearnerDashboard() {
                   </p>
                 </motion.div>
               </div>
-              
+
               {/* Subtle decorative accent */}
               <motion.div
                 className="absolute -bottom-2 -right-2 w-16 h-16 rounded-full opacity-5"
@@ -510,8 +510,8 @@ export default function LearnerDashboard() {
 
             {/* Completed Modules Card */}
             <motion.div
-              whileHover={{ 
-                y: -8, 
+              whileHover={{
+                y: -8,
                 scale: 1.02,
                 transition: { duration: 0.2, ease: "easeOut" }
               }}
@@ -530,7 +530,7 @@ export default function LearnerDashboard() {
                 whileHover={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
               />
-              
+
               {/* Content */}
               <div className="relative z-10">
                 <div className="flex items-start justify-between mb-4">
@@ -550,7 +550,7 @@ export default function LearnerDashboard() {
                     </div>
                   </div>
                 </div>
-                
+
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -561,7 +561,7 @@ export default function LearnerDashboard() {
                     {completedModules}
                   </div>
                 </motion.div>
-                
+
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -572,7 +572,7 @@ export default function LearnerDashboard() {
                   </p>
                 </motion.div>
               </div>
-              
+
               {/* Subtle decorative accent */}
               <motion.div
                 className="absolute -bottom-2 -right-2 w-16 h-16 rounded-full opacity-5"
@@ -593,8 +593,8 @@ export default function LearnerDashboard() {
 
             {/* In Progress Card */}
             <motion.div
-              whileHover={{ 
-                y: -8, 
+              whileHover={{
+                y: -8,
                 scale: 1.02,
                 transition: { duration: 0.2, ease: "easeOut" }
               }}
@@ -613,7 +613,7 @@ export default function LearnerDashboard() {
                 whileHover={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
               />
-              
+
               {/* Content */}
               <div className="relative z-10">
                 <div className="flex items-start justify-between mb-4">
@@ -633,7 +633,7 @@ export default function LearnerDashboard() {
                     </div>
                   </div>
                 </div>
-                
+
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -644,7 +644,7 @@ export default function LearnerDashboard() {
                     {inProgressModules}
                   </div>
                 </motion.div>
-                
+
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -655,7 +655,7 @@ export default function LearnerDashboard() {
                   </p>
                 </motion.div>
               </div>
-              
+
               {/* Subtle decorative accent */}
               <motion.div
                 className="absolute -bottom-2 -right-2 w-16 h-16 rounded-full opacity-5"
@@ -676,8 +676,8 @@ export default function LearnerDashboard() {
 
             {/* Average Progress Card */}
             <motion.div
-              whileHover={{ 
-                y: -8, 
+              whileHover={{
+                y: -8,
                 scale: 1.02,
                 transition: { duration: 0.2, ease: "easeOut" }
               }}
@@ -696,7 +696,7 @@ export default function LearnerDashboard() {
                 whileHover={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
               />
-              
+
               {/* Content */}
               <div className="relative z-10">
                 <div className="flex items-start justify-between mb-4">
@@ -716,7 +716,7 @@ export default function LearnerDashboard() {
                     </div>
                   </div>
                 </div>
-                
+
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -727,7 +727,7 @@ export default function LearnerDashboard() {
                     {Math.round(averageProgress)}%
                   </div>
                 </motion.div>
-                
+
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -748,7 +748,7 @@ export default function LearnerDashboard() {
                   <Progress value={averageProgress} className="h-2" />
                 </motion.div>
               </div>
-              
+
               {/* Subtle decorative accent */}
               <motion.div
                 className="absolute -bottom-2 -right-2 w-16 h-16 rounded-full opacity-5"
@@ -789,11 +789,11 @@ export default function LearnerDashboard() {
                       const inProgressModules = sortedModules.filter((m: any) => {
                         // Use the same progress calculation logic as module detail view
                         let progress = m.progress?.overall_progress ?? m.progress?.progress ?? 0;
-                        
+
                         // If overall_progress is 0 but there are completion details, calculate progress
                         if (progress === 0 && m.progress?.completion_details) {
                           const { chapters_completed, total_lesson_chapter_items, contents_completed, total_content_items } = m.progress.completion_details;
-                          
+
                           // Try chapter-based progress first
                           if (total_lesson_chapter_items > 0) {
                             progress = Math.round((chapters_completed / total_lesson_chapter_items) * 100);
@@ -803,7 +803,7 @@ export default function LearnerDashboard() {
                             progress = Math.round((contents_completed / total_content_items) * 100);
                           }
                         }
-                        
+
                         // Consider "In Progress" if status is "In Progress" OR (progress > 0 and < 100)
                         return m.progress?.status === 'In Progress' || (progress > 0 && progress < 100);
                       });
@@ -818,11 +818,11 @@ export default function LearnerDashboard() {
                         {sortedModules.filter((m: any) => {
                           // Use the same logic as the filter above
                           let progress = m.progress?.overall_progress ?? m.progress?.progress ?? 0;
-                          
+
                           // If overall_progress is 0 but there are completion details, calculate progress
                           if (progress === 0 && m.progress?.completion_details) {
                             const { chapters_completed, total_lesson_chapter_items, contents_completed, total_content_items } = m.progress.completion_details;
-                            
+
                             // Try chapter-based progress first
                             if (total_lesson_chapter_items > 0) {
                               progress = Math.round((chapters_completed / total_lesson_chapter_items) * 100);
@@ -832,7 +832,7 @@ export default function LearnerDashboard() {
                               progress = Math.round((contents_completed / total_content_items) * 100);
                             }
                           }
-                          
+
                           // Consider "In Progress" if status is "In Progress" OR (progress > 0 and < 100)
                           return m.progress?.status === 'In Progress' || (progress > 0 && progress < 100);
                         }).map((module: any, idx: number) => {
@@ -853,34 +853,34 @@ export default function LearnerDashboard() {
                                   {/* Image or Avatar */}
                                   {module.image ? (
                                     <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 relative">
-                                      <img 
+                                      <img
                                         src={(() => {
                                           // Helper function to get full image URL
                                           const getImageUrl = (path: string): string => {
                                             if (!path) return '';
                                             const trimmed = path.trim();
                                             if (!trimmed) return '';
-                                            
+
                                             // If already a full URL, return as is
                                             if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
                                               return trimmed;
                                             }
-                                            
+
                                             // Ensure path starts with / if it doesn't already
                                             const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-                                            
+
                                             // Determine base URL
                                             // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                                             // In development: use http://lms.noveloffice.org
                                             const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
                                             const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-                                            
+
                                             return `${cleanBaseUrl}${relativePath}`;
                                           };
                                           return getImageUrl(module.image);
                                         })()}
-                                        alt={module.name1 + ' image'} 
-                                        className="object-cover w-full h-full rounded-r-xl" 
+                                        alt={module.name1 + ' image'}
+                                        className="object-cover w-full h-full rounded-r-xl"
                                         loading="lazy"
                                         onError={() => {
                                           console.error('Failed to load module image:', module.image);
@@ -896,15 +896,15 @@ export default function LearnerDashboard() {
                                   <div className="flex-1 flex flex-col justify-between p-4 gap-2 min-w-0">
                                     {/* Progress and Meta */}
                                     <div className="flex flex-col gap-1 mt-2">
-                                        <div className="flex flex-col space-y-1 text-xs">
-                                          <h3 className="text-lg font-semibold truncate">{module.name1}</h3>
-                                          <p className="text-sm text-muted-foreground truncate">{module.description?.replace(/<[^>]+>/g, '')}</p>
-                                          <div className="flex items-center justify-between">
-                                            <span className="text-muted-foreground">Progress</span>
-                                            <span className="font-semibold text-base">{Math.round(progress)}%</span>
-                                          </div>
+                                      <div className="flex flex-col space-y-1 text-xs">
+                                        <h3 className="text-lg font-semibold truncate">{module.name1}</h3>
+                                        <p className="text-sm text-muted-foreground truncate">{module.description?.replace(/<[^>]+>/g, '')}</p>
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-muted-foreground">Progress</span>
+                                          <span className="font-semibold text-base">{Math.round(progress)}%</span>
                                         </div>
-                                        <Progress value={progress} className="h-2" aria-label={`Progress: ${Math.round(progress)}%`} />
+                                      </div>
+                                      <Progress value={progress} className="h-2" aria-label={`Progress: ${Math.round(progress)}%`} />
                                       {/* {startDate && <span className="text-xs text-muted-foreground mt-1">Started: {startDate.toLocaleDateString()}</span>} */}
                                       {/* {duration && <span className="text-xs text-muted-foreground mt-1">Duration: {duration} days</span>} */}
                                       <span className="text-xs text-muted-foreground mt-1">
@@ -988,15 +988,15 @@ export default function LearnerDashboard() {
                         <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
                         <div className="mt-4 text-muted-foreground">Loading modules...</div>
                       </div>
-                    ) : (function() {
+                    ) : (function () {
                       const notStarted = sortedModules.filter((m: any) => {
                         // Use the same progress calculation logic as module detail view
                         let progress = m.progress?.overall_progress ?? m.progress?.progress ?? 0;
-                        
+
                         // If overall_progress is 0 but there are completion details, calculate progress
                         if (progress === 0 && m.progress?.completion_details) {
                           const { chapters_completed, total_lesson_chapter_items, contents_completed, total_content_items } = m.progress.completion_details;
-                          
+
                           // Try chapter-based progress first
                           if (total_lesson_chapter_items > 0) {
                             progress = Math.round((chapters_completed / total_lesson_chapter_items) * 100);
@@ -1006,12 +1006,12 @@ export default function LearnerDashboard() {
                             progress = Math.round((contents_completed / total_content_items) * 100);
                           }
                         }
-                        
+
                         // Consider "Not Started" only if progress is 0 and status is "Not Started"
                         // This ensures modules with progress > 0 are not shown in "Ready to Start"
                         return progress === 0 && (!m.progress || m.progress.status === 'Not Started');
                       });
-                      
+
                       const ordered = notStarted.filter((item: any) => item.order && item.order > 0).sort((a: any, b: any) => a.order - b.order);
                       const unordered = notStarted.filter((item: any) => !item.order || item.order === 0);
                       const readyToStart = [...ordered, ...unordered];
@@ -1028,11 +1028,11 @@ export default function LearnerDashboard() {
                           {readyToStart.map((module: any, idx: number) => {
                             const moduleName = module?.name1 || module?.name || "Module";
                             const duration = module?.duration;
-                            
+
                             // For "Ready to Start" modules, use backend is_locked if available
                             let isLocked = false;
                             let lockReason = "";
-                            
+
                             // CRITICAL: Use backend is_locked field if available (same as other sections)
                             if (module.is_locked !== undefined && module.is_locked !== null) {
                               isLocked = Boolean(module.is_locked);
@@ -1045,7 +1045,7 @@ export default function LearnerDashboard() {
                               const moduleDepartment = (module.department || "").trim().toLowerCase();
                               const deptOrdered = sortedModules.filter((m: any) => {
                                 const mDept = (m.department || "").trim().toLowerCase();
-                                return m.assignment_based === "Department" 
+                                return m.assignment_based === "Department"
                                   && m.order && m.order > 0
                                   && mDept === moduleDepartment; // SAME DEPARTMENT ONLY
                               });
@@ -1056,7 +1056,7 @@ export default function LearnerDashboard() {
                                 console.warn(`⚠️ [DASHBOARD] Ready to Start - Module ${module.name} (${module.name1}) - Using fallback calculation, is_locked was missing`);
                               }
                             }
-                            
+
                             const isMissed = false; // Not started modules can't be missed
                             return (
                               <motion.div key={module.name || `ready-module-${idx}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }} className="transition-all duration-200">
@@ -1065,38 +1065,38 @@ export default function LearnerDashboard() {
                                     {/* Image or Avatar */}
                                     {module.image ? (
                                       <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 relative">
-                                        <img 
+                                        <img
                                           src={(() => {
                                             // Helper function to get full image URL
                                             const getImageUrl = (path: string): string => {
                                               if (!path) return '';
                                               const trimmed = path.trim();
                                               if (!trimmed) return '';
-                                              
+
                                               // If already a full URL, return as is
                                               if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
                                                 return trimmed;
                                               }
-                                              
+
                                               // Ensure path starts with / if it doesn't already
                                               const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-                                              
+
                                               // Determine base URL
                                               // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                                               // In development: use http://lms.noveloffice.org
                                               const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
                                               const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-                                              
+
                                               return `${cleanBaseUrl}${relativePath}`;
                                             };
                                             return getImageUrl(module.image);
                                           })()}
-                                        alt={moduleName + ' image'} 
-                                        className="object-cover w-full h-full rounded-r-xl" 
-                                        loading="lazy"
-                                        onError={() => {
-                                          console.error('Failed to load module image:', module.image);
-                                        }}
+                                          alt={moduleName + ' image'}
+                                          className="object-cover w-full h-full rounded-r-xl"
+                                          loading="lazy"
+                                          onError={() => {
+                                            console.error('Failed to load module image:', module.image);
+                                          }}
                                         />
                                       </div>
                                     ) : (
@@ -1190,11 +1190,11 @@ export default function LearnerDashboard() {
                         const completedModules = sortedModules.filter((m: any) => {
                           // Use the same progress calculation logic as module detail view
                           let progress = m.progress?.overall_progress ?? m.progress?.progress ?? 0;
-                          
+
                           // If overall_progress is 0 but there are completion details, calculate progress
                           if (progress === 0 && m.progress?.completion_details) {
                             const { chapters_completed, total_lesson_chapter_items, contents_completed, total_content_items } = m.progress.completion_details;
-                            
+
                             // Try chapter-based progress first
                             if (total_lesson_chapter_items > 0) {
                               progress = Math.round((chapters_completed / total_lesson_chapter_items) * 100);
@@ -1204,7 +1204,7 @@ export default function LearnerDashboard() {
                               progress = Math.round((contents_completed / total_content_items) * 100);
                             }
                           }
-                          
+
                           // Consider "Completed" if progress >= 100 or status is "Completed"
                           return progress >= 100 || m.progress?.status === 'Completed';
                         });
@@ -1231,38 +1231,38 @@ export default function LearnerDashboard() {
                                     {/* Image or Avatar */}
                                     {module.image ? (
                                       <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 relative">
-                                        <img 
+                                        <img
                                           src={(() => {
                                             // Helper function to get full image URL
                                             const getImageUrl = (path: string): string => {
                                               if (!path) return '';
                                               const trimmed = path.trim();
                                               if (!trimmed) return '';
-                                              
+
                                               // If already a full URL, return as is
                                               if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
                                                 return trimmed;
                                               }
-                                              
+
                                               // Ensure path starts with / if it doesn't already
                                               const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-                                              
+
                                               // Determine base URL
                                               // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                                               // In development: use http://lms.noveloffice.org
                                               const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
                                               const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-                                              
+
                                               return `${cleanBaseUrl}${relativePath}`;
                                             };
                                             return getImageUrl(module.image);
                                           })()}
-                                        alt={module.name1 + ' image'} 
-                                        className="object-cover w-full h-full rounded-r-xl" 
-                                        loading="lazy"
-                                        onError={() => {
-                                          console.error('Failed to load module image:', module.image);
-                                        }}
+                                          alt={module.name1 + ' image'}
+                                          className="object-cover w-full h-full rounded-r-xl"
+                                          loading="lazy"
+                                          onError={() => {
+                                            console.error('Failed to load module image:', module.image);
+                                          }}
                                         />
                                       </div>
                                     ) : (
@@ -1378,14 +1378,14 @@ export default function LearnerDashboard() {
                       // Filter and order modules for deadlines section
                       let inProgressModules = getModulesArray().filter((item: any) => {
                         if (!item.progress) return false;
-                        
+
                         // Use the same progress calculation logic as other sections
                         let progress = item.progress?.overall_progress ?? item.progress?.progress ?? 0;
-                        
+
                         // If overall_progress is 0 but there are completion details, calculate progress
                         if (progress === 0 && item.progress?.completion_details) {
                           const { chapters_completed, total_lesson_chapter_items, contents_completed, total_content_items } = item.progress.completion_details;
-                          
+
                           // Try chapter-based progress first
                           if (total_lesson_chapter_items > 0) {
                             progress = Math.round((chapters_completed / total_lesson_chapter_items) * 100);
@@ -1395,7 +1395,7 @@ export default function LearnerDashboard() {
                             progress = Math.round((contents_completed / total_content_items) * 100);
                           }
                         }
-                        
+
                         // Consider "In Progress" if status is "In Progress" OR (progress > 0 and < 100)
                         return item.progress.status === "In Progress" || (progress > 0 && progress < 100);
                       });
@@ -1462,14 +1462,14 @@ export default function LearnerDashboard() {
                       // Filter and order modules for ready to start section
                       let notStartedModules = getModulesArray().filter((item: any) => {
                         if (!item.progress) return true; // No progress means not started
-                        
+
                         // Use the same progress calculation logic as other sections
                         let progress = item.progress?.overall_progress ?? item.progress?.progress ?? 0;
-                        
+
                         // If overall_progress is 0 but there are completion details, calculate progress
                         if (progress === 0 && item.progress?.completion_details) {
                           const { chapters_completed, total_lesson_chapter_items, contents_completed, total_content_items } = item.progress.completion_details;
-                          
+
                           // Try chapter-based progress first
                           if (total_lesson_chapter_items > 0) {
                             progress = Math.round((chapters_completed / total_lesson_chapter_items) * 100);
@@ -1479,7 +1479,7 @@ export default function LearnerDashboard() {
                             progress = Math.round((contents_completed / total_content_items) * 100);
                           }
                         }
-                        
+
                         // Consider "Not Started" only if progress is 0 and status is "Not Started"
                         // This ensures modules with progress > 0 are not shown in "Ready to Start"
                         return progress === 0 && item.progress.status === 'Not Started';
