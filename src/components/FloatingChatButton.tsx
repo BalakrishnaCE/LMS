@@ -5,6 +5,7 @@ import { useTheme } from "@/components/theme-provider";
 import { useUser } from "@/hooks/use-user";
 import { useLocation } from "wouter";
 import { BASE_PATH } from "@/config/routes";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const DEFAULT_WIDTH = 360;
 const DEFAULT_HEIGHT = 550;
@@ -313,9 +314,9 @@ const FloatingChatButton = () => {
             {/* Chat Panel */}
             {isOpen && (
                 <div
-                    className={`fixed z-50 shadow-2xl border overflow-visible animate-in slide-in-from-bottom-5 fade-in duration-300 ${isMaximized
+                    className={`fixed z-50 shadow-2xl overflow-visible animate-in slide-in-from-bottom-5 fade-in duration-300 ${isMaximized
                         ? "inset-0 w-full h-full rounded-none m-0 bg-background/50 backdrop-blur-sm"
-                        : "bottom-24 right-6 rounded-xl"
+                        : "bottom-24 right-6 rounded-[18px]"
                         }`}
                     style={isMaximized ? {
                         transition: 'all 0.3s ease',
@@ -388,38 +389,46 @@ const FloatingChatButton = () => {
                         </div>
                     )}
 
-                    <div className="w-full h-full overflow-hidden rounded-xl">
+                    <div className="w-full h-full overflow-hidden rounded-[18px]">
                         <AiChat
                             initialModuleName={moduleName}
                             isFloating={true}
                             shouldRestoreSession={shouldRestoreSession}
                             extraHeaderButtons={
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); toggleMaximize(); }}
-                                    className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-teal-900/20 dark:hover:bg-teal-100/20 backdrop-blur-md border border-teal-900/10 dark:border-teal-100/10 text-teal-900 dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95"
-                                    title="Open in new window"
-                                >
-                                    {isMaximized ? (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="20"
-                                            height="20"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="w-4 h-4"
-                                        >
-                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                            <line x1="21" y1="3" x2="10" y2="14" />
-                                            <polyline points="10 9 10 14 15 14" />
-                                        </svg>
-                                    ) : (
-                                        <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
-                                    )}
-                                </button>
+                                <TooltipProvider delayDuration={300}>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); toggleMaximize(); }}
+                                                className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-[#018790] dark:hover:bg-teal-100/20 hover:text-[#d6ecec] dark:hover:text-teal-100 backdrop-blur-md border border-[#018790] dark:border-teal-100/10 text-[#018790] dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95"
+                                            >
+                                                {isMaximized ? (
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        width="20"
+                                                        height="20"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2.5"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        className="w-4 h-4"
+                                                    >
+                                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                                        <line x1="21" y1="3" x2="10" y2="14" />
+                                                        <polyline points="10 9 10 14 15 14" />
+                                                    </svg>
+                                                ) : (
+                                                    <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
+                                                )}
+                                            </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" className="bg-[#018790] text-white border-0 rounded-lg shadow-lg text-xs px-2.5 py-1.5">
+                                            Open in Full Screen
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             }
                         />
                     </div>
@@ -435,14 +444,14 @@ const FloatingChatButton = () => {
             >
                 {isOpen ? (
                     // When open, show a close button with matching gradient style
-                    <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-cyan-50 to-cyan-200 dark:from-cyan-900 dark:to-cyan-800 flex items-center justify-center shadow-lg border border-cyan-100/50 dark:border-cyan-700/50 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer text-cyan-700 dark:text-cyan-100">
+                    <div className="w-14 h-14 rounded-3xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer text-white" style={{ backgroundColor: '#018790' }}>
                         <X className="w-7 h-7" strokeWidth={2.5} />
                     </div>
                 ) : (
                     // When closed, show the CSS Robot inside a circular frame
                     <div
-                        className="relative flex items-center justify-center w-14 h-14 bg-cyan-500 dark:bg-cyan-700 rounded-full shadow-lg border-2 border-cyan-300 dark:border-cyan-500 overflow-hidden hover:scale-110 transition-transform duration-300 cursor-pointer"
-                        style={{ boxShadow: theme === 'dark' ? '0 4px 12px rgba(166, 235, 247, 0.6), inset 0 0 10px rgba(255,255,255,0.15)' : '0 4px 16px rgba(6,182,212,0.5), inset 0 0 12px rgba(255,255,255,0.2)' }}
+                        className="relative flex items-center justify-center w-14 h-14 bg-[#018790] dark:bg-[#016b73] rounded-full shadow-lg border-2 border-[#01a8a8] dark:border-[#018790] overflow-hidden hover:scale-110 transition-transform duration-300 cursor-pointer"
+                        style={{ boxShadow: theme === 'dark' ? '0 4px 12px rgba(1, 135, 144, 0.6), inset 0 0 10px rgba(255,255,255,0.15)' : '0 4px 16px rgba(1, 135, 144, 0.5), inset 0 0 12px rgba(255,255,255,0.2)' }}
                     >
                         {/* Scale down the entire robot to fit the frame */}
                         <div className="transform scale-[0.45] translate-y-1">

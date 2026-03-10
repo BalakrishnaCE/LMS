@@ -39,11 +39,20 @@ export function NavAiChat() {
             const response = await fetch('/api/method/novel_lms.novel_lms.api.Chat.get_user_chats');
             const data = await response.json();
             if (data.message) {
-                const sessions = data.message.map((c: any) => ({
-                    id: c.name,
-                    title: [c.department, c.module, c.lesson].filter(Boolean).join(' - ') || 'New Conversation',
-                    timestamp: new Date(c.modified)
-                }));
+                const sessions = data.message.map((c: any) => {
+                    // Priority: (1) DB title, (2) localStorage cache,
+                    // (3) human-readable dept/module/lesson names, (4) generic label
+                    const localTitle = localStorage.getItem(`novel_lms_chat_title_${c.name}`);
+                    const fallbackTitle =
+                        [c.department_name || c.department, c.module_name || c.module, c.lesson_name || c.lesson]
+                            .filter(Boolean).join(' - ') ||
+                        'New Conversation';
+                    return {
+                        id: c.name,
+                        title: c.title || localTitle || fallbackTitle,
+                        timestamp: new Date(c.modified)
+                    };
+                });
                 setChatSessions(sessions);
             }
         } catch (error) {
@@ -87,7 +96,7 @@ export function NavAiChat() {
             <SidebarMenu>
                 <Collapsible
                     asChild
-                    open={isOpen}
+                    open={isOpen && !isCollapsed}
                     onOpenChange={setIsOpen}
                     className="group/collapsible"
                 >
@@ -95,7 +104,7 @@ export function NavAiChat() {
                         <CollapsibleTrigger asChild>
                             <SidebarMenuButton
                                 tooltip="AI Chat"
-                                className="h-10"
+                                className="hover:text-white data-[active=true]:text-white data-[active=true]:bg-primary/90"
                                 onClick={() => {
                                     if (!isOpen) {
                                         handleNewChat();
@@ -103,30 +112,30 @@ export function NavAiChat() {
                                 }}
                                 isActive={isAiPage && (!currentChatId || currentChatId === 'ai')}
                             >
-                                <Bot className={`w-4 h-4 ${isAiPage && (!currentChatId || currentChatId === 'ai') ? 'text-primary' : ''}`} />
-                                <span className="font-semibold">AI Chat</span>
-                                <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                <Bot className="w-4 h-4" />
+                                <span>AI Chat</span>
+                                <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[collapsible=icon]:hidden" />
                             </SidebarMenuButton>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
-                            <SidebarMenuSub className="mr-0 pr-0 border-l-0 pl-1">
+                            <SidebarMenuSub className="mr-0 pr-1 border-l-0 pl-1">
                                 <SidebarMenu className="gap-1.5 mt-2">
                                     <SidebarMenuItem>
                                         <SidebarMenuButton
                                             tooltip="New Chat"
                                             onClick={handleNewChat}
-                                            className="w-full"
+                                            className="w-full hover:text-white data-[active=true]:text-white data-[active=true]:bg-primary/90"
                                             isActive={isAiPage && (!currentChatId || currentChatId === 'ai')}
                                         >
                                             <MessageSquarePlus className="w-4 h-4" />
-                                            <span className="font-medium text-sm">New Chat</span>
+                                            <span>New Chat</span>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
 
                                     <SidebarMenuItem>
                                         <SidebarMenuButton
                                             tooltip="Search"
-                                            className="w-full"
+                                            className="w-full hover:text-white data-[active=true]:text-white data-[active=true]:bg-primary/90"
                                             onClick={() => {
                                                 setIsSearchOpen(!isSearchOpen);
                                                 if (!isSearchOpen) setTimeout(() => document.getElementById('ai-chat-search')?.focus(), 100);
@@ -134,7 +143,7 @@ export function NavAiChat() {
                                             isActive={isSearchOpen}
                                         >
                                             <Search className="w-4 h-4" />
-                                            <span className="font-medium text-sm">Search</span>
+                                            <span>Search</span>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
 
@@ -165,11 +174,12 @@ export function NavAiChat() {
                                                     <SidebarMenuItem key={session.id}>
                                                         <SidebarMenuButton
                                                             onClick={() => handleSelectChat(session.id)}
-                                                            className="w-full"
+                                                            className="w-full hover:text-white data-[active=true]:text-white data-[active=true]:bg-primary/90"
+                                                            isActive={currentChatId === session.id}
                                                             tooltip={session.title}
                                                         >
-                                                            <History className={`w-3.5 h-3.5 shrink-0 transition-colors ${currentChatId === session.id ? 'text-primary' : 'text-muted-foreground/40 group-hover:text-primary'}`} />
-                                                            <span className={`truncate text-xs font-medium transition-colors ${currentChatId === session.id ? 'text-foreground font-bold' : 'text-foreground/70 group-hover:text-foreground'}`}>{session.title}</span>
+                                                            <History className="w-3.5 h-3.5 shrink-0" />
+                                                            <span className={`truncate ${currentChatId === session.id ? 'font-semibold' : ''}`}>{session.title}</span>
                                                         </SidebarMenuButton>
                                                     </SidebarMenuItem>
                                                 ))}

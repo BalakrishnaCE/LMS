@@ -5,9 +5,7 @@
     right: 0;
     z-index: 50;
     height: 85px;
-    /* Light Mode: Light background, visible border */
-    background-color: rgba(4, 91, 97, 0.8);
-    backdrop-filter: blur(12px);
+    background-color: #d6ecec;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     display: flex;
     align-items: center;
@@ -25,11 +23,15 @@
 
 .nia-subtitle {
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.7);
+    color: #000000;
     font-weight: 500;
     line-height: 1;
     margin-bottom: 4px;
     margin-bottom: 0.5rem;
+}
+
+.dark .nia-subtitle {
+    color: rgba(255, 255, 255, 0.7);
 }
 
 /* Chat Bubbles */
@@ -44,12 +46,12 @@
 
 .chat-bubble-user {
     /* bg-teal-700/90 */
-    background-color: rgba(15, 118, 110, 0.9);
+    background-color: rgba(212, 248, 245, 0.9);
     /* border-teal-600/50 */
-    border-color: rgba(13, 148, 136, 0.5);
-    color: #ffffff;
+    border-color: rgba(155, 236, 230, 0.5);
+    color: #000000;
     border-top-right-radius: 0;
-    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);
+    /* box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2); */
 }
 
 .dark .chat-bubble-user {
@@ -57,26 +59,23 @@
     background-color: #012E31;
     /* dark:border-teal-500/30 */
     border-color: rgba(51, 65, 85, 0.5);
+    color: #ffffff;
 }
 
 .chat-bubble-ai {
-    /* bg-emerald-50/80 */
-    background-color: rgba(236, 253, 245, 0.8);
-    /* border-white/60 */
-    border-color: rgba(255, 255, 255, 0.6);
-    /* text-teal-900 */
-    color: #134e4a;
-    border-top-left-radius: 0;
+    background-color: transparent;
+    border-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+    color: #000000;
     font-weight: 500;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .dark .chat-bubble-ai {
-    /* dark:bg-white/10 */
-    background-color: rgba(255, 255, 255, 0.1);
-    /* dark:border-white/10 */
-    border-color: rgba(255, 255, 255, 0.1);
-    /* dark:text-teal-50 */
+    background-color: transparent;
+    border-color: transparent;
     color: #f0fdfa;
 }
 
@@ -109,27 +108,38 @@
 /* Greeting Card Structure */
 .greeting-wrapper {
     position: relative;
+    background-color: transparent;
     width: 100%;
-    max-width: 24rem;
-    margin: 0 auto 1rem auto;
+    max-width: 100%;
+    margin: 0 0 1rem 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.dark .greeting-wrapper {
+    position: relative;
+    background-color: transparent;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 1rem 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
 }
 
 .greeting-card {
     position: relative;
     overflow: hidden;
-    border-radius: 1.5rem;
-    /* Light Mode Default */
-    background: rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Dark mode handling via .dark ancestor */
 .dark .greeting-card {
-    background: rgba(0, 0, 0, 0.4);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: transparent;
+    border-color: transparent;
 }
 
 .greeting-content {
@@ -138,6 +148,8 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    flex: 1;
+    overflow: hidden;
 }
 
 /* Header Section */
@@ -187,9 +199,9 @@
 .greeting-title {
     font-size: 1.125rem;
     font-weight: 600;
-    color: #134e4a;
-    /* teal-900 */
+    color: #000000;
     margin: 0;
+    padding-left: 5%;
 }
 
 .dark .greeting-title {
@@ -198,10 +210,9 @@
 
 .greeting-subtitle {
     font-size: 0.875rem;
-    color: rgba(15, 118, 110, 0.7);
-    /* teal-700/70 */
-    padding-left: 2.75rem;
-    /* ~11 * 0.25rem */
+    color: #6b7280;
+    /* gray-500 */
+    padding-left: 5%;
     margin: 0;
 }
 
@@ -216,6 +227,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    flex: 1;
+    overflow-y: auto;
+    /* Hide scrollbar but keep scrollable */
+    scrollbar-width: none;
+}
+
+.options-container::-webkit-scrollbar {
+    display: none;
 }
 
 .options-list {
@@ -227,9 +246,9 @@
 .option-button {
     position: relative;
     overflow: hidden;
-    background-color: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    color: #134e4a;
+    background-color: #d6ecec;
+    border: 1px solid #b8dede;
+    color: #000000;
     padding: 0.75rem 1rem;
     border-radius: 0.75rem;
     font-size: 0.875rem;
@@ -251,7 +270,7 @@
 }
 
 .option-button:hover {
-    background-color: rgba(255, 255, 255, 0.8);
+    background-color: #c0e0e0;
     transform: scale(1.02);
 }
 
@@ -266,7 +285,7 @@
 .option-icon {
     height: 1rem;
     width: 1rem;
-    color: rgba(13, 148, 136, 0.7);
+    color: rgba(0, 0, 0, 0.5);
     transition: all 0.2s ease;
 }
 
@@ -317,4 +336,64 @@
     to {
         transform: rotate(360deg);
     }
+}
+
+/* ─────────────────────────────────────────────
+   Full-screen two-column layout
+   Left  = 30% (selection steps)
+   Right = 70% (chat / messages)
+───────────────────────────────────────────── */
+.fullscreen-left-panel {
+    width: 30%;
+    flex-shrink: 0;
+    height: 100%;
+    overflow: hidden;
+    background-color: #ffffff;
+    /* very subtle teal tint in light */
+}
+
+/* Hide ALL scrollbars inside the left panel (native + Radix UI) */
+.fullscreen-left-panel [data-radix-scroll-area-viewport] {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.fullscreen-left-panel [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+}
+
+.fullscreen-left-panel [data-radix-scroll-area-scrollbar],
+.fullscreen-left-panel [data-radix-scroll-area-thumb] {
+    display: none !important;
+    width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.dark .fullscreen-left-panel {
+    background-color: rgba(12, 12, 12, 0.06);
+    /* subtle teal in dark */
+}
+
+.fullscreen-right-panel {
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* When the right panel is shown alongside the left panel, add slight indent */
+.fullscreen-right-panel--split {
+    /* right panel shows a placeholder / empty state in split view */
+    align-items: center;
+    justify-content: center;
+}
+
+/* Input bar in full-screen qa mode: keep it full-width (no left-panel offset needed) */
+.fullscreen-input-area {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 1.5rem;
 }

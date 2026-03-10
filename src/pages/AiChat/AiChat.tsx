@@ -1,9 +1,9 @@
 import * as React from "react";
 import { useState, useRef, useEffect, memo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, Loader2, ChevronRight, Copy, Check, Info, Minimize2, Plus, ArrowLeft } from 'lucide-react';
+import { Send, Loader2, ChevronRight, Copy, Check, Info, Minimize2, Plus, ArrowLeft } from 'lucide-react';
 import CssRobot from "@/components/CssRobot";
 import "./AIchat.css";
 import { useUser } from "@/hooks/use-user";
@@ -15,8 +15,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 
-// API Base URL (via Nginx proxy)
-const API_BASE_URL = "http://10.80.4.84:8090/chatbot";
+// API Base URL for Frappe backend
+const API_BASE_URL = "/api/method/novel_lms.lms_ai_bot.main.chat";
 
 type ConversationStep = 'department' | 'module' | 'lesson' | 'chapter' | 'qa';
 
@@ -121,11 +121,11 @@ const MessageBubble = memo(({ message, onCopy, copiedId }: { message: Message, o
     return (
         <div className={`flex w-full ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex flex-col max-w-[80%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                {message.sender === 'ai' && (
+                {/* {message.sender === 'ai' && (
                     <span className="text-[10px] text-muted-foreground mb-1 px-1">
                         AI • {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
-                )}
+                )} */}
                 {message.sender === 'user' && (
                     <span className="text-[10px] text-muted-foreground mb-1 px-1">
                         You • {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -276,6 +276,13 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 const response = await fetch(`/api/method/novel_lms.novel_lms.api.Chat.get_chat?chat_id=${id}`);
                 const data = await response.json();
                 const chat = data.message;
+                // ── DEBUG ──
+                console.log('[NIA] get_chat raw response:', {
+                    module: chat?.module, module_name: chat?.module_name,
+                    lesson: chat?.lesson, lesson_name: chat?.lesson_name,
+                    chapter: chat?.chapter, chapter_name: chat?.chapter_name,
+                });
+                // ──────────
 
                 if (chat) {
                     // Reconstruct Messages
@@ -305,11 +312,13 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                     setChatId(chat.name);
 
                     // Reconstruct Context
+                    // chat.department/module/lesson/chapter = raw Frappe doc IDs
+                    // chat.*_name = human-readable display names returned by get_chat
                     const newContext: ChatContext = {};
-                    if (chat.department) newContext.department = { id: chat.department, name: chat.department, label: chat.department, value: chat.department };
-                    if (chat.module) newContext.module = { id: chat.module, name: chat.module, description: '', label: chat.module, value: chat.module };
-                    if (chat.lesson) newContext.lesson = { id: chat.lesson, name: chat.lesson, description: '', order: 0, label: chat.lesson, value: chat.lesson };
-                    if (chat.chapter) newContext.chapter = { id: chat.chapter, name: chat.chapter, description: '', label: chat.chapter, value: chat.chapter };
+                    if (chat.department) newContext.department = { id: chat.department, name: chat.department_name || chat.department, label: chat.department_name || chat.department, value: chat.department };
+                    if (chat.module) newContext.module = { id: chat.module, name: chat.module_name || chat.module, description: '', label: chat.module_name || chat.module, value: chat.module };
+                    if (chat.lesson) newContext.lesson = { id: chat.lesson, name: chat.lesson_name || chat.lesson, description: '', order: 0, label: chat.lesson_name || chat.lesson, value: chat.lesson };
+                    if (chat.chapter) newContext.chapter = { id: chat.chapter, name: chat.chapter_name || chat.chapter, description: '', label: chat.chapter_name || chat.chapter, value: chat.chapter };
 
                     setContext(newContext);
                     setCurrentStep('qa');
@@ -650,8 +659,8 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         }]);
     };
 
-    const sendQueryToAPI = async (query: string): Promise<string> => {
-        const response = await fetch(`${API_BASE_URL}/query`, {
+    const sendQueryToAPI = async (query: string): Promise<{ response: string; suggested_title?: string }> => {
+        const response = await fetch(API_BASE_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -670,7 +679,15 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         }
 
         const data = await response.json();
-        return data.response;
+
+        // Frappe wraps the response in a 'message' object
+        const result = data.message || data;
+
+        return {
+            response: result.response,
+            // Only present on the very first turn (backend omits it on follow-ups)
+            suggested_title: result.suggested_title ?? undefined,
+        };
     };
 
     const createChatSession = async (): Promise<string | null> => {
@@ -715,6 +732,11 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         if (!inputValue.trim() || isLoading) return;
 
         const userQuery = inputValue.trim();
+        // Snapshot whether this is the very first user message (no AI replies yet)
+        // If chatId is null, this is the first real API call on a fresh session.
+        // (The greeting AI bubble in state doesn't count — it's local, not from the bot.)
+        const isFirstMessage = !chatId;
+
         const newMessage: Message = {
             id: Date.now().toString(),
             text: userQuery,
@@ -731,7 +753,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
         setIsLoading(true);
         try {
-            const aiResponseText = await sendQueryToAPI(userQuery);
+            const { response: aiResponseText, suggested_title } = await sendQueryToAPI(userQuery);
 
             // Handle persistence
             let currentChatId = chatId;
@@ -743,6 +765,21 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             if (currentChatId) {
                 // Don't await this to keep UI snappy
                 saveQueryResponse(currentChatId, userQuery, aiResponseText);
+
+                if (isFirstMessage && suggested_title) {
+                    // 1. Write to localStorage immediately so the sidebar updates
+                    //    without waiting for the next fetch cycle.
+                    localStorage.setItem(
+                        `novel_lms_chat_title_${currentChatId}`,
+                        suggested_title
+                    );
+                    // 2. Persist permanently to the Chats DocType (fire-and-forget)
+                    fetch('/api/method/novel_lms.novel_lms.api.Chat.update_chat_title', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chat_id: currentChatId, title: suggested_title })
+                    }).catch(err => console.error('[NIA] Failed to save title to backend:', err));
+                }
             }
 
             const aiResponse: Message = {
@@ -848,12 +885,13 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                     <div className="greeting-header-inner">
                                         <div className="greeting-title-wrapper">
                                             <div className="greeting-title-row">
-                                                <div className="bot-icon-wrapper">
+                                                {/* <div className="bot-icon-wrapper">
                                                     <Bot className="w-5 h-5" />
-                                                </div>
+                                                </div> */}
                                                 <h3 className="greeting-title">
                                                     Hi {user?.full_name || 'there'}!
                                                 </h3>
+
                                             </div>
                                             <p className="greeting-subtitle">
                                                 Please select department to start conversation
@@ -905,9 +943,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                     <div className="greeting-header-inner">
                                         <div className="greeting-title-wrapper">
                                             <div className="greeting-title-row">
-                                                <div className="bot-icon-wrapper">
+                                                {/* <div className="bot-icon-wrapper">
                                                     <Bot className="w-5 h-5" />
-                                                </div>
+                                                </div> */}
                                                 <h3 className="greeting-title">
                                                     Hi I'm your {context.department?.name} Assistant!
                                                 </h3>
@@ -961,9 +999,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                     <div className="greeting-header-inner">
                                         <div className="greeting-title-wrapper">
                                             <div className="greeting-title-row">
-                                                <div className="bot-icon-wrapper">
+                                                {/* <div className="bot-icon-wrapper">
                                                     <Bot className="w-5 h-5" />
-                                                </div>
+                                                </div> */}
                                                 <h3 className="greeting-title">
                                                     Great! 👍
                                                 </h3>
@@ -1017,9 +1055,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                     <div className="greeting-header-inner">
                                         <div className="greeting-title-wrapper">
                                             <div className="greeting-title-row">
-                                                <div className="bot-icon-wrapper">
+                                                {/* <div className="bot-icon-wrapper">
                                                     <Bot className="w-5 h-5" />
-                                                </div>
+                                                </div> */}
                                                 <h3 className="greeting-title">
                                                     Okay! 👍
                                                 </h3>
@@ -1067,8 +1105,8 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-1rem)] w-full overflow-hidden">
-            <Card className={`relative flex flex-col h-full w-full shadow-2xl overflow-hidden border-0 ${isFloating ? 'rounded-[30px]' : 'rounded-none'} bg-background`}>
+        <div className={`flex flex-col ${isFloating ? 'h-full' : 'h-[calc(100vh-1rem)]'} w-full overflow-hidden`}>
+            <div className={`relative flex flex-col h-full w-full overflow-hidden bg-background ${isFloating ? 'rounded-[18px]' : 'rounded-none'}`}>
                 {/* Custom Glass Header - Absolutely positioned, never scrolls */}
                 <div className="ai-chat-header">
                     {sidebarControl}
@@ -1079,7 +1117,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                             variant="ghost"
                             size="icon"
                             onClick={handleBack}
-                            className="-ml-1 w-8 h-8 rounded-full text-teal-800 dark:text-teal-200 hover:bg-teal-100/30 dark:hover:bg-teal-800/20"
+                            className="-ml-1 w-8 h-8 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-[#018790] dark:hover:bg-teal-100/20 hover:text-[#d6ecec] dark:hover:text-teal-100 backdrop-blur-md text-[#018790] dark:text-teal-200 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95"
                             title="Go Back"
                         >
                             <ArrowLeft className="w-5 h-5" />
@@ -1093,7 +1131,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         </div>
                     </div>
                     <div className="flex flex-col min-w-0 flex-1 justify-center">
-                        <h3 className="text-sm font-bold text-teal-900 dark:text-teal-50 leading-none mb-0.5" title="NIA">
+                        <h3 className="text-sm font-bold text-black dark:text-teal-50 leading-none mb-0.5" title="NIA">
                             NIA
                         </h3>
                         <span className="nia-subtitle">
@@ -1102,7 +1140,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         <TooltipProvider delayDuration={100}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <span className="text-[10px] text-white font-medium leading-tight truncate cursor-help drop-shadow-sm">
+                                    <span className="text-[10px] text-black dark:text-white font-medium leading-tight truncate drop-shadow-sm">
                                         {[
                                             context.department?.name,
                                             context.module?.name,
@@ -1114,40 +1152,40 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 <TooltipContent
                                     side="bottom"
                                     align="start"
-                                    className="bg-white/90 dark:bg-teal-950/90 backdrop-blur-md border border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-50 shadow-xl p-3 rounded-xl max-w-xs"
+                                    className="bg-[#018790] text-white border-0 shadow-xl p-3 rounded-xl max-w-xs"
                                 >
                                     <div className="space-y-2">
-                                        <div className="flex items-center gap-2 pb-1 border-b border-teal-100 dark:border-teal-800">
-                                            <Info className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-                                            <span className="text-[11px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Current Context</span>
+                                        <div className="flex items-center gap-2 pb-1 border-b border-white/20">
+                                            <Info className="w-3.5 h-3.5 text-white" />
+                                            <span className="text-[11px] font-bold uppercase tracking-wider text-white">Current Context</span>
                                         </div>
                                         <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[11px]">
                                             {context.department && (
                                                 <>
-                                                    <span className="text-teal-500/70 dark:text-teal-400/50 font-medium">Dept:</span>
-                                                    <span className="font-semibold">{context.department.name}</span>
+                                                    <span className="text-white/70 font-medium">Dept:</span>
+                                                    <span className="font-semibold text-white">{context.department.name}</span>
                                                 </>
                                             )}
                                             {context.module && (
                                                 <>
-                                                    <span className="text-teal-500/70 dark:text-teal-400/50 font-medium">Module:</span>
-                                                    <span className="font-semibold">{context.module.name}</span>
+                                                    <span className="text-white/70 font-medium">Module:</span>
+                                                    <span className="font-semibold text-white">{context.module.name}</span>
                                                 </>
                                             )}
                                             {context.lesson && (
                                                 <>
-                                                    <span className="text-teal-500/70 dark:text-teal-400/50 font-medium">Lesson:</span>
-                                                    <span className="font-semibold">{context.lesson.name}</span>
+                                                    <span className="text-white/70 font-medium">Lesson:</span>
+                                                    <span className="font-semibold text-white">{context.lesson.name}</span>
                                                 </>
                                             )}
                                             {context.chapter && (
                                                 <>
-                                                    <span className="text-teal-500/70 dark:text-teal-400/50 font-medium">Chapter:</span>
-                                                    <span className="font-semibold">{context.chapter.name}</span>
+                                                    <span className="text-white/70 font-medium">Chapter:</span>
+                                                    <span className="font-semibold text-white">{context.chapter.name}</span>
                                                 </>
                                             )}
                                             {!context.department && (
-                                                <span className="col-span-2 text-teal-500/70 italic">Please select a department to start.</span>
+                                                <span className="col-span-2 text-white/70 italic">Please select a department to start.</span>
                                             )}
                                         </div>
                                     </div>
@@ -1158,77 +1196,145 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
                     {/* New Chat / Reset Button */}
                     <div className="flex items-center gap-2">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleReset}
-                            className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-teal-900/20 dark:hover:bg-teal-100/20 backdrop-blur-md border border-teal-900/10 dark:border-teal-100/10 text-teal-100 dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 h-auto w-auto"
-                            title="Start New Chat"
-                        >
-                            <Plus className="w-4 h-4" strokeWidth={2.5} />
-                        </Button>
+                        <TooltipProvider delayDuration={300}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={handleReset}
+                                        className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-[#018790] dark:hover:bg-teal-100/20 hover:text-[#d6ecec] dark:hover:text-teal-100 backdrop-blur-md border border-[#018790] dark:border-teal-100/10 text-[#018790] dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 h-auto w-auto"
+                                    >
+                                        <Plus className="w-4 h-4" strokeWidth={2.5} />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="bg-[#018790] text-white border-0 rounded-lg shadow-lg text-xs px-2.5 py-1.5">
+                                    Start New Chat
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                         {extraHeaderButtons}
 
                         {onMinimize && (
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                    saveState();
-                                    onMinimize();
-                                }}
-                                className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-teal-900/20 dark:hover:bg-teal-100/20 backdrop-blur-md border border-teal-900/10 dark:border-teal-100/10 text-teal-100 dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 h-auto w-auto"
-                                title="Minimize / Close Window"
-                            >
-                                <Minimize2 className="w-4 h-4" strokeWidth={2.5} />
-                            </Button>
+                            <TooltipProvider delayDuration={300}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => {
+                                                saveState();
+                                                onMinimize();
+                                            }}
+                                            className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-[#018790] dark:hover:bg-teal-100/20 hover:text-[#d6ecec] dark:hover:text-teal-100 backdrop-blur-md border border-[#018790] dark:border-teal-100/10 text-[#018790] dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 h-auto w-auto"
+                                        >
+                                            <Minimize2 className="w-4 h-4" strokeWidth={2.5} />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="bg-[#045b61cc] dark:bg-[#018790] backdrop-blur-md text-white border-0 rounded-lg shadow-lg text-xs px-2.5 py-1.5">
+                                        Minimize Window
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         )}
                     </div>
 
                 </div>
 
                 {/* Content area with top padding to account for fixed header */}
-                {/* Content area with top padding to account for fixed header */}
-                <CardContent className="flex-1 p-0 overflow-hidden relative pt-[85px]">
-                    <ScrollArea className="h-full">
-                        <div className="flex flex-col gap-2 p-3 min-h-full">
-                            {renderGreeting()}
+                {isFloating ? (
+                    /* ── FLOATING: single-column layout (unchanged) ── */
+                    <div className="flex-1 p-0 overflow-hidden relative pt-[85px]">
+                        <ScrollArea className="h-full">
+                            <div className="flex flex-col gap-2 p-3 min-h-full">
+                                {renderGreeting()}
 
-                            {currentStep === 'qa' && messages.length > 0 && (
-                                <>
-                                    {messages.map((message) => (
-                                        <MessageBubble
-                                            key={message.id}
-                                            message={message}
-                                            onCopy={handleCopy}
-                                            copiedId={copiedId}
-                                        />
-                                    ))}
-                                    {isLoading && (
-                                        <div className="flex w-full justify-start">
-                                            <div className="flex flex-col items-start">
-                                                <span className="text-[10px] text-muted-foreground mb-1 px-1">
-                                                    AI • typing...
-                                                </span>
-                                                <div className="px-4 py-2 rounded-2xl shadow-sm bg-muted/50 border border-border rounded-tl-md">
-                                                    <div className="flex items-center gap-2">
-                                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                                        <span className="text-sm text-muted-foreground">Thinking...</span>
+                                {currentStep === 'qa' && messages.length > 0 && (
+                                    <>
+                                        {messages.map((message) => (
+                                            <MessageBubble
+                                                key={message.id}
+                                                message={message}
+                                                onCopy={handleCopy}
+                                                copiedId={copiedId}
+                                            />
+                                        ))}
+                                        {isLoading && (
+                                            <div className="flex w-full justify-start">
+                                                <div className="flex flex-col items-start">
+                                                    <span className="text-[10px] text-muted-foreground mb-1 px-1">
+                                                        AI • typing...
+                                                    </span>
+                                                    <div className="px-4 py-2 rounded-2xl shadow-sm bg-muted/50 border border-border rounded-tl-md">
+                                                        <div className="flex items-center gap-2">
+                                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                            <span className="text-sm text-muted-foreground">Thinking...</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}
+                                    </>
+                                )}
+                                <div ref={scrollRef} />
+                            </div>
+                        </ScrollArea>
+                    </div>
+                ) : (
+                    /* ── FULL-SCREEN: two-column layout ── */
+                    <div className="flex flex-1 overflow-hidden pt-[85px]">
+                        {/* LEFT PANEL – 30% – selection steps (hidden in qa) */}
+                        {currentStep !== 'qa' && (
+                            <div className="fullscreen-left-panel">
+                                <div className="h-full overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                                    <div className="flex flex-col gap-2 p-4 min-h-full">
+                                        {renderGreeting()}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* RIGHT PANEL – 70% (or 100% in qa) – chat messages */}
+                        <div className={`fullscreen-right-panel ${currentStep !== 'qa' ? 'fullscreen-right-panel--split' : ''}`}>
+                            <ScrollArea className="h-full">
+                                <div className="flex flex-col gap-2 p-4 min-h-full">
+                                    {currentStep === 'qa' && messages.length > 0 && (
+                                        <>
+                                            {messages.map((message) => (
+                                                <MessageBubble
+                                                    key={message.id}
+                                                    message={message}
+                                                    onCopy={handleCopy}
+                                                    copiedId={copiedId}
+                                                />
+                                            ))}
+                                            {isLoading && (
+                                                <div className="flex w-full justify-start">
+                                                    <div className="flex flex-col items-start">
+                                                        <span className="text-[10px] text-muted-foreground mb-1 px-1">
+                                                            AI • typing...
+                                                        </span>
+                                                        <div className="px-4 py-2 rounded-2xl shadow-sm bg-muted/50 border border-border rounded-tl-md">
+                                                            <div className="flex items-center gap-2">
+                                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                                <span className="text-sm text-muted-foreground">Thinking...</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
-                                </>
-                            )}
-                            <div ref={scrollRef} />
+                                    <div ref={scrollRef} />
+                                </div>
+                            </ScrollArea>
                         </div>
-                    </ScrollArea>
-                </CardContent>
+                    </div>
+                )}
 
                 {
                     currentStep === 'qa' && (
-                        <CardFooter className="p-2 bg-transparent">
+                        <div className={`p-2 pb-6 bg-transparent ${!isFloating ? 'fullscreen-input-area' : ''}`}>
                             <div className="relative w-full">
                                 {/* Input Container */}
                                 <div className="relative flex w-full items-end gap-2 bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-xl p-2 shadow-md z-10 transition-all duration-300 hover:bg-white/80 dark:hover:bg-white/10 hover:border-white/70 dark:hover:border-white/20 focus-within:bg-white/95 dark:focus-within:bg-black/60 focus-within:border-teal-400/50 dark:focus-within:border-teal-500/50">
@@ -1239,7 +1345,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInputValue(e.target.value)}
                                         onKeyDown={handleKeyPress}
                                         rows={1}
-                                        className="flex-1 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-teal-900 dark:text-white placeholder:text-teal-700/30 dark:placeholder:text-white/30 resize-none min-h-[34px] max-h-[80px] overflow-y-auto py-2 text-sm [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] shadow-none"
+                                        className="flex-1 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-black dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 resize-none min-h-[34px] max-h-[80px] overflow-y-auto py-2 text-sm [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] shadow-none"
                                         disabled={isLoading}
                                         style={{ height: 'auto' }}
                                         onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
@@ -1254,7 +1360,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                         disabled={isLoading || !inputValue.trim()}
                                         className={`h-8 w-8 rounded-lg shrink-0 transition-all duration-300 ${!inputValue.trim()
                                             ? 'bg-teal-600/20 text-teal-700/60 cursor-not-allowed hover:bg-teal-600/20'
-                                            : 'bg-teal-600 text-white hover:bg-teal-700 shadow-md hover:scale-105 active:scale-95'
+                                            : 'bg-[#018790] text-white hover:bg-teal-700 shadow-md hover:scale-105 active:scale-95'
                                             }`}
                                     >
                                         {isLoading ? (
@@ -1265,10 +1371,10 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                     </Button>
                                 </div>
                             </div>
-                        </CardFooter>
+                        </div>
                     )
                 }
-            </Card >
+            </div>
         </div >
     );
 };

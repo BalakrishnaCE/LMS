@@ -3,18 +3,18 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-  } from "@/components/ui/card"
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {  useFrappeGetDocList, useFrappeAuth } from "frappe-react-sdk"
+import { useFrappeGetDocList, useFrappeAuth, useFrappePostCall } from "frappe-react-sdk"
 import { Link } from "wouter"
 import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
 } from "@/components/ui/pagination"
 import { useState, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { motion } from "framer-motion"
-import { Download, X, CopyPlus } from "lucide-react"
+import { Download, X, CopyPlus, Bot } from "lucide-react"
 import { toast } from "sonner"
 import { LMS_API_BASE_URL, ROUTES } from "@/config/routes"
 
@@ -44,35 +44,35 @@ interface ModulesProps {
 
 // Helper function to convert module data to CSV
 function convertToCSV(modules: any[]) {
-  const headers = ["Name", "Short Text", "Description", "Status", "Department", "Image"];
-  const rows = modules.map(module => [
-    module.name1,
-    module.short_text,
-    module.description,
-    module.status,
-    module.department,
-    module.image
-  ]);
-  
-  return [
-    headers.join(","),
-    ...rows.map(row => row.map(cell => `"${cell?.replace(/"/g, '""') || ''}"`).join(","))
-  ].join("\n");
+    const headers = ["Name", "Short Text", "Description", "Status", "Department", "Image"];
+    const rows = modules.map(module => [
+        module.name1,
+        module.short_text,
+        module.description,
+        module.status,
+        module.department,
+        module.image
+    ]);
+
+    return [
+        headers.join(","),
+        ...rows.map(row => row.map(cell => `"${cell?.replace(/"/g, '""') || ''}"`).join(","))
+    ].join("\n");
 }
 
 // Helper function to download CSV
 function downloadCSV(csv: string, filename: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  link.style.visibility = "hidden";
-  
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = "hidden";
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: ModulesProps) {
@@ -99,6 +99,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
 
     // Add authentication check to prevent race condition
     const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
+    const { call: triggerModuleIngestion } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.start_module_ingestion");
 
     // Debounced save function for search query
     const saveSearchToStorage = useCallback(
@@ -148,12 +149,12 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
         fields: ["name", "department"],
         limit: 100,
     });
-    
+
     // Sort departments alphabetically by department name
-    const sortedDepartments = departments?.sort((a, b) => 
+    const sortedDepartments = departments?.sort((a, b) =>
         (a.department || a.name).localeCompare(b.department || b.name)
     ) || [];
-    
+
     const filters: any[] = []
     if (selectedDepartment && selectedDepartment !== "all") {
         filters.push(["department", "=", selectedDepartment])
@@ -177,24 +178,24 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
 
     const { data: module_data } = useFrappeGetDocList("LMS Module",
         {
-          fields: ["name", "name1", "short_text", "description", "status", "image", "department"],
-          limit: itemsPerPage,
-          limit_start: (page - 1) * itemsPerPage,
-          filters: filters
+            fields: ["name", "name1", "short_text", "description", "status", "image", "department", "is_injest"],
+            limit: itemsPerPage,
+            limit_start: (page - 1) * itemsPerPage,
+            filters: filters
         }
-      )
+    )
 
     const { data: total_count } = useFrappeGetDocList("LMS Module",
         {
-          fields: ["name"],
-          limit: 0,
-          filters: filters
+            fields: ["name"],
+            limit: 0,
+            filters: filters
         }
-      )
+    )
 
     const totalPages = Math.ceil((total_count?.length || 0) / itemsPerPage)
 
-    const module_list = module_data?.map((module: { name: string; name1: string; description: string; status: string; image: string; short_text: string; department: string }) => ({
+    const module_list = module_data?.map((module: { name: string; name1: string; description: string; status: string; image: string; short_text: string; department: string; is_injest: number }) => ({
         name: module.name,
         name1: module.name1,
         description: module.description,
@@ -202,7 +203,8 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
         image: module.image,
         short_text: module.short_text,
         department: module.department,
-      }))
+        is_injest: module.is_injest,
+    }))
 
     const handlePageChange = (newPage: number) => {
         setPage(newPage)
@@ -212,7 +214,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
     useEffect(() => {
         setPage(1)
     }, [searchQuery, selectedDepartment, selectedStatus, showArchived])
-    
+
     // Reset status filter when showArchived changes
     useEffect(() => {
         if (showArchived && selectedStatus !== "all" && selectedStatus !== "Archived") {
@@ -273,7 +275,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
             const csv = convertToCSV(exportModules);
             const filename = `modules_export_${new Date().toISOString().split('T')[0]}.csv`;
             downloadCSV(csv, filename);
-            
+
             toast.dismiss();
             toast.success(`Successfully exported ${exportModules.length} modules`);
         } catch (error) {
@@ -315,11 +317,11 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
             }
 
             const data = await response.json();
-            
+
             if (data.message && data.message.success) {
                 toast.dismiss();
                 toast.success("Module duplicated successfully");
-                
+
                 // Refresh the page to show the new module
                 setTimeout(() => {
                     window.location.reload();
@@ -333,6 +335,28 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
             console.error("Duplicate error:", error);
         } finally {
             setModuleToDuplicate(null);
+        }
+    };
+
+    const handleModuleIngest = async (moduleName: string) => {
+        try {
+            toast.loading("Scheduling Module AI Ingestion...", { id: "ingestion" });
+            const response = await triggerModuleIngestion({ module_id: moduleName });
+
+            if (response && response.message) {
+                toast.success(`Success: ${response.message}`, { id: "ingestion" });
+            } else {
+                toast.success("AI Ingestion triggered successfully!", { id: "ingestion" });
+            }
+
+            // Reload the page to remove the icon naturally via API state
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+
+        } catch (err: any) {
+            console.error("Ingestion error:", err);
+            toast.error(err.message || "Failed to trigger ingestion", { id: "ingestion" });
         }
     };
 
@@ -413,8 +437,8 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                         />
                     </button>
                 </div>
-                <Button 
-                    variant="outline" 
+                <Button
+                    variant="outline"
                     className="w-auto flex-shrink-0 ml-2"
                     onClick={handleExport}
                     disabled={isExporting}
@@ -444,38 +468,38 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                         if (!path) return '';
                         const trimmed = path.trim();
                         if (!trimmed) return '';
-                        
+
                         // If already a full URL, return as is
                         if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
                             return trimmed;
                         }
-                        
+
                         // Ensure path starts with / if it doesn't already
                         const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-                        
+
                         // Determine base URL
                         // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                         // In development: use http://lms.noveloffice.org
                         const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
                         const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-                        
+
                         return `${cleanBaseUrl}${relativePath}`;
                     };
-                    
+
                     // Use imageErrors state for this module
                     const imageUrl = module.image ? getImageUrl(module.image) : null;
-                    
+
                     // Debug: Log image URL construction
                     // if (module.image) {
                     //     console.log(`Module ${module.name1}: image="${module.image}", imageUrl="${imageUrl}"`);
                     // }
-                    
+
                     const hasError = imageErrors[module.name];
 
                     return (
                         <motion.div
                             key={module.name}
-                            whileHover={{ 
+                            whileHover={{
                                 scale: 1.02,
                                 transition: { duration: 0.2 }
                             }}
@@ -486,7 +510,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                                     <div className="relative">
                                         {/* Status Bar */}
                                         <div className={`w-full h-8 flex items-center justify-center text-sm font-medium ${statusColor} ${statusDarkColor} z-10`}
-                                             style={{ position: 'absolute', top: 0, left: 0 }}>
+                                            style={{ position: 'absolute', top: 0, left: 0 }}>
                                             {module.status === "Approval Pending" ? "Pending" : module.status}
                                         </div>
                                         {/* Duplicate Icon Button - Positioned below status bar (h-8 = 2rem, so 2rem + 0.5rem = 2.5rem = top-10) */}
@@ -501,6 +525,22 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                                         >
                                             <CopyPlus className="h-4 w-4 text-primary" />
                                         </button>
+
+                                        {/* Bot Icon Button - Positioned exactly to the left of Duplicate Icon */}
+                                        {(!module.is_injest || module.is_injest === 0) && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleModuleIngest(module.name);
+                                                }}
+                                                className="absolute top-10 right-12 z-20 p-2 rounded-full bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/80 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
+                                                title="Ingest to AI"
+                                            >
+                                                <Bot className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                            </button>
+                                        )}
+
                                         {/* Image or Letter Avatar with fallback */}
                                         {imageUrl && !hasError ? (
                                             <img
@@ -531,7 +571,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                                 </div>
                                 <CardFooter className="pt-0 pb-4 mt-auto">
                                     <Link href={ROUTES.ADMIN_MODULE_DETAIL(module.name)} className="w-full">
-                                        <Button 
+                                        <Button
                                             variant="outline"
                                             className="w-full transition-all duration-200 dark:text-foreground dark:hover:bg-primary dark:hover:text-primary-foreground dark:border-primary/50 hover:scale-[1.02] active:scale-[0.98]"
                                         >
@@ -549,12 +589,12 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                 <Pagination>
                     <PaginationContent>
                         <PaginationItem>
-                            <PaginationPrevious 
+                            <PaginationPrevious
                                 onClick={() => handlePageChange(Math.max(1, page - 1))}
                                 className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                             />
                         </PaginationItem>
-                        
+
                         {/* Updated Pagination Logic with Ellipsis */}
                         {(() => {
                             const pageButtons = [];
@@ -619,7 +659,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                         })()}
 
                         <PaginationItem>
-                            <PaginationNext 
+                            <PaginationNext
                                 onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
                                 className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                             />

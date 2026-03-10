@@ -3,19 +3,7 @@ const common_site_config = require('../../../sites/common_site_config.json');
 const { webserver_port } = common_site_config;
 
 export default {
-	'/chatbot': {
-		target: 'http://10.80.4.84:8090/chatbot',
-		changeOrigin: true,
-		secure: false,
-		configure: (proxy: any, options: any) => {
-			proxy.on('proxyReq', (proxyReq: any, req: any, res: any) => {
-				console.log('🤖 Proxying chatbot request to:', options.target + req.url);
-			});
-			proxy.on('error', (err: any, req: any, res: any) => {
-				console.error('❌ Proxy error:', err);
-			});
-		}
-	},
+
 	'/api': {
 		target: `http://127.0.0.1:${webserver_port}`,
 		changeOrigin: true,

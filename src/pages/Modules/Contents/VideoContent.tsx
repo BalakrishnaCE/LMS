@@ -39,34 +39,34 @@ export default function VideoContent({
   const handlePlay = () => {
     pauseAllExcept(mediaId);
   };
-  
+
   // Debug logging
   console.log('VideoContent - Content data:', content);
-  
+
   // Normalize URL to handle both relative and full URLs
   // Uses lms.noveloffice.org as base URL in both development and production
   const getVideoUrl = (url: string) => {
     if (!url) return '';
     const trimmed = url.trim();
     if (!trimmed) return '';
-    
+
     // If already a full URL, return as is
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return trimmed;
     }
-    
+
     // Ensure path starts with / if it doesn't already
     const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    
+
     // Determine base URL
     // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
     // In development: use http://lms.noveloffice.org
     const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
     const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-    
+
     return `${cleanBaseUrl}${relativePath}`;
   };
-  
+
   const handleEnded = () => {
     onComplete?.();
   };
@@ -109,14 +109,29 @@ export default function VideoContent({
           onPlay={handlePlay}
         />
       </div>
-      
+
       {/* Video info */}
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-4">
         {content.title && !content.title.match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/i) && (
           <h3 className="text-lg font-semibold">{content.title}</h3>
         )}
         {content.description && (
           <p className="text-muted-foreground">{content.description}</p>
+        )}
+
+        {content.video_script && (
+          <div className="mt-6 rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div className="flex flex-col space-y-1.5 p-6">
+              <h3 className="text-xl font-semibold leading-none tracking-tight">Video Script</h3>
+            </div>
+            <div className="p-6 pt-0">
+              <div
+                className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-muted-foreground"
+              >
+                {content.video_script}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </motion.div>
