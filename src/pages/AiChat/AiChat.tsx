@@ -873,7 +873,6 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
     const renderGreeting = (): React.ReactNode => {
         switch (currentStep) {
             case 'department':
-            case 'department':
                 return (
                     <div className="greeting-wrapper">
                         <div className="greeting-card">
@@ -930,7 +929,6 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                     </div>
                 );
 
-            case 'module':
             case 'module':
                 return (
                     <div className="greeting-wrapper">
