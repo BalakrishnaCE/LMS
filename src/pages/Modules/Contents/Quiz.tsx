@@ -498,7 +498,7 @@ function QuizDialog({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white w-full h-full max-w-4xl mx-auto rounded-lg shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-background w-full h-full max-w-4xl mx-auto rounded-lg shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-xl font-semibold">{quiz.title || 'Untitled Quiz'}</h2>

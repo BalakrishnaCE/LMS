@@ -8,6 +8,7 @@ import {
 } from "@tabler/icons-react"
 import { Building2 } from "lucide-react"
 import { NavMain, type NavMainItem } from "@/components/nav-main"
+import { NavAiChat } from "@/components/nav-ai-chat"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -117,13 +118,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <Link href={isLMSAdmin ? ROUTES.HOME : ROUTES.LEARNER_DASHBOARD} className="hover:text-white">
                   <IconBook className="!size-5" />
                   <span className="text-base font-semibold">Novel LMS</span>
-                </Link>            
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
           <NavMain items={navData.navMain} />
+          {!isLMSAdmin && <NavAiChat />}
         </SidebarContent>
         <SidebarFooter>
           <NavUser user={navData.user} />

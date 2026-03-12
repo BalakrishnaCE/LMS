@@ -1,0 +1,399 @@
+.ai-chat-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    height: 85px;
+    background-color: #d6ecec;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1rem;
+}
+
+
+/* Dark Mode Override */
+.dark .ai-chat-header {
+    /* Dark Mode: Dark transparent background, subtle border */
+    background-color: #018790;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nia-subtitle {
+    font-size: 10px;
+    color: #000000;
+    font-weight: 500;
+    line-height: 1;
+    margin-bottom: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.dark .nia-subtitle {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Chat Bubbles */
+.chat-bubble {
+    padding: 0.625rem 1rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(4px);
+    border: 1px solid;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+    border-radius: 1rem;
+}
+
+.chat-bubble-user {
+    /* bg-teal-700/90 */
+    background-color: rgba(212, 248, 245, 0.9);
+    /* border-teal-600/50 */
+    border-color: rgba(155, 236, 230, 0.5);
+    color: #000000;
+    border-top-right-radius: 0;
+    /* box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2); */
+}
+
+.dark .chat-bubble-user {
+    /* dark:bg-teal-600/60 */
+    background-color: #012E31;
+    /* dark:border-teal-500/30 */
+    border-color: rgba(51, 65, 85, 0.5);
+    color: #ffffff;
+}
+
+.chat-bubble-ai {
+    background-color: transparent;
+    border-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+    color: #000000;
+    font-weight: 500;
+}
+
+.dark .chat-bubble-ai {
+    background-color: transparent;
+    border-color: transparent;
+    color: #f0fdfa;
+}
+
+/* Message formatting */
+.messageHeading {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--foreground);
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.messageHeading:first-child {
+    margin-top: 0;
+}
+
+.messageSpacer {
+    height: 0.5rem;
+}
+
+.messageParagraph {
+    min-height: 1.5em;
+    margin-bottom: 0.375rem;
+}
+
+.messageParagraph:last-child {
+    margin-bottom: 0;
+}
+
+/* Greeting Card Structure */
+.greeting-wrapper {
+    position: relative;
+    background-color: transparent;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 1rem 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.dark .greeting-wrapper {
+    position: relative;
+    background-color: transparent;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 0 1rem 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.greeting-card {
+    position: relative;
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Dark mode handling via .dark ancestor */
+.dark .greeting-card {
+    background: transparent;
+    border-color: transparent;
+}
+
+.greeting-content {
+    position: relative;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Header Section */
+.greeting-header {
+    width: 100%;
+    text-align: left;
+}
+
+.greeting-header-inner {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.greeting-title-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.greeting-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bot-icon-wrapper {
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    background-color: #ccfbf1;
+    /* teal-100 */
+    color: #0d9488;
+    /* teal-600 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dark .bot-icon-wrapper {
+    background-color: rgba(19, 78, 74, 0.5);
+    /* teal-900/50 */
+    color: #2dd4bf;
+    /* teal-400 */
+}
+
+.greeting-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #000000;
+    margin: 0;
+    padding-left: 5%;
+}
+
+.dark .greeting-title {
+    color: #ffffff;
+}
+
+.greeting-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    /* gray-500 */
+    padding-left: 5%;
+    margin: 0;
+}
+
+.dark .greeting-subtitle {
+    color: #9ca3af;
+    /* gray-400 */
+}
+
+/* Options List */
+.options-container {
+    padding-left: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+    overflow-y: auto;
+    /* Hide scrollbar but keep scrollable */
+    scrollbar-width: none;
+}
+
+.options-container::-webkit-scrollbar {
+    display: none;
+}
+
+.options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.option-button {
+    position: relative;
+    overflow: hidden;
+    background-color: #d6ecec;
+    border: 1px solid #b8dede;
+    color: #000000;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    width: 100%;
+    cursor: pointer;
+    text-align: left;
+}
+
+.dark .option-button {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.option-button:hover {
+    background-color: #c0e0e0;
+    transform: scale(1.02);
+}
+
+.dark .option-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.option-button span {
+    flex: 1;
+}
+
+.option-icon {
+    height: 1rem;
+    width: 1rem;
+    color: rgba(0, 0, 0, 0.5);
+    transition: all 0.2s ease;
+}
+
+.dark .option-icon {
+    color: #9ca3af;
+}
+
+.option-button:hover .option-icon {
+    color: #0d9488;
+    transform: translateX(0.25rem);
+}
+
+.dark .option-button:hover .option-icon {
+    color: #ffffff;
+}
+
+/* Loading / Empty States */
+.state-container {
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-message {
+    padding: 1rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+}
+
+.spinner {
+    height: 1.5rem;
+    width: 1.5rem;
+    animation: spin 1s linear infinite;
+    color: #0d9488;
+}
+
+.dark .spinner {
+    color: #2dd4bf;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ─────────────────────────────────────────────
+   Full-screen two-column layout
+   Left  = 30% (selection steps)
+   Right = 70% (chat / messages)
+───────────────────────────────────────────── */
+.fullscreen-left-panel {
+    width: 30%;
+    flex-shrink: 0;
+    height: 100%;
+    overflow: hidden;
+    background-color: #ffffff;
+    /* very subtle teal tint in light */
+}
+
+/* Hide ALL scrollbars inside the left panel (native + Radix UI) */
+.fullscreen-left-panel [data-radix-scroll-area-viewport] {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.fullscreen-left-panel [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+}
+
+.fullscreen-left-panel [data-radix-scroll-area-scrollbar],
+.fullscreen-left-panel [data-radix-scroll-area-thumb] {
+    display: none !important;
+    width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.dark .fullscreen-left-panel {
+    background-color: rgba(12, 12, 12, 0.06);
+    /* subtle teal in dark */
+}
+
+.fullscreen-right-panel {
+    flex: 1;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* When the right panel is shown alongside the left panel, add slight indent */
+.fullscreen-right-panel--split {
+    /* right panel shows a placeholder / empty state in split view */
+    align-items: center;
+    justify-content: center;
+}
+
+/* Input bar in full-screen qa mode: keep it full-width (no left-panel offset needed) */
+.fullscreen-input-area {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 1.5rem;
+}

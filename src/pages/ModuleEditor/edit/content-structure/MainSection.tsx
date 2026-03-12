@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {  FileText, Image as ImageIcon, Video, Volume2, File, GripVertical, Pencil, ExternalLink, Trash2 } from "lucide-react";
+import { FileText, Image as ImageIcon, Video, Volume2, File, GripVertical, Pencil, ExternalLink, Trash2, RefreshCw } from "lucide-react";
 import RichEditor from "@/components/RichEditor";
 import {
   Drawer,
@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 // import ChecklistContent from './ChecklistContent';
 // import StepsContent from './StepsContent';
 import { AccordionPreview } from '@/pages/ModuleEditor/edit/content-structure/AccordionContent';
-import { useFrappeCreateDoc, useFrappeUpdateDoc, useFrappeDeleteDoc } from "frappe-react-sdk";
+import { useFrappeCreateDoc, useFrappeUpdateDoc, useFrappeDeleteDoc, useFrappePostCall, useFrappeGetDoc } from "frappe-react-sdk";
 import { toast } from "sonner";
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
@@ -154,7 +154,7 @@ interface Chapter {
 
 
 // Sortable content blocks wrapper
-function SortableContentBlocks({ contents, chapter, reorderContentBlocks, setModule }: { contents: any[]; chapter: any; reorderContentBlocks: any; setModule: any }) {
+function SortableContentBlocks({ contents, chapter, reorderContentBlocks, setModule, onContentEditChange, setNeedsIngestion }: { contents: any[]; chapter: any; reorderContentBlocks: any; setModule: any; onContentEditChange?: (id: string, isEditing: boolean) => void; setNeedsIngestion: (needs: boolean) => void }) {
   return (
     <SortableContext items={contents.map((c, idx) => c.id || `content-${idx}`)} strategy={verticalListSortingStrategy}>
       <div className="mt-8 w-full flex flex-col gap-6">
@@ -167,6 +167,8 @@ function SortableContentBlocks({ contents, chapter, reorderContentBlocks, setMod
             chapter={chapter}
             reorderContentBlocks={reorderContentBlocks}
             setModule={setModule}
+            onEditChange={(isEditing: boolean) => onContentEditChange?.(content.id || `content-${idx}`, isEditing)}
+            setNeedsIngestion={setNeedsIngestion}
           />
         ))}
       </div>
@@ -217,10 +219,10 @@ function FloatingDraggableBar() {
   );
 }
 
-export default function MainSection({ 
-  hasLessons, 
-  lessons, 
-  addContentToChapter, 
+export default function MainSection({
+  hasLessons,
+  lessons,
+  addContentToChapter,
   setModule,
   moduleId,
   loading,
@@ -247,6 +249,8 @@ export default function MainSection({
   const [newChapterTitle, setNewChapterTitle] = useState('');
   const { createDoc } = useFrappeCreateDoc();
   const { updateDoc } = useFrappeUpdateDoc();
+  const { call: triggerIngestion } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.start_ingestion");
+  const { data: moduleDocData, mutate: mutateModuleDoc } = useFrappeGetDoc("LMS Module", moduleId || "");
   const [minLoading, setMinLoading] = useState(true);
   const [editingLessonName, setEditingLessonName] = useState(false);
   const [editingLessonDesc, setEditingLessonDesc] = useState(false);
@@ -258,6 +262,40 @@ export default function MainSection({
   const activeLesson = lessons?.find(l => l.id === activeLessonId) || null;
   const activeChapter = activeLesson?.chapters?.find((c: Chapter) => c.id === activeChapterId) || null;
 
+  const [editingContentMap, setEditingContentMap] = useState<Record<string, boolean>>({});
+  const handleContentEditChange = useCallback((id: string, isEditing: boolean) => {
+    setEditingContentMap(prev => {
+      if (prev[id] === isEditing) return prev;
+      return { ...prev, [id]: isEditing };
+    });
+  }, []);
+  const isAnyContentEditing = Object.values(editingContentMap).some(v => v);
+  const isAnyEditing = editingLessonName || editingLessonDesc || editingChapterName || isAnyContentEditing;
+
+  const [needsIngestion, setNeedsIngestion] = useState(false);
+
+  useEffect(() => {
+    if (moduleDocData && moduleDocData.is_injest === 0) {
+      setNeedsIngestion(true);
+    }
+  }, [moduleDocData]);
+
+  useEffect(() => {
+    if (isAnyEditing) {
+      setNeedsIngestion(true);
+      if (moduleId) {
+        updateDoc("LMS Module", moduleId, { is_injest: 0 })
+          .then(() => mutateModuleDoc())
+          .catch((err: any) => console.error("Failed to uncheck is_injest:", err));
+      }
+    }
+  }, [isAnyEditing, moduleId]);
+
+  useEffect(() => {
+    if (moduleDocData?.is_injest !== 0 && !isAnyEditing) {
+      setNeedsIngestion(false);
+    }
+  }, [activeLessonId, activeChapterId, moduleDocData, isAnyEditing]);
 
   // Preview function
   const handlePreviewModule = () => {
@@ -265,10 +303,56 @@ export default function MainSection({
       console.error('Module ID is required for preview');
       return;
     }
-// Use Admin preview route so Draft modules can be previewed too
+    // Use Admin preview route so Draft modules can be previewed too
     const previewUrl = `${BASE_PATH}/modules/${moduleId}`;
     window.open(previewUrl, '_blank');
   };
+
+  // AI Ingestion Trigger
+  const handleIngestToAI = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    // 1. Safety check to make sure the user has selected a lesson and chapter
+    if (!moduleId || !activeLessonId || !activeChapterId) {
+      toast.error("Module, Lesson, and Chapter must be selected to start ingestion.");
+      return;
+    }
+
+    // 2. Show a loading state to the user
+    toast.info("Scheduling AI Ingestion...", { id: "ai-ingest" });
+
+    try {
+      // 3. Trigger the Frappe API call securely
+      const response = await triggerIngestion({
+        module_id: moduleId,
+        chapter_id: activeChapterId,
+        lesson_id: activeLessonId
+      });
+
+      // 4. The response from your python API
+      // is automatically wrapped in `message` by Frappe
+      if (response && response.message) {
+        toast.success(`Success: ${response.message}`, { id: "ai-ingest" });
+        setNeedsIngestion(false);
+        await updateDoc("LMS Module", moduleId, { is_injest: 1 }).catch(console.error);
+        mutateModuleDoc();
+      } else {
+        toast.success("AI Ingestion started successfully!", { id: "ai-ingest" });
+        setNeedsIngestion(false);
+        await updateDoc("LMS Module", moduleId, { is_injest: 1 }).catch(console.error);
+        mutateModuleDoc();
+      }
+
+    } catch (error: any) {
+      console.error("AI Ingestion Trigger Error:", error);
+      toast.error(error.message || "Failed to trigger AI ingestion.", { id: "ai-ingest" });
+    }
+  };
+
+
+
 
   useEffect(() => {
     const timer = setTimeout(() => setMinLoading(false), 1000);
@@ -447,7 +531,7 @@ export default function MainSection({
           <div className="w-full max-w-4xl mx-auto">
             <h2 className="text-2xl font-bold mb-4">Create Your First Lesson</h2>
             <p className="text-muted-foreground mb-8">Start by creating your first lesson and chapter</p>
-            
+
             {/* Show drag-drop area even when no lessons exist */}
             <div className="w-full mb-8">
               <h3 className="text-lg font-semibold mb-4">Content Creation Area</h3>
@@ -461,7 +545,7 @@ export default function MainSection({
                 activeLessonId={''}
                 activeChapterId={''}
               />
-              
+
               {/* Demo content preview */}
               <div className="mt-6 p-4 bg-muted/30 rounded-lg border-2 border-dashed border-muted">
                 <h4 className="text-sm font-medium text-muted-foreground mb-2">Preview: After creating a lesson, you'll see:</h4>
@@ -473,7 +557,7 @@ export default function MainSection({
                 </div>
               </div>
             </div>
-            
+
             <Button
               onClick={() => setAdding(true)}
               className="rounded-full px-8 py-3 text-lg shadow-lg"
@@ -522,7 +606,7 @@ export default function MainSection({
               <Button variant="outline" onClick={() => setAdding(false)}>
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={() => {
                   if (lessonTitle && chapterTitle) {
                     handleCreateLessonAndChapter({
@@ -545,7 +629,7 @@ export default function MainSection({
         {activeLesson && (
           <div className="w-full px-2 md:px-0">
             {/* Lesson Name with Edit and Preview Button */}
-            <div className="flex items-center justify-center gap-2 mb-2">
+            <div className="relative flex items-center justify-center mb-2 min-h-[36px]">
               {editingLessonName ? (
                 <div className="flex items-center gap-2">
                   <Input
@@ -560,26 +644,60 @@ export default function MainSection({
                   }}>Cancel</Button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold">Lesson: {activeLesson.title}</h2>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingLessonName(true)}
-                    className="p-1"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePreviewModule}
-                    className="flex items-center gap-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Preview Module
-                  </Button>
-                </div>
+                <>
+                  {/* CENTER: Lesson title + pencil */}
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold">Lesson: {activeLesson.title}</h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditingLessonName(true)}
+                      className="p-1"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* RIGHT: Action buttons — absolutely positioned so title stays truly centered */}
+                  <div className="absolute right-0 top-0 flex items-start gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePreviewModule}
+                      className="flex items-center gap-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Preview Module
+                    </Button>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <Button
+                        type="button"
+                        variant={needsIngestion ? "default" : "outline"}
+                        size="sm"
+                        disabled={!needsIngestion}
+                        onClick={handleIngestToAI}
+                        className="flex items-center justify-center gap-2 transition-all"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${needsIngestion ? 'animate-pulse' : ''}`} />
+                        Injest to AI
+                      </Button>
+                      {moduleDocData?.last_injetion && (
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                          Last Injested:{" "}
+                          {(() => {
+                            const d = new Date(moduleDocData.last_injetion);
+                            const date = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+                            let hours = d.getHours();
+                            const minutes = d.getMinutes().toString().padStart(2, "0");
+                            const ampm = hours >= 12 ? "PM" : "AM";
+                            hours = hours % 12 || 12;
+                            return `${date} ${hours}:${minutes}${ampm}`;
+                          })()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
@@ -615,7 +733,7 @@ export default function MainSection({
             </div>
 
             <hr className="my-6 border-border" />
-            
+
             {activeChapter && (
               <>
                 {/* Chapter Name with Edit */}
@@ -651,7 +769,7 @@ export default function MainSection({
                 </div>
 
                 <hr className="my-6 border-border" />
-                
+
                 {/* Render content blocks */}
                 {activeChapter.contents && activeChapter.contents.length > 0 && (
                   <SortableContentBlocks
@@ -659,6 +777,8 @@ export default function MainSection({
                     chapter={activeChapter}
                     reorderContentBlocks={reorderContentBlocks}
                     setModule={setModule}
+                    onContentEditChange={handleContentEditChange}
+                    setNeedsIngestion={setNeedsIngestion}
                   />
                 )}
                 {/* Clickable Add Content Section (now at the end) */}
@@ -829,9 +949,8 @@ function DraggableContentIcon({ content, showLabel, onHover, onUnhover }: { cont
       {...attributes}
       onMouseEnter={onHover}
       onMouseLeave={onUnhover}
-      className={`flex items-center gap-2 px-2 py-2 rounded-lg border border-input bg-background text-foreground cursor-grab transition-all duration-200 ${
-        isDragging ? 'opacity-50' : 'hover:bg-accent'
-      } ${showLabel ? 'w-auto' : 'w-12'}`}
+      className={`flex items-center gap-2 px-2 py-2 rounded-lg border border-input bg-background text-foreground cursor-grab transition-all duration-200 ${isDragging ? 'opacity-50' : 'hover:bg-accent'
+        } ${showLabel ? 'w-auto' : 'w-12'}`}
     >
       <LucideIcon className="w-7 h-7" />
       <span className={`transition-all duration-200 ${showLabel ? 'opacity-100 w-auto' : 'opacity-0 w-0 overflow-hidden'}`}>
@@ -842,8 +961,23 @@ function DraggableContentIcon({ content, showLabel, onHover, onUnhover }: { cont
 }
 
 // Content block editor/preview
-function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: { content: any, onSaveContent: (data: any) => void, onCancelContent: () => void, isNew?: boolean }) {
+function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew, onEditChange }: { content: any, onSaveContent: (data: any) => void, onCancelContent: () => void, isNew?: boolean, onEditChange?: (isEditing: boolean) => void }) {
   const [editing, setEditing] = useState(isNew === true);
+  const onEditChangeRef = useRef(onEditChange);
+  useEffect(() => {
+    onEditChangeRef.current = onEditChange;
+  }, [onEditChange]);
+
+  useEffect(() => {
+    onEditChangeRef.current?.(editing);
+  }, [editing]);
+
+  useEffect(() => {
+    return () => {
+      // Tell the parent "I'm not editing" if this component unmounts
+      onEditChangeRef.current?.(false);
+    };
+  }, []);
   const [localContent, setLocalContent] = useState(content);
 
   useEffect(() => {
@@ -916,21 +1050,21 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
     if (!path) return '';
     const trimmed = path.trim();
     if (!trimmed) return '';
-    
+
     // If already a full URL, return as is
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return trimmed;
     }
-    
+
     // Ensure path starts with / if it doesn't already
     const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    
+
     // Determine base URL
     // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
     // In development: use http://lms.noveloffice.org
     const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
     const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-    
+
     return `${cleanBaseUrl}${relativePath}`;
   };
 
@@ -964,8 +1098,8 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
                 margin: 1em 0;
               }
             `}</style>
-            <div 
-              className="prose prose-sm dark:prose-invert prose-ol:text-foreground prose-ul:text-foreground editor-text-prose" 
+            <div
+              className="prose prose-sm dark:prose-invert prose-ol:text-foreground prose-ul:text-foreground editor-text-prose"
               dangerouslySetInnerHTML={{ __html: content.body }}
             />
           </>
@@ -973,12 +1107,12 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
         </div>
       );
     case 'Image Content':
-            return (
+      return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           {content.attach && (
-            <img 
-              src={getMediaUrl(content.attach)} 
-              alt={content.title || 'Image'} 
+            <img
+              src={getMediaUrl(content.attach)}
+              alt={content.title || 'Image'}
               className="max-h-48 mx-auto rounded object-contain"
             />
           )}
@@ -986,7 +1120,7 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
         </div>
       );
     case 'Video Content':
-            return (
+      return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           {content.video && (
             <div className="relative">
@@ -997,13 +1131,13 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
         </div>
       );
     case 'Audio Content':
-            return (
+      return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto text-center">
           <div className="font-bold mb-2">{content.title}</div>
           {content.attach && (
-            <audio 
-              src={getMediaUrl(content.attach)} 
-              controls 
+            <audio
+              src={getMediaUrl(content.attach)}
+              controls
               className="w-full mt-2 rounded"
             />
           )}
@@ -1016,9 +1150,9 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
           <div className="font-bold mb-2">{content.title}</div>
           {content.attachment && (
             <div className="mt-2">
-              <a 
-                href={content.attachment} 
-                download={content.title || 'download'} 
+              <a
+                href={content.attachment}
+                download={content.title || 'download'}
                 className="text-primary underline hover:text-primary/80"
               >
                 Download File
@@ -1058,10 +1192,10 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
     case 'Accordion Content':
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto">
-          <AccordionPreview 
-            title={content.title} 
-            description={content.description} 
-            accordion_items={content.accordion_items || []} 
+          <AccordionPreview
+            title={content.title}
+            description={content.description}
+            accordion_items={content.accordion_items || []}
           />
           <Button size="sm" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Edit</Button>
         </div>
@@ -1069,10 +1203,10 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
     case 'Slide Content':
       return (
         <div className="bg-background border border-border rounded-lg p-4 w-full mx-auto">
-          <SlidePreview 
-            title={content.title} 
+          <SlidePreview
+            title={content.title}
             description={content.description}
-            slide_show_items={content.slide_show_items || []} 
+            slide_show_items={content.slide_show_items || []}
           />
           <Button size="sm" variant="outline" className="mt-4" onClick={() => setEditing(true)}>Edit</Button>
         </div>
@@ -1110,7 +1244,7 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew }: 
   }
 }
 
-function SortableContentBlock({ id, content, chapter, setModule }: any) {
+function SortableContentBlock({ id, content, chapter, setModule, onEditChange, setNeedsIngestion }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -1145,7 +1279,7 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
         case 'video':
         case 'Video Content':
           doctype = 'Video Content';
-          fields = { title: data.title, video: data.video };
+          fields = { title: data.title, video: data.video, video_script: data.video_script };
           break;
         case 'audio':
         case 'Audio Content':
@@ -1159,7 +1293,7 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
           break;
         case 'Check List':
           doctype = 'Check List';
-          fields = { 
+          fields = {
             title: data.title,
             check_list_item: (Array.isArray(data.check_list_item) ? data.check_list_item : []).map((item: any) => ({
               item: item.item,
@@ -1169,7 +1303,7 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
           break;
         case 'Steps':
           doctype = 'Steps';
-          fields = { 
+          fields = {
             title: data.title,
             steps_item: (Array.isArray(data.steps_item) ? data.steps_item : []).map((item: any) => ({
               name: item.name || item.id,
@@ -1180,7 +1314,7 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
           break;
         case 'Accordion Content':
           doctype = 'Accordion Content';
-          fields = { 
+          fields = {
             title: data.title,
             description: data.description,
             accordion_items: data.accordion_items.map((item: any) => ({
@@ -1246,7 +1380,7 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
         }
         case 'Question Answer':
           doctype = 'Question Answer';
-          fields = { 
+          fields = {
             title: data.title,
             description: data.description,
             max_score: data.max_score,
@@ -1260,7 +1394,7 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
           break;
         case 'Slide Content':
           doctype = 'Slide Content';
-          fields = { 
+          fields = {
             title: data.title,
             description: data.description,
             progress_enabled: data.progress_enabled,
@@ -1275,7 +1409,7 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
           break;
         case 'Iframe Content':
           doctype = 'Iframe Content';
-          fields = { 
+          fields = {
             title: data.title,
             url: data.url
           };
@@ -1329,10 +1463,10 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
               let updatedContents = (ch.contents || []).filter((c: any) => c.docname || c.content_reference);
               // Now, add or update the saved content
               const idx = updatedContents.findIndex((c: any) => c.docname === docname || c.content_reference === docname);
-              const newContent = { 
+              const newContent = {
                 id: docname, // Use docname as the ID for consistency
-                type: doctype, 
-                docname, 
+                type: doctype,
+                docname,
                 content_type: doctype,
                 content_reference: docname,
                 ...fields,
@@ -1350,6 +1484,7 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
         return { ...prev, lessons };
       });
       toast.success('Content saved');
+      setNeedsIngestion(true); // Persist ingestion requirement after a successful save
     } catch (err) {
       console.error('Error saving content', err);
       toast.error('Failed to save content');
@@ -1435,6 +1570,7 @@ function SortableContentBlock({ id, content, chapter, setModule }: any) {
           onSaveContent={handleSaveContent}
           onCancelContent={handleCancelContent}
           isNew={content.isNew}
+          onEditChange={onEditChange}
         />
       </div>
       {/* Delete button, visible on hover */}

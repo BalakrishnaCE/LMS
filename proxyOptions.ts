@@ -1,13 +1,20 @@
+// @ts-ignore - CommonJS require for JSON config file
 const common_site_config = require('../../../sites/common_site_config.json');
 const { webserver_port } = common_site_config;
 
 export default {
+
 	'/api': {
-		target: 'https://lms.noveloffice.org',
+		target: `http://127.0.0.1:${webserver_port}`,
 		changeOrigin: true,
-		secure: true,
+		secure: false,
 		configure: (proxy: any) => {
 			proxy.on('proxyReq', (proxyReq: any, req: any) => {
+				// Set Host header to lms.local so Frappe knows which site to use
+				proxyReq.setHeader('Host', 'lms.local');
+				// Override the X-Frappe-Site-Name header set by frappe-react-sdk
+				proxyReq.setHeader('X-Frappe-Site-Name', 'lms.local');
+
 				// Forward cookies from the request
 				if (req.headers.cookie) {
 					proxyReq.setHeader('Cookie', req.headers.cookie);
@@ -43,7 +50,7 @@ export default {
 			proxy.on('proxyReq', (proxyReq: any, req: any) => {
 				// Set Host header to production domain so Frappe knows which site to use
 				proxyReq.setHeader('Host', 'lms.noveloffice.org');
-				
+
 				// Forward cookies
 				if (req.headers.cookie) {
 					proxyReq.setHeader('Cookie', req.headers.cookie);
