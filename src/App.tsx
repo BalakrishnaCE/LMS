@@ -24,6 +24,7 @@ import DepartmentPage from "@/pages/Department/Department";
 import { ErrorBoundary } from "@/lib/error-boundary";
 import FloatingChatButton from "@/components/FloatingChatButton";
 import AiChatPage from "@/pages/AiChat/AiChatPage";
+import FAQPage from "@/pages/FAQ/FAQPage";
 
 // import AnalyticsDashboardNew from "@/pages/Analytics/AnalyticsDashboard";
 // import H5PReactDemo from '@/pages/Test/H5PReactDemo';
@@ -122,6 +123,11 @@ function App() {
                           <DepartmentPage />
                         </Layout>
                       )} allowedRoles={["LMS Admin"]} />
+                      <ProtectedRoute path="/faq" component={() => (
+                        <Layout>
+                          <FAQPage />
+                        </Layout>
+                      )} allowedRoles={["LMS Student"]} />
                       {/* <ProtectedRoute path="/analytics-new" component={() => (
                 <Layout>
                   <AnalyticsDashboardNew />

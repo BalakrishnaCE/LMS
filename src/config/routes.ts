@@ -10,7 +10,7 @@ export const getRelativePath = (fullPath: string) => fullPath.replace(BASE_PATH,
 // LMS API base URL
 // Use relative URL in development (goes through Vite proxy for cookie handling)
 // Use absolute URL in production
-export const LMS_API_BASE_URL = import.meta.env.PROD ? "https://lms.noveloffice.org/" : "";
+export const LMS_API_BASE_URL = import.meta.env.PROD ? "https://lms.noveloffice.org" : "http://10.80.4.85";
 
 // Common routes
 export const ROUTES = {
@@ -34,4 +34,6 @@ export const ROUTES = {
   EDIT_MODULE: (moduleId: string) => `/edit/${moduleId}`,
   QUIZ: '/quiz',
   QUIZ_QUESTIONS: '/quiz-questions',
+  AI_CHAT: '/ai',
+  FAQ: '/faq',
 } as const; 
