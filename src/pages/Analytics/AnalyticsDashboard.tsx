@@ -97,16 +97,16 @@ interface SortButtonProps {
   onReset?: () => void;
 }
 
-const SortButton = ({ 
-  column, 
-  currentColumn, 
-  currentOrder, 
-  direction, 
+const SortButton = ({
+  column,
+  currentColumn,
+  currentOrder,
+  direction,
   onSortChange,
-  onReset 
+  onReset
 }: SortButtonProps) => {
   const isActive = currentColumn === column && currentOrder === direction;
-  
+
   const handleClick = () => {
     if (isActive) {
       onSortChange(null, null);
@@ -119,9 +119,8 @@ const SortButton = ({
   return (
     <button
       onClick={handleClick}
-      className={`p-0.5 hover:bg-muted rounded transition-colors ${
-        isActive ? 'text-primary' : 'text-muted-foreground'
-      }`}
+      className={`p-0.5 hover:bg-muted rounded transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'
+        }`}
       title={`Sort ${direction === 'asc' ? 'ascending' : 'descending'}`}
     >
       {direction === 'asc' ? (
@@ -229,7 +228,7 @@ export default function AnalyticsDashboard() {
   const [learnerCurrentPage, setLearnerCurrentPage] = useState(1);
   const [learnerTotalPages, setLearnerTotalPages] = useState(1);
   const itemsPerPage = 10;
-  
+
   // Module search with localStorage
   const [moduleSearchQuery, setModuleSearchQuery] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -237,7 +236,7 @@ export default function AnalyticsDashboard() {
     }
     return '';
   });
-  
+
   // Save search query to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -310,7 +309,7 @@ export default function AnalyticsDashboard() {
     }
     return '';
   });
-  
+
   // Save quiz search query to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -371,7 +370,7 @@ export default function AnalyticsDashboard() {
     }
     return '';
   });
-  
+
   // Save Q&A search query to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -461,17 +460,17 @@ export default function AnalyticsDashboard() {
     }
     return '';
   });
-  
+
   // Save learner search query to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('analytics_learner_search', learnerSearchQuery);
     }
   }, [learnerSearchQuery]);
-  
-  
+
+
   const [loadingLearners, setLoadingLearners] = useState(false);
-  
+
   // Data persistence state to prevent data loss during tab switches
   const [persistedData, setPersistedData] = useState<any>(null);
   const [dataInitialized, setDataInitialized] = useState(false);
@@ -496,32 +495,32 @@ export default function AnalyticsDashboard() {
   // Data validation function
   const validateAnalyticsData = (data: any) => {
     if (!data || typeof data !== 'object') return false;
-    
+
     // Check if we have meaningful data
     const hasOverview = data.overview && (
-      data.overview.total_learners > 0 || 
-      data.overview.total_modules > 0 || 
+      data.overview.total_learners > 0 ||
+      data.overview.total_modules > 0 ||
       data.overview.total_learners > 0
     );
-    
+
     const hasModuleAnalytics = data.module_analytics && data.module_analytics.length > 0;
-    
+
     return hasOverview || hasModuleAnalytics;
   };
 
   // API call with filters
   const { data: analyticsData, isLoading: dataLoading, error, mutate } = useLMSAnalytics(filters);
-  
+
   // Separate API call for learners data
   const { data: learnersData, isLoading: learnersLoading, error: learnersError } = useFrappeGetCall<any>("novel_lms.novel_lms.api.analytics.get_learners_analytics_data");
-  
-  
+
+
   // Safely extract data with fallbacks - handle double-nested message structure
   const rawData = (analyticsData as any)?.message?.message || (analyticsData as any)?.message || analyticsData || {};
-  
+
   // Use persisted data if available, otherwise use fresh data
   const safeData = persistedData || rawData;
-  
+
   // Create fallback data structure to prevent zero values
   const createFallbackData = () => ({
     overview: {
@@ -542,27 +541,27 @@ export default function AnalyticsDashboard() {
     department_analytics: [],
     recent_activity: []
   });
-  
+
   // Ensure we always have a valid data structure
   const finalData = safeData && Object.keys(safeData).length > 0 ? safeData : createFallbackData();
-  
+
   // Add fallback to prevent zero values during refresh
   const preventZeroValues = (data: any) => {
     if (!data || !data.overview) return data;
-    
+
     // If we have persisted data and the new data has zero values, use persisted data
-    if (persistedData && persistedData.overview && 
-        (data.overview.total_learners === 0)) {
-      
+    if (persistedData && persistedData.overview &&
+      (data.overview.total_learners === 0)) {
+
       return persistedData;
     }
-    
+
     return data;
   };
-  
+
   const finalDataWithFallback = preventZeroValues(finalData);
-  
-  
+
+
 
   React.useEffect(() => {
     if (!dataLoading) {
@@ -573,14 +572,14 @@ export default function AnalyticsDashboard() {
   // Persist data when successfully loaded
   React.useEffect(() => {
     if (!dataLoading && rawData && validateAnalyticsData(rawData)) {
-     
+
       setPersistedData(rawData);
       setDataInitialized(true);
-      
+
       // Also save to localStorage for persistence across page reloads
       try {
         localStorage.setItem('analytics_persisted_data', JSON.stringify(rawData));
-       
+
       } catch (error) {
         console.error('Error saving to localStorage:', error);
       }
@@ -590,18 +589,18 @@ export default function AnalyticsDashboard() {
   // Force refresh analytics data when tab changes or data is empty
   React.useEffect(() => {
     if (activeTab === 'modules' && !dataLoading && !validateAnalyticsData(finalDataWithFallback)) {
-      
+
       mutate();
     }
   }, [activeTab, dataLoading, finalDataWithFallback, mutate]);
 
   // Handle tab switching with data preservation
   React.useEffect(() => {
-    
-    
+
+
     // Only refresh if we're switching to modules and we don't have valid persisted data
     if (activeTab === 'modules' && !dataLoading && !dataInitialized && !validateAnalyticsData(finalDataWithFallback)) {
-      
+
       mutate();
     }
   }, [activeTab, dataLoading, dataInitialized, finalData, mutate]);
@@ -613,7 +612,7 @@ export default function AnalyticsDashboard() {
     } else {
       document.body.style.overflow = 'unset';
     }
-    
+
     // Cleanup function to restore scrollbar when component unmounts
     return () => {
       document.body.style.overflow = 'unset';
@@ -664,8 +663,8 @@ export default function AnalyticsDashboard() {
       ...data.map(row => headers.map(header => {
         const value = row[header.toLowerCase().replace(/\s+/g, '_')] || row[header] || '';
         // Escape commas and quotes in CSV
-        return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
-          ? `"${value.replace(/"/g, '""')}"` 
+        return typeof value === 'string' && (value.includes(',') || value.includes('"'))
+          ? `"${value.replace(/"/g, '""')}"`
           : value;
       }).join(","))
     ].join("\n");
@@ -690,11 +689,11 @@ export default function AnalyticsDashboard() {
   const handleExport = async () => {
     setExporting(true);
     try {
-     
-      
+
+
       // Get current date for filename
       const currentDate = new Date().toISOString().split('T')[0];
-      
+
       // Export Overview Data
       if (finalDataWithFallback?.overview) {
         const overviewData = [{
@@ -707,12 +706,12 @@ export default function AnalyticsDashboard() {
           'Total Quiz Attempts': finalDataWithFallback.overview.total_quiz_attempts || 0,
           'Total Q&A Attempts': finalDataWithFallback.overview.total_qa_attempts || 0
         }];
-        
+
         const overviewHeaders = ['Total Learners', 'Total Modules', 'Completed Modules', 'In Progress Modules', 'Not Started Modules', 'Average Progress', 'Total Quiz Attempts', 'Total Q&A Attempts'];
         const overviewCSV = convertToCSV(overviewData, overviewHeaders);
         downloadCSV(overviewCSV, `analytics_overview_${currentDate}.csv`);
       }
-      
+
       // Export Module Analytics with Complete Details
       if (finalDataWithFallback?.module_analytics && finalDataWithFallback.module_analytics.length > 0) {
         const moduleData = finalDataWithFallback.module_analytics.map((module: any) => ({
@@ -739,18 +738,18 @@ export default function AnalyticsDashboard() {
           'In Progress Count': module.in_progress_count || 0,
           'Not Started Count': module.not_started_count || 0
         }));
-        
+
         const moduleHeaders = [
-          'Module ID', 'Module Name', 'Description', 'Short Text', 'Duration', 'Department', 
-          'Assignment Type', 'Status', 'Is Published', 'Has Scoring', 'Has Progress', 
-          'Total Score', 'Order', 'Created By', 'Published By', 'Image', 
-          'Assigned Count', 'Completed Count', 'Completion Rate', 'Average Score', 
+          'Module ID', 'Module Name', 'Description', 'Short Text', 'Duration', 'Department',
+          'Assignment Type', 'Status', 'Is Published', 'Has Scoring', 'Has Progress',
+          'Total Score', 'Order', 'Created By', 'Published By', 'Image',
+          'Assigned Count', 'Completed Count', 'Completion Rate', 'Average Score',
           'In Progress Count', 'Not Started Count'
         ];
         const moduleCSV = convertToCSV(moduleData, moduleHeaders);
         downloadCSV(moduleCSV, `analytics_modules_detailed_${currentDate}.csv`);
       }
-      
+
       // Export Quiz Analytics with Complete Details
       if (finalDataWithFallback?.quiz_analytics && finalDataWithFallback.quiz_analytics.length > 0) {
         const quizData = finalDataWithFallback.quiz_analytics.map((quiz: any) => ({
@@ -770,16 +769,16 @@ export default function AnalyticsDashboard() {
           'Status': quiz.status || 'N/A',
           'Quiz Progress ID': quiz.quiz_progress_id || 'N/A'
         }));
-        
+
         const quizHeaders = [
-          'Quiz ID', 'Quiz Name', 'User', 'Module ID', 'Module Name', 'Score', 'Max Score', 
-          'Percentage Score', 'Total Attempts', 'Time Spent', 'Time Limit', 'Date Started', 
+          'Quiz ID', 'Quiz Name', 'User', 'Module ID', 'Module Name', 'Score', 'Max Score',
+          'Percentage Score', 'Total Attempts', 'Time Spent', 'Time Limit', 'Date Started',
           'Date Completed', 'Status', 'Quiz Progress ID'
         ];
         const quizCSV = convertToCSV(quizData, quizHeaders);
         downloadCSV(quizCSV, `analytics_quizzes_detailed_${currentDate}.csv`);
       }
-      
+
       // Export Q&A Analytics with Complete Details
       if (finalDataWithFallback?.qa_analytics && finalDataWithFallback.qa_analytics.length > 0) {
         const qaData = finalDataWithFallback.qa_analytics.map((qa: any) => ({
@@ -799,16 +798,16 @@ export default function AnalyticsDashboard() {
           'Status': qa.status || 'N/A',
           'Q&A Progress ID': qa.qa_progress_id || 'N/A'
         }));
-        
+
         const qaHeaders = [
-          'Q&A ID', 'Q&A Name', 'User', 'Module ID', 'Module Name', 'Score', 'Max Score', 
-          'Percentage Score', 'Total Attempts', 'Time Spent', 'Time Limit', 'Date Started', 
+          'Q&A ID', 'Q&A Name', 'User', 'Module ID', 'Module Name', 'Score', 'Max Score',
+          'Percentage Score', 'Total Attempts', 'Time Spent', 'Time Limit', 'Date Started',
           'Date Completed', 'Status', 'Q&A Progress ID'
         ];
         const qaCSV = convertToCSV(qaData, qaHeaders);
         downloadCSV(qaCSV, `analytics_qa_detailed_${currentDate}.csv`);
       }
-      
+
       // Export Learner Analytics (if available)
       if (finalDataWithFallback?.learner_analytics && finalDataWithFallback.learner_analytics.length > 0) {
         const learnerData = finalDataWithFallback.learner_analytics.map((learner: any) => ({
@@ -830,16 +829,16 @@ export default function AnalyticsDashboard() {
           'User Image': learner.user_image || 'N/A',
           'Roles': learner.roles?.join(', ') || 'N/A'
         }));
-        
+
         const learnerHeaders = [
-          'Learner Name', 'Email', 'Department', 'Status', 'Modules Enrolled', 'Modules Completed', 
-          'Completion Rate', 'Average Progress', 'Average Score', 'Total Time Spent', 'Achievements Count', 
+          'Learner Name', 'Email', 'Department', 'Status', 'Modules Enrolled', 'Modules Completed',
+          'Completion Rate', 'Average Progress', 'Average Score', 'Total Time Spent', 'Achievements Count',
           'Last Activity', 'Mobile No', 'Creation Date', 'Last Login', 'User Image', 'Roles'
         ];
         const learnerCSV = convertToCSV(learnerData, learnerHeaders);
         downloadCSV(learnerCSV, `analytics_learners_detailed_${currentDate}.csv`);
       }
-      
+
       toast.success("Analytics data exported successfully! Check your downloads folder.");
     } catch (error) {
       console.error('Export error:', error);
@@ -850,14 +849,14 @@ export default function AnalyticsDashboard() {
   };
 
   const handleRefresh = () => {
-   
+
     setIsLoading(true);
-    
+
     // Don't clear persisted data immediately - let the API call complete first
-    
+
     // Force refresh the analytics data
     mutate();
-    
+
     // Also refresh quiz and Q&A data if they're loaded
     if (quizAnalyticsData.length > 0) {
       fetchQuizAnalytics();
@@ -865,29 +864,29 @@ export default function AnalyticsDashboard() {
     if (qaAnalyticsData.length > 0) {
       fetchQaAnalytics();
     }
-    
+
     // Set a timeout to clear persisted data only if the new data is valid
     setTimeout(() => {
-      
+
       if (validateAnalyticsData(rawData)) {
-       
+
         setPersistedData(null);
         setDataInitialized(false);
         try {
           localStorage.removeItem('analytics_persisted_data');
-          
+
         } catch (error) {
           console.error('Error clearing localStorage:', error);
         }
       } else {
-      
+
       }
       setIsLoading(false);
     }, 2000);
   };
 
   const handleModuleClick = (module: any) => {
-    
+
     setSidebarContent({
       type: 'module',
       data: module
@@ -896,7 +895,7 @@ export default function AnalyticsDashboard() {
   };
 
   const handleLearnerClick = async (learner: any) => {
-    
+
     setSidebarContent({
       type: 'learner',
       data: learner
@@ -904,7 +903,7 @@ export default function AnalyticsDashboard() {
     setShowSidebar(true);
     setLoadingLearnerSidebar(true);
     setLearnerModuleFilter('all'); // Reset filter when new learner is clicked
-    
+
     try {
       // Fetch detailed learner data
       const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_learner_sidebar_details?learner_name=${learner.name}`, {
@@ -914,11 +913,11 @@ export default function AnalyticsDashboard() {
         },
         credentials: 'include',
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setLearnerSidebarData(data.message.message);
-        
+
       } else {
         console.error('Failed to fetch learner sidebar details');
         setLearnerSidebarData(null);
@@ -946,14 +945,14 @@ export default function AnalyticsDashboard() {
       const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_quiz_analytics`, {
         credentials: 'include'
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch quiz analytics');
       }
-      
+
       const data = await response.json();
-      
-      
+
+
       if (data.message && data.message.success) {
         const allData = data.message.data.quiz_progress || [];
         setQuizAnalyticsData(allData);
@@ -982,19 +981,19 @@ export default function AnalyticsDashboard() {
       const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_qa_analytics`, {
         credentials: 'include'
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch Q&A analytics');
       }
-      
+
       const data = await response.json();
-      
-      
+
+
       if (data.message && data.message.success) {
         const allData = data.message.data.qa_progress || [];
         const scoredData = data.message.data.scored_data || [];
         const pendingData = data.message.data.pending_data || [];
-        
+
         setQaAnalyticsData(allData);
         setQaScoredData(scoredData);
         setQaPendingData(pendingData);
@@ -1022,7 +1021,7 @@ export default function AnalyticsDashboard() {
     if (!timeStr) return 0;
     // If it's already a number, return it
     if (typeof timeStr === 'number') return timeStr;
-    
+
     const str = String(timeStr).trim();
     // Try to parse "HH:MM:SS" format
     const timeMatchFull = str.match(/(\d+):(\d+):(\d+)/);
@@ -1055,29 +1054,29 @@ export default function AnalyticsDashboard() {
       // Load the image
       const img = new Image();
       img.src = imageSrc;
-      
+
       await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
       });
-      
+
       // Create canvas to process the image
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
-      
+
       if (!ctx) {
         return null;
       }
-      
+
       // Draw the image
       ctx.drawImage(img, 0, 0);
-      
+
       // Get image data
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
-      
+
       // Convert all non-transparent pixels to white
       for (let i = 0; i < data.length; i += 4) {
         const alpha = data[i + 3];
@@ -1089,10 +1088,10 @@ export default function AnalyticsDashboard() {
           // Keep original alpha: data[i + 3] = alpha;
         }
       }
-      
+
       // Put the modified image data back
       ctx.putImageData(imageData, 0, 0);
-      
+
       // Convert canvas to data URL
       return canvas.toDataURL('image/png');
     } catch (error) {
@@ -1106,21 +1105,21 @@ export default function AnalyticsDashboard() {
   // Returns timestamp in milliseconds for accurate sorting by year, month, day, hour, minute, second
   const parseDateToTimestamp = (dateStr: string | Date | null | undefined): number => {
     if (!dateStr) return 0;
-    
+
     // If it's already a Date object, return timestamp
     if (dateStr instanceof Date) {
       const timestamp = dateStr.getTime();
       return isNaN(timestamp) ? 0 : timestamp;
     }
-    
+
     // If it's already a number (timestamp), return it
     if (typeof dateStr === 'number') {
       return isNaN(dateStr) ? 0 : dateStr;
     }
-    
+
     const str = String(dateStr).trim();
     if (!str || str === 'null' || str === 'undefined') return 0;
-    
+
     // Priority 1: Try DD/MM/YYYY format with time (e.g., "15/01/2024 14:30:00", "15/01/2024 14:30", "15/01/2024")
     const ddMMYYYYTimeMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
     if (ddMMYYYYTimeMatch) {
@@ -1130,7 +1129,7 @@ export default function AnalyticsDashboard() {
       const hour = ddMMYYYYTimeMatch[4] ? parseInt(ddMMYYYYTimeMatch[4], 10) : 0;
       const minute = ddMMYYYYTimeMatch[5] ? parseInt(ddMMYYYYTimeMatch[5], 10) : 0;
       const second = ddMMYYYYTimeMatch[6] ? parseInt(ddMMYYYYTimeMatch[6], 10) : 0;
-      
+
       // Validate: day should be 1-31, month should be 0-11 (after -1)
       if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
         const parsedDate = new Date(year, month, day, hour, minute, second);
@@ -1139,7 +1138,7 @@ export default function AnalyticsDashboard() {
         }
       }
     }
-    
+
     // Priority 2: Try YYYY-MM-DD format with time (e.g., "2024-01-15 14:30:00", "2024-01-15 14:30", "2024-01-15")
     const yyyyMMDDTimeMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
     if (yyyyMMDDTimeMatch) {
@@ -1149,26 +1148,26 @@ export default function AnalyticsDashboard() {
       const hour = yyyyMMDDTimeMatch[4] ? parseInt(yyyyMMDDTimeMatch[4], 10) : 0;
       const minute = yyyyMMDDTimeMatch[5] ? parseInt(yyyyMMDDTimeMatch[5], 10) : 0;
       const second = yyyyMMDDTimeMatch[6] ? parseInt(yyyyMMDDTimeMatch[6], 10) : 0;
-      
+
       const parsedDate = new Date(year, month, day, hour, minute, second);
       if (!isNaN(parsedDate.getTime())) {
         return parsedDate.getTime();
       }
     }
-    
+
     // Priority 3: Try standard Date constructor (handles ISO strings, etc.)
     const date = new Date(str);
     if (!isNaN(date.getTime())) {
       return date.getTime();
     }
-    
+
     // Priority 4: Try simple DD/MM/YYYY format without time
     const ddMMYYYYMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (ddMMYYYYMatch) {
       const day = parseInt(ddMMYYYYMatch[1], 10);
       const month = parseInt(ddMMYYYYMatch[2], 10) - 1; // Month is 0-indexed
       const year = parseInt(ddMMYYYYMatch[3], 10);
-      
+
       // Validate: day should be 1-31, month should be 0-11 (after -1)
       if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
         const parsedDate = new Date(year, month, day);
@@ -1177,20 +1176,20 @@ export default function AnalyticsDashboard() {
         }
       }
     }
-    
+
     // Priority 5: Try YYYY-MM-DD format without time
     const yyyyMMDDMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (yyyyMMDDMatch) {
       const year = parseInt(yyyyMMDDMatch[1], 10);
       const month = parseInt(yyyyMMDDMatch[2], 10) - 1; // Month is 0-indexed
       const day = parseInt(yyyyMMDDMatch[3], 10);
-      
+
       const parsedDate = new Date(year, month, day);
       if (!isNaN(parsedDate.getTime())) {
         return parsedDate.getTime();
       }
     }
-    
+
     return 0;
   };
 
@@ -1221,7 +1220,7 @@ export default function AnalyticsDashboard() {
       return [...filtered].sort((a: any, b: any) => {
         let aValue: any;
         let bValue: any;
-        
+
         if (quizSortColumn === 'user') {
           aValue = (a.user || '').toLowerCase();
           bValue = (b.user || '').toLowerCase();
@@ -1238,7 +1237,7 @@ export default function AnalyticsDashboard() {
           aValue = parseTimeToSeconds(a.time_spent || '0');
           bValue = parseTimeToSeconds(b.time_spent || '0');
         }
-        
+
         if (aValue < bValue) return quizSortOrder === "asc" ? -1 : 1;
         if (aValue > bValue) return quizSortOrder === "asc" ? 1 : -1;
         return 0;
@@ -1291,7 +1290,7 @@ export default function AnalyticsDashboard() {
       return [...filtered].sort((a: any, b: any) => {
         let aValue: any;
         let bValue: any;
-        
+
         if (qaSortColumn === 'user') {
           aValue = (a.user || '').toLowerCase();
           bValue = (b.user || '').toLowerCase();
@@ -1308,7 +1307,7 @@ export default function AnalyticsDashboard() {
           aValue = parseTimeToSeconds(a.time_spent || '0');
           bValue = parseTimeToSeconds(b.time_spent || '0');
         }
-        
+
         if (aValue < bValue) return qaSortOrder === "asc" ? -1 : 1;
         if (aValue > bValue) return qaSortOrder === "asc" ? 1 : -1;
         return 0;
@@ -1381,7 +1380,7 @@ export default function AnalyticsDashboard() {
   const filteredLearnersData = React.useMemo(() => {
     const learners = learnersData?.message?.message?.learner_analytics || [];
     let filtered = learners;
-    
+
     // Filter by search query
     if (learnerSearchQuery.trim()) {
       const searchLower = learnerSearchQuery.toLowerCase();
@@ -1397,7 +1396,7 @@ export default function AnalyticsDashboard() {
       return [...filtered].sort((a: any, b: any) => {
         let aValue: any;
         let bValue: any;
-        
+
         if (learnerSortColumn === 'name') {
           aValue = ((a.full_name || a.name || '') + ' ' + (a.email || '')).toLowerCase();
           bValue = ((b.full_name || b.name || '') + ' ' + (b.email || '')).toLowerCase();
@@ -1411,7 +1410,7 @@ export default function AnalyticsDashboard() {
           aValue = a.completion_rate || 0;
           bValue = b.completion_rate || 0;
         }
-        
+
         if (aValue < bValue) return learnerSortOrder === "asc" ? -1 : 1;
         if (aValue > bValue) return learnerSortOrder === "asc" ? 1 : -1;
         return 0;
@@ -1459,14 +1458,14 @@ export default function AnalyticsDashboard() {
       const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_quiz_details?quiz_progress_id=${encodeURIComponent(quizProgressId)}`, {
         credentials: 'include'
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch quiz details');
       }
-      
+
       const data = await response.json();
-      
-      
+
+
       if (data.message && data.message.success) {
         setQuizDetailsData(data.message.data);
         setShowQuizDetailsModal(true);
@@ -1489,18 +1488,18 @@ export default function AnalyticsDashboard() {
 
   const exportToPDF = async () => {
     if (!quizDetailsData) return;
-    
+
     try {
       // Create filename: email_module_name.pdf
       const email = quizDetailsData.user || 'unknown';
       const moduleName = quizDetailsData.module?.name1 || quizDetailsData.module?.name || 'module';
       const filename = `${email}_${moduleName}.pdf`;
-      
+
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const midX = pageWidth / 2;
-      
+
       // Teal color for header and footer (RGB: 0, 128, 128 or similar teal)
       const tealColor = [0, 128, 128] as [number, number, number];
       const lightTealColor = [230, 245, 245] as [number, number, number];
@@ -1511,7 +1510,7 @@ export default function AnalyticsDashboard() {
       // Header - Teal colored bar
       doc.setFillColor(tealColor[0], tealColor[1], tealColor[2]);
       doc.rect(0, 0, pageWidth, 25, 'F');
-      
+
       // Add logo to header (if loaded)
       if (logoDataUrl) {
         try {
@@ -1522,20 +1521,20 @@ export default function AnalyticsDashboard() {
           console.error('Could not add logo to PDF:', error);
         }
       }
-      
+
       // NOVEL LMS text in header (white text) - positioned after logo
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       const logoTextX = logoDataUrl ? 32 : 14; // Position text after logo if logo exists (14 + 15 logo width + 3 spacing)
       doc.text("NOVEL LMS", logoTextX, 16);
-      
+
       // Title - centered below header
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
       doc.text("Quiz Report", midX, 45, { align: "center" });
-      
+
       // Two-column header summary
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
@@ -1573,13 +1572,13 @@ export default function AnalyticsDashboard() {
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text("Question Analysis", midX, yPosition, { align: "center" });
-      
+
       // Horizontal line separator after Question Analysis heading (teal color)
       yPosition += 5;
       doc.setDrawColor(tealColor[0], tealColor[1], tealColor[2]);
       doc.line(14, yPosition, pageWidth - 14, yPosition);
       yPosition += 8;
-      
+
       // Helper function to clean question text (remove trailing "1" or numbers)
       const cleanQuestionText = (text: string) => {
         if (!text) return 'N/A';
@@ -1589,7 +1588,7 @@ export default function AnalyticsDashboard() {
         cleaned = cleaned.replace(/\s+1\s*$/, '').trim();
         return cleaned;
       };
-      
+
       // Prepare table data
       const tableData = quizDetailsData.question_analysis?.map((qa: any) => [
         cleanQuestionText(qa.question), // Clean question text
@@ -1597,21 +1596,21 @@ export default function AnalyticsDashboard() {
         (qa.correct_answer || 'N/A').replace(/<[^>]*>/g, ''), // Strip HTML tags
         qa.is_correct ? 'Correct' : 'Incorrect'
       ]) || [];
-      
+
       // Add table using autoTable with enhanced styling
       autoTable(doc, {
         head: [['Question', 'Your Answer', 'Correct Answer', 'Result']],
         body: tableData,
         startY: yPosition,
         rowPageBreak: 'avoid', // Prevent rows from splitting across pages
-        styles: { 
+        styles: {
           fontSize: 9,
           cellPadding: 5,
           overflow: 'linebreak',
           lineColor: [220, 220, 220], // Gray color for inner table lines
           lineWidth: 0.5
         },
-        headStyles: { 
+        headStyles: {
           fillColor: lightTealColor,
           textColor: [0, 0, 0],
           fontStyle: 'bold',
@@ -1631,14 +1630,14 @@ export default function AnalyticsDashboard() {
           const footerY = pageHeight - 15;
           doc.setFillColor(tealColor[0], tealColor[1], tealColor[2]);
           doc.rect(0, footerY, pageWidth, 15, 'F');
-          
+
           // Footer text (white)
           doc.setTextColor(255, 255, 255);
           doc.setFontSize(9);
           doc.setFont('helvetica', 'normal');
           const footerText = "Generated by Novel LMS | For support, contact L&D Team";
           doc.text(footerText, midX, footerY + 10, { align: "center" });
-          
+
           // Page numbers (above footer, in regular text color)
           doc.setTextColor(100, 100, 100);
           doc.setFontSize(8);
@@ -1647,10 +1646,10 @@ export default function AnalyticsDashboard() {
           doc.text(`Page ${currentPage} of ${pageCount}`, midX, footerY - 3, { align: "center" });
         }
       });
-      
+
       // Save the PDF
       doc.save(filename);
-      
+
       toast.success('Quiz report downloaded successfully!');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1672,14 +1671,14 @@ export default function AnalyticsDashboard() {
       }
 
       const data = await response.json();
-      
+
 
       if (data.message?.success) {
         // Add the record ID to the data for score updates
         const detailsWithId = { ...data.message.data, name: qaProgressId };
         setQaDetailsData(detailsWithId);
         setShowQaDetailsModal(true);
-       
+
       } else {
         console.error('Q&A Details API Error:', data.message?.error);
         toast.error('Failed to fetch Q&A details');
@@ -1707,10 +1706,10 @@ export default function AnalyticsDashboard() {
   const handleScoreInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setScoreValue(value);
-    
+
     // Clear previous error
     setScoreError('');
-    
+
     // Validate score if value is not empty
     if (value) {
       const numericValue = parseFloat(value);
@@ -1726,21 +1725,21 @@ export default function AnalyticsDashboard() {
 
   const handleSaveScore = async () => {
     if (!qaDetailsData || !scoreValue) return;
-    
+
     const numericValue = parseFloat(scoreValue);
-    
+
     // Check if score is negative
     if (numericValue < 0) {
       setScoreError('Score cannot be negative');
       return;
     }
-    
+
     // Check if score exceeds max score
     if (qaDetailsData?.max_score && numericValue > qaDetailsData.max_score) {
       setScoreError(`Score cannot exceed maximum score of ${qaDetailsData.max_score}`);
       return;
     }
-    
+
     setLoadingAddScore(true);
     try {
       const params = new URLSearchParams({
@@ -1768,7 +1767,7 @@ export default function AnalyticsDashboard() {
 
       // Check for success in nested structure: data.message.message.success
       const isSuccess = data.message?.message?.success || data.message?.success || data.success;
-      
+
       if (isSuccess) {
         setScoreUpdateSuccess(true);
         // Show success message in popup instead of toast
@@ -1813,10 +1812,10 @@ export default function AnalyticsDashboard() {
       setQaAllotedMarks(prev => prev.map((v: number, i: number) => (i === index ? constrainedValue : v)));
     }
   };
-  
+
   const handleSaveAllotedScores = async () => {
     if (!qaDetailsData) return;
-    
+
     // Validate: Check each allotted mark doesn't exceed its question_score
     if (qaDetailsData.question_answer_responses) {
       for (let i = 0; i < qaDetailsData.question_answer_responses.length; i++) {
@@ -1828,7 +1827,7 @@ export default function AnalyticsDashboard() {
         }
       }
     }
-    
+
     // Validate: Check total doesn't exceed max_score
     const total = qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0);
     const maxScore = qaDetailsData.max_score ?? 0;
@@ -1836,7 +1835,7 @@ export default function AnalyticsDashboard() {
       toast.error(`Total score (${total}) cannot exceed maximum score (${maxScore})`);
       return;
     }
-    
+
     try {
       const params = new URLSearchParams({
         name: qaDetailsData.name,
@@ -1867,23 +1866,23 @@ export default function AnalyticsDashboard() {
 
   const exportQaToPDF = async () => {
     if (!qaDetailsData) return;
-    
+
     try {
       // Create filename: email_module_name_qa.pdf
       const email = qaDetailsData.user || 'unknown';
       const moduleName = qaDetailsData.module?.name1 || qaDetailsData.module?.name || 'module';
       const filename = `${email}_${moduleName}_qa.pdf`;
-      
+
       // Create new PDF document
       const doc = new jsPDF();
-      
+
       // Page dimensions
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
       const margin = 14;
       const contentWidth = pageWidth - (margin * 2);
       const midX = pageWidth / 2;
-      
+
       // Teal color for header and footer
       const tealColor = [0, 128, 128] as [number, number, number];
 
@@ -1893,7 +1892,7 @@ export default function AnalyticsDashboard() {
       // Header - Teal colored bar
       doc.setFillColor(tealColor[0], tealColor[1], tealColor[2]);
       doc.rect(0, 0, pageWidth, 25, 'F');
-      
+
       // Add logo to header (if loaded)
       if (logoDataUrl) {
         try {
@@ -1902,26 +1901,26 @@ export default function AnalyticsDashboard() {
           console.error('Could not add logo to PDF:', error);
         }
       }
-      
+
       // NOVEL LMS text in header (white text)
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       const logoTextX = logoDataUrl ? 32 : 14;
       doc.text("NOVEL LMS", logoTextX, 16);
-      
+
       // Title - Centered (adjusted for header)
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
       const titleText = "Q&A Report";
       doc.text(titleText, midX, 45, { align: "center" });
-      
+
       // Summary Section - Two Column Layout (adjusted for header)
       let yPosition = 55;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      
+
       // Left Column
       const leftX = margin;
       doc.text(`Module: ${qaDetailsData.module?.name1 || qaDetailsData.module?.name || 'N/A'}`, leftX, yPosition);
@@ -1929,7 +1928,7 @@ export default function AnalyticsDashboard() {
       doc.text(`Date: ${qaDetailsData.date_attended || 'N/A'}`, leftX, yPosition);
       yPosition += 8;
       doc.text(`Score: ${qaDetailsData.score || 'N/A'} / ${qaDetailsData.max_score || 'N/A'} (${qaDetailsData.percentage_score || 0}%)`, leftX, yPosition);
-      
+
       // Right Column
       yPosition = 55;
       const rightX = pageWidth / 2 + 20;
@@ -1942,7 +1941,7 @@ export default function AnalyticsDashboard() {
       doc.setDrawColor(tealColor[0], tealColor[1], tealColor[2]);
       doc.setLineWidth(0.5);
       doc.line(14, topLineY, pageWidth - 14, topLineY);
-      
+
       // Answer Analysis Section Title centered between two lines
       const answerCenterY = topLineY + 10; // center point
       doc.setFontSize(14);
@@ -1958,21 +1957,21 @@ export default function AnalyticsDashboard() {
       doc.line(14, bottomLineY, pageWidth - 14, bottomLineY);
 
       yPosition = bottomLineY + 12;
-      
+
       // Process each question-answer pair
       const questions = qaDetailsData.question_answer_responses || [];
-      
+
       for (let i = 0; i < questions.length; i++) {
         const qa = questions[i];
         const questionNum = i + 1;
-        
+
         // Check if we need a new page (account for footer)
         if (yPosition > pageHeight - 80) {
           doc.addPage();
           // No header on subsequent pages for QA report
           yPosition = margin + 10;
         }
-        
+
         // Question block: strict 3-row layout
         const normalizeLine = (text: string) =>
           (text || 'N/A')
@@ -2023,7 +2022,7 @@ export default function AnalyticsDashboard() {
         }
 
         // --- Row 2: Question text (full width, wrapped) ---
-                // --- Row 2: Question text (full width, single line) ---
+        // --- Row 2: Question text (full width, single line) ---
         // --- Row 2: Question text (full width, single line) ---
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
@@ -2065,33 +2064,33 @@ export default function AnalyticsDashboard() {
         const answerHeight = answerLines.length * 5 + 5; // +5 for the label line
         yPosition += Math.max(answerHeight, rowHeight) + 4;
       }
-      
+
       // Add footer and page numbers to all pages
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        
+
         // Footer - Teal colored bar at bottom
         const footerY = pageHeight - 15;
         doc.setFillColor(tealColor[0], tealColor[1], tealColor[2]);
         doc.rect(0, footerY, pageWidth, 15, 'F');
-        
+
         // Footer text (white)
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         const footerText = "Generated by Novel LMS | For support, contact L&D Team";
         doc.text(footerText, midX, footerY + 10, { align: "center" });
-        
+
         // Page numbers (above footer, in regular text color)
         doc.setTextColor(100, 100, 100);
         doc.setFontSize(8);
         doc.text(`Page ${i} of ${pageCount}`, midX, footerY - 3, { align: "center" });
       }
-      
+
       // Save the PDF
       doc.save(filename);
-    
+
       toast.success('Q&A report downloaded successfully!');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -2100,85 +2099,85 @@ export default function AnalyticsDashboard() {
   };
 
   const fetchLearnerDetails = async (status: string) => {
-     if (!sidebarContent?.data) return;
-     
-     setLoadingLearners(true);
-     setSelectedStatus(status);
-     
-     try {
-       
-       
-       // Get module ID from sidebar content
-       const moduleId = sidebarContent.data.module_id || sidebarContent.data.name;
-       const moduleName = sidebarContent.data.module_name || sidebarContent.data.name1;
-       
-      
-       
-       // Check if module ID or name is valid
-       if (!moduleId && !moduleName) {
-         console.error('No module ID or name provided');
-         setAllLearnerDetails([]);
-         setLearnerDetails([]);
-         return;
-       }
-       
-      
-       
-       // Use the original API directly
-       let response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_module_learners?module_id=${encodeURIComponent(moduleId)}&module_name=${encodeURIComponent(moduleName)}`, { credentials: 'include' });
-       
-      
+    if (!sidebarContent?.data) return;
+
+    setLoadingLearners(true);
+    setSelectedStatus(status);
+
+    try {
+
+
+      // Get module ID from sidebar content
+      const moduleId = sidebarContent.data.module_id || sidebarContent.data.name;
+      const moduleName = sidebarContent.data.module_name || sidebarContent.data.name1;
+
+
+
+      // Check if module ID or name is valid
+      if (!moduleId && !moduleName) {
+        console.error('No module ID or name provided');
+        setAllLearnerDetails([]);
+        setLearnerDetails([]);
+        return;
+      }
+
+
+
+      // Use the original API directly
+      let response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.get_module_learners?module_id=${encodeURIComponent(moduleId)}&module_name=${encodeURIComponent(moduleName)}`, { credentials: 'include' });
+
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('API Error Response:', errorText);
         console.error('Response status:', response.status);
         console.error('Response URL:', response.url);
-        
+
         // If API fails, show empty array (no static data)
-      
+
         setAllLearnerDetails([]);
         setLearnerDetails([]);
         return;
       }
-      
+
       const data = await response.json();
-      
-       
+
+
       // Handle double-nested message structure
       let learners = null;
       let success = false;
       let moduleInfo = null;
-      
+
       // Check for double-nested structure first
       if (data.message && data.message.message && data.message.message.learners) {
         learners = data.message.message.learners;
         success = data.message.message.success;
         moduleInfo = data.message.message.module_info;
-        
+
       }
       // Check for single-nested structure
       else if (data.message && data.message.learners) {
         learners = data.message.learners;
         success = data.message.success;
         moduleInfo = data.message.module_info;
-       
+
       }
-      
+
       if (success && learners && Array.isArray(learners)) {
-        
-        
-        
+
+
+
         learners.forEach((_learner: any, _index: number) => {
-          
+
         });
-        
+
         // Transform the API response to match frontend expectations
         const transformedLearners = learners.map((learner: any) => {
           // Normalize status to match frontend expectations
           let normalizedStatus = 'not_started';
           if (learner.status) {
             const statusLower = learner.status.toLowerCase().replace(/\s+/g, '_');
-            
+
             if (statusLower.includes('completed')) {
               normalizedStatus = 'completed';
             } else if (statusLower.includes('progress')) {
@@ -2186,9 +2185,9 @@ export default function AnalyticsDashboard() {
             } else if (statusLower.includes('started')) {
               normalizedStatus = 'not_started';
             }
-            
+
           }
-          
+
           return {
             learner_name: learner.learner_name || learner.learner, // Use actual name or fallback to email
             email: learner.learner,
@@ -2209,54 +2208,54 @@ export default function AnalyticsDashboard() {
             last_login: learner.last_login
           };
         });
-        
-       
-        
+
+
+
         // Debug: Log each learner individually
         transformedLearners.forEach((_learner: any, _index: number) => {
-          
+
         });
-         
-         // Filter learners based on status if not 'total'
-         let filteredLearners = transformedLearners;
-         if (status !== 'total') {
-           filteredLearners = transformedLearners.filter((learner: any) => {
-             const learnerStatus = learner.status?.toLowerCase();
-             // console.log(`Filtering learner ${learner.learner_name} with status ${learnerStatus} for filter ${status}`);
-             switch (status) {
-               case 'completed':
-                 return learnerStatus === 'completed';
-               case 'in_progress':
-                 return learnerStatus === 'in_progress';
-               case 'not_started':
-                 return learnerStatus === 'not_started';
-               default:
-                 return true;
-             }
-           });
-         }
-         
-        
-         
-         // Store the original unfiltered data for count calculations
-         setAllLearnerDetails(transformedLearners);
-         setLearnerDetails(filteredLearners);
+
+        // Filter learners based on status if not 'total'
+        let filteredLearners = transformedLearners;
+        if (status !== 'total') {
+          filteredLearners = transformedLearners.filter((learner: any) => {
+            const learnerStatus = learner.status?.toLowerCase();
+            // console.log(`Filtering learner ${learner.learner_name} with status ${learnerStatus} for filter ${status}`);
+            switch (status) {
+              case 'completed':
+                return learnerStatus === 'completed';
+              case 'in_progress':
+                return learnerStatus === 'in_progress';
+              case 'not_started':
+                return learnerStatus === 'not_started';
+              default:
+                return true;
+            }
+          });
+        }
+
+
+
+        // Store the original unfiltered data for count calculations
+        setAllLearnerDetails(transformedLearners);
+        setLearnerDetails(filteredLearners);
       } else {
-        
+
         // Show error message to user
         if (data.message?.error) {
           toast.error('API Error: ' + data.message.error);
         } else {
           toast.error('No learners found for this module');
         }
-        
+
         setAllLearnerDetails([]);
         setLearnerDetails([]);
       }
     } catch (error) {
       console.error('Error fetching learner details:', error);
-       setAllLearnerDetails([]);
-       setLearnerDetails([]);
+      setAllLearnerDetails([]);
+      setLearnerDetails([]);
     } finally {
       setLoadingLearners(false);
     }
@@ -2300,7 +2299,7 @@ export default function AnalyticsDashboard() {
       return [...filtered].sort((a: any, b: any) => {
         let aValue: any;
         let bValue: any;
-        
+
         if (moduleSortColumn === 'name') {
           aValue = (a.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
           bValue = (b.module_name || '').replace(/<[^>]*>/g, '').toLowerCase();
@@ -2314,7 +2313,7 @@ export default function AnalyticsDashboard() {
           aValue = a.completion_rate || 0;
           bValue = b.completion_rate || 0;
         }
-        
+
         if (aValue < bValue) return moduleSortOrder === "asc" ? -1 : 1;
         if (aValue > bValue) return moduleSortOrder === "asc" ? 1 : -1;
         return 0;
@@ -2395,8 +2394,8 @@ export default function AnalyticsDashboard() {
     }
     setLearnerCurrentPage(1);
   };
-  
- 
+
+
   if ((isLoading || dataLoading) && !persistedData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
@@ -2409,7 +2408,7 @@ export default function AnalyticsDashboard() {
   if (error) {
     // Handle error object properly - ensure we only render strings
     let errorMessage = 'An unknown error occurred';
-    
+
     if (typeof error === 'string') {
       errorMessage = error;
     } else if (error && typeof error === 'object') {
@@ -2429,7 +2428,7 @@ export default function AnalyticsDashboard() {
         }
       }
     }
-    
+
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
         <AlertTriangle className="h-16 w-16 text-red-500 mb-4" />
@@ -2478,19 +2477,19 @@ export default function AnalyticsDashboard() {
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger 
+          <TabsTrigger
             value="modules"
             className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
           >
             Modules
           </TabsTrigger>
-          <TabsTrigger 
+          <TabsTrigger
             value="quizzes"
             className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
           >
             Test
           </TabsTrigger>
-          <TabsTrigger 
+          <TabsTrigger
             value="learners"
             className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
           >
@@ -2501,7 +2500,7 @@ export default function AnalyticsDashboard() {
 
         {/* Modules Tab */}
         <TabsContent value="modules" className="space-y-6">
-              <Card>
+          <Card>
             <CardHeader>
               <CardTitle>Module Performance</CardTitle>
               <CardDescription>
@@ -2522,7 +2521,7 @@ export default function AnalyticsDashboard() {
                     className="pl-10 border-2 border-border/50 focus:border-primary"
                   />
                 </div>
-                
+
                 {/* Department Filter */}
                 <div className="w-full sm:w-[200px]">
                   <Select
@@ -2595,7 +2594,7 @@ export default function AnalyticsDashboard() {
                     <tr className="border-b">
                       <th className="text-left p-3 font-semibold text-sm">
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="cursor-pointer hover:text-primary transition-colors select-none"
                             onClick={() => handleModuleSort("name")}
                           >
@@ -2617,7 +2616,7 @@ export default function AnalyticsDashboard() {
                       </th>
                       <th className="text-left p-3 font-semibold text-sm">
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="cursor-pointer hover:text-primary transition-colors select-none"
                             onClick={() => handleModuleSort("assigned")}
                           >
@@ -2639,7 +2638,7 @@ export default function AnalyticsDashboard() {
                       </th>
                       <th className="text-left p-3 font-semibold text-sm">
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="cursor-pointer hover:text-primary transition-colors select-none"
                             onClick={() => handleModuleSort("completed")}
                           >
@@ -2661,7 +2660,7 @@ export default function AnalyticsDashboard() {
                       </th>
                       <th className="text-left p-3 font-semibold text-sm">
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="cursor-pointer hover:text-primary transition-colors select-none"
                             onClick={() => handleModuleSort("completion_rate")}
                           >
@@ -2683,47 +2682,47 @@ export default function AnalyticsDashboard() {
                       </th>
                     </tr>
                   </thead>
-        <tbody>
+                  <tbody>
                     {modulePagination.currentData.map((module: any, index: number) => (
-                      <tr 
-                        key={module.module_id || module.name || module.module_name || `module-${index}`} 
+                      <tr
+                        key={module.module_id || module.name || module.module_name || `module-${index}`}
                         className="border-b hover:bg-muted/50 cursor-pointer"
-                    onClick={() => handleModuleClick(module)}
-                  >
+                        onClick={() => handleModuleClick(module)}
+                      >
                         <td className="p-3">
                           <div className="font-medium truncate" title={module.module_name?.replace(/<[^>]*>/g, '') || 'N/A'}>
                             {module.module_name?.replace(/<[^>]*>/g, '') || 'N/A'}
                           </div>
-                </td>
+                        </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <Users className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium">{module.enrolled_count}</span>
                           </div>
-                 </td>
+                        </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <Award className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium">{module.completed_count}</span>
                           </div>
-                 </td>
+                        </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">{module.completion_rate.toFixed(1)}%</span>
                             <div className="w-16 bg-muted rounded-full h-2">
-                              <div 
+                              <div
                                 className="bg-primary h-2 rounded-full transition-all duration-300"
                                 style={{ width: `${Math.min(module.completion_rate || 0, 100)}%` }}
                               />
                             </div>
                           </div>
-                </td>
-              </tr>
+                        </td>
+                      </tr>
                     ))}
-        </tbody>
+                  </tbody>
                 </table>
               </div>
-              
+
               {/* Pagination Controls */}
               {(filteredModules?.length || 0) > 0 && (
                 <div className="flex items-center justify-between mt-4">
@@ -2744,7 +2743,7 @@ export default function AnalyticsDashboard() {
                         const totalPages = modulePagination.maxPage;
                         const currentPage = modulePagination.currentPage;
                         const pages = [];
-                        
+
                         // Show first page
                         if (currentPage > 3) {
                           pages.push(
@@ -2762,11 +2761,11 @@ export default function AnalyticsDashboard() {
                             pages.push(<span key="ellipsis1" className="px-2">...</span>);
                           }
                         }
-                        
+
                         // Show pages around current page
                         const startPage = Math.max(1, currentPage - 2);
                         const endPage = Math.min(totalPages, currentPage + 2);
-                        
+
                         for (let i = startPage; i <= endPage; i++) {
                           pages.push(
                             <Button
@@ -2780,7 +2779,7 @@ export default function AnalyticsDashboard() {
                             </Button>
                           );
                         }
-                        
+
                         // Show last page
                         if (currentPage < totalPages - 2) {
                           if (currentPage < totalPages - 3) {
@@ -2798,7 +2797,7 @@ export default function AnalyticsDashboard() {
                             </Button>
                           );
                         }
-                        
+
                         return pages;
                       })()}
                     </div>
@@ -2823,7 +2822,7 @@ export default function AnalyticsDashboard() {
         <TabsContent value="quizzes" className="space-y-6">
           {/* Analytics Buttons */}
           <div className="flex gap-4">
-            <Button 
+            <Button
               variant={quizAnalyticsView === 'quiz' ? 'default' : 'outline'}
               className="flex-1 h-12 text-base font-medium"
               onClick={() => setQuizAnalyticsView('quiz')}
@@ -2831,7 +2830,7 @@ export default function AnalyticsDashboard() {
               <Award className="h-5 w-5 mr-2" />
               Quiz Analytics
             </Button>
-            <Button 
+            <Button
               variant={quizAnalyticsView === 'qa' ? 'default' : 'outline'}
               className="flex-1 h-12 text-base font-medium"
               onClick={() => setQuizAnalyticsView('qa')}
@@ -2864,7 +2863,7 @@ export default function AnalyticsDashboard() {
                       className="pl-10 border-2 border-border/50 focus:border-primary"
                     />
                   </div>
-                  
+
                   {/* Module Filter - Text Input (by typing) */}
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -2891,7 +2890,7 @@ export default function AnalyticsDashboard() {
                       <tr className="border-b bg-muted/50">
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
-                            <span 
+                            <span
                               className="cursor-pointer hover:text-primary transition-colors select-none"
                               onClick={() => handleQuizSort("user")}
                             >
@@ -2913,7 +2912,7 @@ export default function AnalyticsDashboard() {
                         </th>
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
-                            <span 
+                            <span
                               className="cursor-pointer hover:text-primary transition-colors select-none"
                               onClick={() => handleQuizSort("module")}
                             >
@@ -2935,7 +2934,7 @@ export default function AnalyticsDashboard() {
                         </th>
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
-                            <span 
+                            <span
                               className="cursor-pointer hover:text-primary transition-colors select-none"
                               onClick={() => handleQuizSort("score")}
                             >
@@ -2957,7 +2956,7 @@ export default function AnalyticsDashboard() {
                         </th>
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
-                            <span 
+                            <span
                               className="cursor-pointer hover:text-primary transition-colors select-none"
                               onClick={() => handleQuizSort("date_attended")}
                             >
@@ -2979,7 +2978,7 @@ export default function AnalyticsDashboard() {
                         </th>
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
-                            <span 
+                            <span
                               className="cursor-pointer hover:text-primary transition-colors select-none"
                               onClick={() => handleQuizSort("time_spent")}
                             >
@@ -3014,8 +3013,8 @@ export default function AnalyticsDashboard() {
                         </tr>
                       ) : filteredQuizData.length > 0 ? (
                         getCurrentPageData().map((quiz: any, index: number) => (
-                          <tr 
-                            key={quiz.name || `quiz-${quiz.user}-${quiz.module?.name || 'unknown'}-${index}`} 
+                          <tr
+                            key={quiz.name || `quiz-${quiz.user}-${quiz.module?.name || 'unknown'}-${index}`}
                             className="border-b hover:bg-muted/50 cursor-pointer"
                             onClick={() => fetchQuizDetails(quiz.name)}
                           >
@@ -3035,8 +3034,8 @@ export default function AnalyticsDashboard() {
                                   ({quiz.percentage_score}%)
                                 </span>
                                 <div className="w-16 bg-muted rounded-full h-2">
-                                  <div 
-                                    className="bg-primary h-2 rounded-full" 
+                                  <div
+                                    className="bg-primary h-2 rounded-full"
                                     style={{ width: `${Math.min(quiz.percentage_score || 0, 100)}%` }}
                                   ></div>
                                 </div>
@@ -3057,7 +3056,7 @@ export default function AnalyticsDashboard() {
                     </tbody>
                   </table>
                 </div>
-                
+
                 {/* Pagination */}
                 {filteredQuizData.length > 0 && (
                   <div className="flex items-center justify-between mt-4">
@@ -3065,22 +3064,22 @@ export default function AnalyticsDashboard() {
                       Showing {((quizCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(quizCurrentPage * itemsPerPage, filteredQuizData.length)} of {filteredQuizData.length} entries
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={handleQuizPrevPage}
                         disabled={quizCurrentPage === 1}
                       >
                         <span className="mr-1">&lt;</span> Previous
                       </Button>
-                      
+
                       {/* Page Numbers */}
                       <div className="flex items-center gap-1">
                         {(() => {
                           const totalPages = quizTotalPages;
                           const currentPage = quizCurrentPage;
                           const pages = [];
-                          
+
                           // Show first page
                           if (currentPage > 3) {
                             pages.push(
@@ -3098,11 +3097,11 @@ export default function AnalyticsDashboard() {
                               pages.push(<span key="ellipsis1" className="px-2">...</span>);
                             }
                           }
-                          
+
                           // Show pages around current page
                           const startPage = Math.max(1, currentPage - 2);
                           const endPage = Math.min(totalPages, currentPage + 2);
-                          
+
                           for (let i = startPage; i <= endPage; i++) {
                             pages.push(
                               <Button
@@ -3116,7 +3115,7 @@ export default function AnalyticsDashboard() {
                               </Button>
                             );
                           }
-                          
+
                           // Show last page
                           if (currentPage < totalPages - 2) {
                             if (currentPage < totalPages - 3) {
@@ -3134,14 +3133,14 @@ export default function AnalyticsDashboard() {
                               </Button>
                             );
                           }
-                          
+
                           return pages;
                         })()}
                       </div>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={handleQuizNextPage}
                         disabled={quizCurrentPage === quizTotalPages}
                       >
@@ -3182,7 +3181,7 @@ export default function AnalyticsDashboard() {
                   >
                     Pending Score ({qaPendingData.length})
                   </Button>
-          </div>
+                </div>
 
                 {/* Search Bar and Filters */}
                 <div className="mb-4 flex flex-col sm:flex-row gap-4">
@@ -3197,7 +3196,7 @@ export default function AnalyticsDashboard() {
                       className="pl-10 border-2 border-border/50 focus:border-primary"
                     />
                   </div>
-                  
+
                   {/* Module Filter - Text Input (by typing) */}
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -3226,7 +3225,7 @@ export default function AnalyticsDashboard() {
                       <tr className="border-b bg-muted/50">
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
-                            <span 
+                            <span
                               className="cursor-pointer hover:text-primary transition-colors select-none"
                               onClick={() => handleQaSort("user")}
                             >
@@ -3248,7 +3247,7 @@ export default function AnalyticsDashboard() {
                         </th>
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
-                            <span 
+                            <span
                               className="cursor-pointer hover:text-primary transition-colors select-none"
                               onClick={() => handleQaSort("module")}
                             >
@@ -3271,7 +3270,7 @@ export default function AnalyticsDashboard() {
                         {qaScoreFilter === 'scored' ? (
                           <th className="text-left p-3 font-semibold text-sm">
                             <div className="flex items-center gap-2">
-                              <span 
+                              <span
                                 className="cursor-pointer hover:text-primary transition-colors select-none"
                                 onClick={() => handleQaSort("score")}
                               >
@@ -3296,7 +3295,7 @@ export default function AnalyticsDashboard() {
                         )}
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
-                            <span 
+                            <span
                               className="cursor-pointer hover:text-primary transition-colors select-none"
                               onClick={() => handleQaSort("date_attended")}
                             >
@@ -3318,7 +3317,7 @@ export default function AnalyticsDashboard() {
                         </th>
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
-                            <span 
+                            <span
                               className="cursor-pointer hover:text-primary transition-colors select-none"
                               onClick={() => handleQaSort("time_spent")}
                             >
@@ -3354,8 +3353,8 @@ export default function AnalyticsDashboard() {
                         </tr>
                       ) : filteredQaData.length > 0 ? (
                         getCurrentQaPageData().map((qa: any, index: number) => (
-                          <tr 
-                            key={qa.name || `qa-${qa.user}-${qa.module?.name || 'unknown'}-${index}`} 
+                          <tr
+                            key={qa.name || `qa-${qa.user}-${qa.module?.name || 'unknown'}-${index}`}
                             className="border-b hover:bg-muted/50 cursor-pointer"
                             onClick={() => fetchQaDetails(qa.name)}
                           >
@@ -3375,8 +3374,8 @@ export default function AnalyticsDashboard() {
                                   {qa.score}/{qa.max_score} ({qa.percentage_score}%)
                                 </span>
                                 <div className="w-16 bg-muted rounded-full h-2">
-                                  <div 
-                                    className="bg-primary h-2 rounded-full" 
+                                  <div
+                                    className="bg-primary h-2 rounded-full"
                                     style={{ width: `${Math.min(qa.percentage_score || 0, 100)}%` }}
                                   ></div>
                                 </div>
@@ -3384,33 +3383,33 @@ export default function AnalyticsDashboard() {
                             </td>
                             <td className="p-3 text-sm">{qa.date_attended}</td>
                             <td className="p-3 text-sm">{qa.time_spent}</td>
-                            <td className="p-3 text-sm text-muted-foreground">N/A</td>
-                              <td className="p-3 text-sm">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="h-7"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    fetchQaDetails(qa.name);
-                                  }}
-                                  disabled={loadingQaDetails}
-                                >
-                                  {loadingQaDetails ? (
-                                    <RefreshCw className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    'View'
-                                  )}
-                                </Button>
-                              </td>
+                            <td className="p-3 text-sm text-muted-foreground">{qa.time_limit || 'N/A'}</td>
+                            <td className="p-3 text-sm">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fetchQaDetails(qa.name);
+                                }}
+                                disabled={loadingQaDetails}
+                              >
+                                {loadingQaDetails ? (
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  'View'
+                                )}
+                              </Button>
+                            </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
                           <td colSpan={7} className="p-8 text-center text-muted-foreground">
                             <div className="text-center py-8">
-                              {qaScoreFilter === 'scored' 
-                                ? 'No scored Q&A data available' 
+                              {qaScoreFilter === 'scored'
+                                ? 'No scored Q&A data available'
                                 : 'No pending score data available'
                               }
                             </div>
@@ -3420,7 +3419,7 @@ export default function AnalyticsDashboard() {
                     </tbody>
                   </table>
                 </div>
-                
+
                 {/* Pagination for Q&A Analytics */}
                 {(() => {
                   const totalPages = Math.ceil(filteredQaData.length / itemsPerPage);
@@ -3429,91 +3428,91 @@ export default function AnalyticsDashboard() {
                       <div className="text-sm text-muted-foreground">
                         Showing {((qaCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(qaCurrentPage * itemsPerPage, filteredQaData.length)} of {filteredQaData.length} entries
                       </div>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleQaPrevPage}
-                        disabled={qaCurrentPage === 1}
-                      >
-                        <span className="mr-1">&lt;</span> Previous
-                      </Button>
-                      
-                      {/* Page Numbers */}
-                      <div className="flex items-center gap-1">
-                        {(() => {
-                          const totalPages = Math.ceil(filteredQaData.length / itemsPerPage);
-                          const currentPage = qaCurrentPage;
-                          const pages = [];
-                          
-                          // Show first page
-                          if (currentPage > 3) {
-                            pages.push(
-                              <Button
-                                key={1}
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleQaPageChange(1)}
-                                className="w-8 h-8 p-0"
-                              >
-                                1
-                              </Button>
-                            );
-                            if (currentPage > 4) {
-                              pages.push(<span key="ellipsis1" className="px-2">...</span>);
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleQaPrevPage}
+                          disabled={qaCurrentPage === 1}
+                        >
+                          <span className="mr-1">&lt;</span> Previous
+                        </Button>
+
+                        {/* Page Numbers */}
+                        <div className="flex items-center gap-1">
+                          {(() => {
+                            const totalPages = Math.ceil(filteredQaData.length / itemsPerPage);
+                            const currentPage = qaCurrentPage;
+                            const pages = [];
+
+                            // Show first page
+                            if (currentPage > 3) {
+                              pages.push(
+                                <Button
+                                  key={1}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQaPageChange(1)}
+                                  className="w-8 h-8 p-0"
+                                >
+                                  1
+                                </Button>
+                              );
+                              if (currentPage > 4) {
+                                pages.push(<span key="ellipsis1" className="px-2">...</span>);
+                              }
                             }
-                          }
-                          
-                          // Show pages around current page
-                          const startPage = Math.max(1, currentPage - 2);
-                          const endPage = Math.min(totalPages, currentPage + 2);
-                          
-                          for (let i = startPage; i <= endPage; i++) {
-                            pages.push(
-                              <Button
-                                key={i}
-                                variant={currentPage === i ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => handleQaPageChange(i)}
-                                className="w-8 h-8 p-0"
-                              >
-                                {i}
-                              </Button>
-                            );
-                          }
-                          
-                          // Show last page
-                          if (currentPage < totalPages - 2) {
-                            if (currentPage < totalPages - 3) {
-                              pages.push(<span key="ellipsis2" className="px-2">...</span>);
+
+                            // Show pages around current page
+                            const startPage = Math.max(1, currentPage - 2);
+                            const endPage = Math.min(totalPages, currentPage + 2);
+
+                            for (let i = startPage; i <= endPage; i++) {
+                              pages.push(
+                                <Button
+                                  key={i}
+                                  variant={currentPage === i ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => handleQaPageChange(i)}
+                                  className="w-8 h-8 p-0"
+                                >
+                                  {i}
+                                </Button>
+                              );
                             }
-                            pages.push(
-                              <Button
-                                key={totalPages}
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleQaPageChange(totalPages)}
-                                className="w-8 h-8 p-0"
-                              >
-                                {totalPages}
-                              </Button>
-                            );
-                          }
-                          
-                          return pages;
-                        })()}
+
+                            // Show last page
+                            if (currentPage < totalPages - 2) {
+                              if (currentPage < totalPages - 3) {
+                                pages.push(<span key="ellipsis2" className="px-2">...</span>);
+                              }
+                              pages.push(
+                                <Button
+                                  key={totalPages}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQaPageChange(totalPages)}
+                                  className="w-8 h-8 p-0"
+                                >
+                                  {totalPages}
+                                </Button>
+                              );
+                            }
+
+                            return pages;
+                          })()}
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleQaNextPage}
+                          disabled={qaCurrentPage === totalPages}
+                        >
+                          Next <span className="ml-1">&gt;</span>
+                        </Button>
                       </div>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleQaNextPage}
-                        disabled={qaCurrentPage === totalPages}
-                      >
-                        Next <span className="ml-1">&gt;</span>
-                      </Button>
                     </div>
-                  </div>
                   );
                 })()}
               </CardContent>
@@ -3557,7 +3556,7 @@ export default function AnalyticsDashboard() {
                     <tr className="border-b">
                       <th className="text-left p-4 font-semibold text-sm">
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="cursor-pointer hover:text-primary transition-colors select-none"
                             onClick={() => handleLearnerSort("name")}
                           >
@@ -3579,7 +3578,7 @@ export default function AnalyticsDashboard() {
                       </th>
                       <th className="text-left p-4 font-semibold text-sm">
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="cursor-pointer hover:text-primary transition-colors select-none"
                             onClick={() => handleLearnerSort("assigned")}
                           >
@@ -3601,7 +3600,7 @@ export default function AnalyticsDashboard() {
                       </th>
                       <th className="text-left p-4 font-semibold text-sm">
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="cursor-pointer hover:text-primary transition-colors select-none"
                             onClick={() => handleLearnerSort("completed")}
                           >
@@ -3623,7 +3622,7 @@ export default function AnalyticsDashboard() {
                       </th>
                       <th className="text-left p-4 font-semibold text-sm">
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="cursor-pointer hover:text-primary transition-colors select-none"
                             onClick={() => handleLearnerSort("completion_rate")}
                           >
@@ -3680,7 +3679,7 @@ export default function AnalyticsDashboard() {
                             <div className="flex items-center gap-3">
                               <span className="font-medium text-foreground">{Math.round(learner.completion_rate || 0)}%</span>
                               <div className="w-20 bg-muted rounded-full h-2">
-                                <div 
+                                <div
                                   className="bg-primary h-2 rounded-full transition-all duration-500"
                                   style={{ width: `${learner.completion_rate || 0}%` }}
                                 ></div>
@@ -3704,7 +3703,7 @@ export default function AnalyticsDashboard() {
                   </tbody>
                 </table>
               </div>
-              
+
               {/* Learners Pagination */}
               {filteredLearnersData.length > 0 && (
                 <div className="flex items-center justify-between mt-4">
@@ -3712,22 +3711,22 @@ export default function AnalyticsDashboard() {
                     Showing {((learnerCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(learnerCurrentPage * itemsPerPage, filteredLearnersData.length)} of {filteredLearnersData.length} entries
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleLearnerPrevPage}
                       disabled={learnerCurrentPage === 1}
                     >
                       <span className="mr-1">&lt;</span> Previous
                     </Button>
-                    
+
                     {/* Page Numbers */}
                     <div className="flex items-center gap-1">
                       {(() => {
                         const totalPages = learnerTotalPages;
                         const currentPage = learnerCurrentPage;
                         const pages = [];
-                        
+
                         // Show first page
                         if (currentPage > 3) {
                           pages.push(
@@ -3745,11 +3744,11 @@ export default function AnalyticsDashboard() {
                             pages.push(<span key="ellipsis1" className="px-2">...</span>);
                           }
                         }
-                        
+
                         // Show pages around current page
                         const startPage = Math.max(1, currentPage - 2);
                         const endPage = Math.min(totalPages, currentPage + 2);
-                        
+
                         for (let i = startPage; i <= endPage; i++) {
                           pages.push(
                             <Button
@@ -3763,7 +3762,7 @@ export default function AnalyticsDashboard() {
                             </Button>
                           );
                         }
-                        
+
                         // Show last page
                         if (currentPage < totalPages - 2) {
                           if (currentPage < totalPages - 3) {
@@ -3781,14 +3780,14 @@ export default function AnalyticsDashboard() {
                             </Button>
                           );
                         }
-                        
+
                         return pages;
                       })()}
                     </div>
-                    
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleLearnerNextPage}
                       disabled={learnerCurrentPage === learnerTotalPages}
                     >
@@ -3806,24 +3805,24 @@ export default function AnalyticsDashboard() {
       {showSidebar && sidebarContent && (
         <div className="fixed inset-0 z-50 flex">
           {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/50" 
+          <div
+            className="fixed inset-0 bg-black/50"
             onClick={closeSidebar}
           />
-          
+
           {/* Sidebar */}
           <div className="relative ml-auto h-full w-full max-w-2xl bg-background border-l shadow-lg">
             <div className="flex h-full flex-col">
               {/* Header */}
               <div className="flex items-center justify-between border-b p-4">
-              <div>
+                <div>
                   <h3 className="text-lg font-semibold">
                     {sidebarContent.type === 'module' ? (sidebarContent.data.module_name?.replace(/<[^>]*>/g, '') || 'N/A') : (sidebarContent.data.full_name || sidebarContent.data.name || 'N/A')}
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {sidebarContent.type === 'module' ? 'Detailed Analytics' : 'Learner Information'}
                   </p>
-              </div>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -3864,9 +3863,9 @@ export default function AnalyticsDashboard() {
                         <BookOpen className="h-4 w-4" />
                         Modules Information
                       </h4>
-                      
+
                       {/* Debug Info */}
-                      
+
                       {loadingLearnerSidebar ? (
                         <div className="text-center py-8">
                           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
@@ -3876,142 +3875,136 @@ export default function AnalyticsDashboard() {
                         <>
                           {/* Status Buttons */}
                           <div className="flex flex-wrap gap-2 mb-4">
-                        <button 
-                          onClick={() => setLearnerModuleFilter('all')}
-                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                            learnerModuleFilter === 'all' 
-                              ? 'bg-primary text-primary-foreground' 
-                              : 'bg-primary/10 text-primary hover:bg-primary/20'
-                          }`}
-                        >
-                          Total: {learnerSidebarData?.learner_info?.total_modules || 0}
-                        </button>
-                        <button 
-                          onClick={() => setLearnerModuleFilter('completed')}
-                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                            learnerModuleFilter === 'completed' 
-                              ? 'bg-primary text-primary-foreground' 
-                              : 'bg-primary/10 text-primary hover:bg-primary/20'
-                          }`}
-                        >
-                          Completed: {learnerSidebarData?.learner_info?.completed_modules || 0}
-                        </button>
-                        <button 
-                          onClick={() => setLearnerModuleFilter('in_progress')}
-                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                            learnerModuleFilter === 'in_progress' 
-                              ? 'bg-primary text-primary-foreground' 
-                              : 'bg-primary/10 text-primary hover:bg-primary/20'
-                          }`}
-                        >
-                          In Progress: {learnerSidebarData?.learner_info?.in_progress_modules || 0}
-                        </button>
-                        <button 
-                          onClick={() => setLearnerModuleFilter('not_started')}
-                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                            learnerModuleFilter === 'not_started' 
-                              ? 'bg-primary text-primary-foreground' 
-                              : 'bg-primary/10 text-primary hover:bg-primary/20'
-                          }`}
-                        >
-                          Not Started: {learnerSidebarData?.learner_info?.not_started_modules || 0}
-                        </button>
-                      </div>
+                            <button
+                              onClick={() => setLearnerModuleFilter('all')}
+                              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${learnerModuleFilter === 'all'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                }`}
+                            >
+                              Total: {learnerSidebarData?.learner_info?.total_modules || 0}
+                            </button>
+                            <button
+                              onClick={() => setLearnerModuleFilter('completed')}
+                              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${learnerModuleFilter === 'completed'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                }`}
+                            >
+                              Completed: {learnerSidebarData?.learner_info?.completed_modules || 0}
+                            </button>
+                            <button
+                              onClick={() => setLearnerModuleFilter('in_progress')}
+                              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${learnerModuleFilter === 'in_progress'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                }`}
+                            >
+                              In Progress: {learnerSidebarData?.learner_info?.in_progress_modules || 0}
+                            </button>
+                            <button
+                              onClick={() => setLearnerModuleFilter('not_started')}
+                              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${learnerModuleFilter === 'not_started'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                }`}
+                            >
+                              Not Started: {learnerSidebarData?.learner_info?.not_started_modules || 0}
+                            </button>
+                          </div>
 
-                      {/* Module Progress Table */}
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b">
-                              <th className="text-left p-3 font-medium text-sm">Module</th>
-                              <th className="text-left p-3 font-medium text-sm">Status</th>
-                              <th className="text-left p-3 font-medium text-sm">Progress</th>
-                              <th className="text-left p-3 font-medium text-sm">Score</th>
-                              <th className="text-left p-3 font-medium text-sm">Start Date</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {loadingLearnerSidebar ? (
-                              <tr>
-                                <td colSpan={5} className="p-8 text-center">
-                                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-                                  <p className="text-gray-600">Loading module details...</p>
-                                </td>
-                              </tr>
-                            ) : learnerSidebarData?.learner_modules?.length > 0 ? (
-                              (() => {
-                                const filteredModules = learnerSidebarData.learner_modules.filter((module: any) => {
-                                  if (learnerModuleFilter === 'all') return true;
-                                  if (learnerModuleFilter === 'completed') return module.status === 'Completed';
-                                  if (learnerModuleFilter === 'in_progress') return module.status === 'In Progress';
-                                  if (learnerModuleFilter === 'not_started') return module.status === 'Not Started';
-                                  return true;
-                                });
-                                
-                                if (filteredModules.length === 0) {
-                                  return (
-                                    <tr>
-                                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                                        <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                                        <p>No modules found for this filter</p>
-                                      </td>
-                                    </tr>
-                                  );
-                                }
-                                
-                                return filteredModules.map((module: any, index: number) => (
-                                <tr key={index} className="border-b">
-                                  <td className="p-3">
-                                    <div className="font-medium">{module.module_name}</div>
-                                  </td>
-                                  <td className="p-3">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                      module.status === 'Completed' 
-                                        ? 'bg-primary/10 text-primary'
-                                        : module.status === 'In Progress'
-                                        ? 'bg-primary/10 text-primary'
-                                        : 'bg-muted text-muted-foreground'
-                                    }`}>
-                                      {module.status}
-                                    </span>
-                                  </td>
-                                  <td className="p-3">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium">{Math.round(module.progress)}%</span>
-                                      <div className="w-16 bg-muted rounded-full h-1">
-                                        <div 
-                                          className={`h-1 rounded-full ${
-                                            module.status === 'Completed' 
-                                              ? 'bg-primary'
-                                              : module.status === 'In Progress'
-                                              ? 'bg-primary'
-                                              : 'bg-muted'
-                                          }`}
-                                          style={{width: `${Math.round(module.progress)}%`}}
-                                        ></div>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="p-3">
-                                    <span className="text-sm">{module.score}</span>
-                                  </td>
-                                  <td className="p-3">
-                                    <span className="text-sm text-muted-foreground">{module.start_date}</span>
-                                  </td>
+                          {/* Module Progress Table */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="text-left p-3 font-medium text-sm">Module</th>
+                                  <th className="text-left p-3 font-medium text-sm">Status</th>
+                                  <th className="text-left p-3 font-medium text-sm">Progress</th>
+                                  <th className="text-left p-3 font-medium text-sm">Score</th>
+                                  <th className="text-left p-3 font-medium text-sm">Start Date</th>
                                 </tr>
-                                ));
-                              })()
-                            ) : (
-                              <tr>
-                                <td colSpan={5} className="p-8 text-center text-gray-600">
-                                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                  <p>No modules assigned to this learner</p>
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                              </thead>
+                              <tbody>
+                                {loadingLearnerSidebar ? (
+                                  <tr>
+                                    <td colSpan={5} className="p-8 text-center">
+                                      <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                                      <p className="text-gray-600">Loading module details...</p>
+                                    </td>
+                                  </tr>
+                                ) : learnerSidebarData?.learner_modules?.length > 0 ? (
+                                  (() => {
+                                    const filteredModules = learnerSidebarData.learner_modules.filter((module: any) => {
+                                      if (learnerModuleFilter === 'all') return true;
+                                      if (learnerModuleFilter === 'completed') return module.status === 'Completed';
+                                      if (learnerModuleFilter === 'in_progress') return module.status === 'In Progress';
+                                      if (learnerModuleFilter === 'not_started') return module.status === 'Not Started';
+                                      return true;
+                                    });
+
+                                    if (filteredModules.length === 0) {
+                                      return (
+                                        <tr>
+                                          <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                                            <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                                            <p>No modules found for this filter</p>
+                                          </td>
+                                        </tr>
+                                      );
+                                    }
+
+                                    return filteredModules.map((module: any, index: number) => (
+                                      <tr key={index} className="border-b">
+                                        <td className="p-3">
+                                          <div className="font-medium">{module.module_name}</div>
+                                        </td>
+                                        <td className="p-3">
+                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${module.status === 'Completed'
+                                              ? 'bg-primary/10 text-primary'
+                                              : module.status === 'In Progress'
+                                                ? 'bg-primary/10 text-primary'
+                                                : 'bg-muted text-muted-foreground'
+                                            }`}>
+                                            {module.status}
+                                          </span>
+                                        </td>
+                                        <td className="p-3">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium">{Math.round(module.progress)}%</span>
+                                            <div className="w-16 bg-muted rounded-full h-1">
+                                              <div
+                                                className={`h-1 rounded-full ${module.status === 'Completed'
+                                                    ? 'bg-primary'
+                                                    : module.status === 'In Progress'
+                                                      ? 'bg-primary'
+                                                      : 'bg-muted'
+                                                  }`}
+                                                style={{ width: `${Math.round(module.progress)}%` }}
+                                              ></div>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="p-3">
+                                          <span className="text-sm">{module.score}</span>
+                                        </td>
+                                        <td className="p-3">
+                                          <span className="text-sm text-muted-foreground">{module.start_date}</span>
+                                        </td>
+                                      </tr>
+                                    ));
+                                  })()
+                                ) : (
+                                  <tr>
+                                    <td colSpan={5} className="p-8 text-center text-gray-600">
+                                      <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                                      <p>No modules assigned to this learner</p>
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
                         </>
                       )}
                     </div>
@@ -4039,11 +4032,10 @@ export default function AnalyticsDashboard() {
                                   <tr key={index} className="border-b">
                                     <td className="p-2 text-xs font-medium">{quiz.module_name}</td>
                                     <td className="p-2 text-xs">
-                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        quiz.status === 'Attempted' 
-                                          ? 'bg-primary/10 text-primary' 
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${quiz.status === 'Attempted'
+                                          ? 'bg-primary/10 text-primary'
                                           : 'bg-muted text-muted-foreground'
-                                      }`}>
+                                        }`}>
                                         {quiz.status}
                                       </span>
                                     </td>
@@ -4086,13 +4078,12 @@ export default function AnalyticsDashboard() {
                                   <tr key={index} className="border-b">
                                     <td className="p-2 text-xs font-medium">{qa.module_name}</td>
                                     <td className="p-2 text-xs">
-                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        qa.status === 'Scored' 
-                                          ? 'bg-primary/10 text-primary' 
-                                          : qa.status === 'Pending Score'
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${qa.status === 'Scored'
                                           ? 'bg-primary/10 text-primary'
-                                          : 'bg-muted text-muted-foreground'
-                                      }`}>
+                                          : qa.status === 'Pending Score'
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'bg-muted text-muted-foreground'
+                                        }`}>
                                         {qa.status}
                                       </span>
                                     </td>
@@ -4113,9 +4104,9 @@ export default function AnalyticsDashboard() {
                     </div>
                   </div>
                 ) : sidebarContent.type === 'module' ? (
-            <div className="space-y-6">
-              {/* Module Information */}
-                  <div>
+                  <div className="space-y-6">
+                    {/* Module Information */}
+                    <div>
                       <h4 className="font-medium mb-3 flex items-center gap-2">
                         <BookOpen className="h-4 w-4" />
                         Module Information
@@ -4124,28 +4115,28 @@ export default function AnalyticsDashboard() {
                         <div className="flex">
                           <span className="text-sm text-muted-foreground">Title:</span>
                           <span className="text-sm font-medium ml-2">{sidebarContent.data.module_name?.replace(/<[^>]*>/g, '') || 'N/A'}</span>
-                  </div>
+                        </div>
                         <div className="flex">
                           <span className="text-sm text-muted-foreground">Department:</span>
                           <span className="text-sm font-medium ml-2">{sidebarContent.data.department || 'General'}</span>
-                  </div>
+                        </div>
                         <div className="flex">
                           <span className="text-sm text-muted-foreground">Assigned Type:</span>
                           <span className="text-sm font-medium ml-2">{sidebarContent.data.assignment_type || 'Everyone'}</span>
-                  </div>
+                        </div>
                         <div className="flex">
                           <span className="text-sm text-muted-foreground">Duration:</span>
                           <span className="text-sm font-medium ml-2">
-                            {sidebarContent.data.duration_days && sidebarContent.data.duration_days > 0 
-                              ? `${sidebarContent.data.duration_days} days` 
+                            {sidebarContent.data.duration_days && sidebarContent.data.duration_days > 0
+                              ? `${sidebarContent.data.duration_days} days`
                               : 'Not specified'
                             }
                           </span>
-                  </div>
-                </div>
-              </div>
+                        </div>
+                      </div>
+                    </div>
 
-              {/* Statistics */}
+                    {/* Statistics */}
                     <div>
                       <h4 className="font-medium mb-3 flex items-center gap-2">
                         <Target className="h-4 w-4" />
@@ -4156,16 +4147,16 @@ export default function AnalyticsDashboard() {
                           <div className="flex items-center justify-center gap-2 mb-1">
                             <Users className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Assigned</span>
-                      </div>
+                          </div>
                           <div className="text-2xl font-bold">{sidebarContent.data.enrolled_count}</div>
-                      </div>
+                        </div>
                         <div className="bg-muted/50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center gap-2 mb-1">
                             <CheckCircle className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Completed</span>
-                      </div>
+                          </div>
                           <div className="text-2xl font-bold">{sidebarContent.data.completed_count}</div>
-                      </div>
+                        </div>
                         <div className="bg-muted/50 rounded-lg p-3 text-center">
                           <div className="flex items-center justify-center gap-2 mb-1">
                             <Target className="h-4 w-4 text-primary" />
@@ -4173,25 +4164,25 @@ export default function AnalyticsDashboard() {
                           </div>
                           <div className="text-2xl font-bold">{sidebarContent.data.completion_rate.toFixed(1)}%</div>
                         </div>
-                </div>
-              </div>
+                      </div>
+                    </div>
 
                     {/* Progress Bar */}
                     <div>
                       <h4 className="font-medium mb-3">Progress Overview</h4>
-                <div className="space-y-2">
+                      <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>Completion Rate</span>
                           <span>{sidebarContent.data.completion_rate.toFixed(1)}%</span>
-                  </div>
+                        </div>
                         <div className="w-full bg-muted rounded-full h-2">
-                          <div 
+                          <div
                             className="bg-primary h-2 rounded-full transition-all duration-300"
                             style={{ width: `${Math.min(sidebarContent.data.completion_rate, 100)}%` }}
                           />
-                  </div>
-                </div>
-              </div>
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Learner Table */}
                     <div>
@@ -4199,156 +4190,151 @@ export default function AnalyticsDashboard() {
                         <Users className="h-4 w-4" />
                         Learners Information
                       </h4>
-                      
-                     {/* Status Buttons */}
-                     <div className="flex flex-wrap gap-2 mb-4">
-                       <button 
-                         onClick={() => fetchLearnerDetails('total')}
-                         className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                           selectedStatus === 'total' 
-                             ? 'bg-primary text-primary-foreground' 
-                             : 'bg-primary/10 text-primary hover:bg-primary/20'
-                         }`}
-                       >
-                         Total: {allLearnerDetails.length}
-                       </button>
-                         <button 
-                           onClick={() => fetchLearnerDetails('completed')}
-                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                             selectedStatus === 'completed' 
-                               ? 'bg-primary text-primary-foreground' 
-                               : 'bg-primary/10 text-primary hover:bg-primary/20'
-                           }`}
-                         >
-                           Completed: {allLearnerDetails.filter(l => l.status === 'completed').length}
-                         </button>
-                         <button 
-                           onClick={() => fetchLearnerDetails('in_progress')}
-                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                             selectedStatus === 'in_progress' 
-                               ? 'bg-primary text-primary-foreground' 
-                               : 'bg-primary/10 text-primary hover:bg-primary/20'
-                           }`}
-                         >
-                           In Progress: {allLearnerDetails.filter(l => l.status === 'in_progress').length}
-                         </button>
-                         <button 
-                           onClick={() => fetchLearnerDetails('not_started')}
-                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                             selectedStatus === 'not_started' 
-                               ? 'bg-primary text-primary-foreground' 
-                               : 'bg-primary/10 text-primary hover:bg-primary/20'
-                           }`}
-                         >
-                           Not Started: {allLearnerDetails.filter(l => l.status === 'not_started').length}
-                         </button>
-                </div>
+
+                      {/* Status Buttons */}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <button
+                          onClick={() => fetchLearnerDetails('total')}
+                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'total'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            }`}
+                        >
+                          Total: {allLearnerDetails.length}
+                        </button>
+                        <button
+                          onClick={() => fetchLearnerDetails('completed')}
+                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'completed'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            }`}
+                        >
+                          Completed: {allLearnerDetails.filter(l => l.status === 'completed').length}
+                        </button>
+                        <button
+                          onClick={() => fetchLearnerDetails('in_progress')}
+                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'in_progress'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            }`}
+                        >
+                          In Progress: {allLearnerDetails.filter(l => l.status === 'in_progress').length}
+                        </button>
+                        <button
+                          onClick={() => fetchLearnerDetails('not_started')}
+                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'not_started'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            }`}
+                        >
+                          Not Started: {allLearnerDetails.filter(l => l.status === 'not_started').length}
+                        </button>
+                      </div>
 
                       <div className="bg-white rounded-lg border">
                         <div>
-                    <table className="w-full">
-                             <thead className="bg-muted/50">
-                               <tr>
-                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Name</th>
-                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Email</th>
-                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Department</th>
-                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Status</th>
-                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Progress</th>
-                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Score</th>
-                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Started On</th>
-                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Completed On</th>
-                        </tr>
-                      </thead>
+                          <table className="w-full">
+                            <thead className="bg-muted/50">
+                              <tr>
+                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Name</th>
+                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Email</th>
+                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Department</th>
+                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Status</th>
+                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Progress</th>
+                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Score</th>
+                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Started On</th>
+                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Completed On</th>
+                              </tr>
+                            </thead>
                             <tbody>
-                            {loadingLearners ? (
-                              <tr>
-                                   <td colSpan={8} className="p-8 text-center text-muted-foreground">
-                                  <div className="flex flex-col items-center justify-center gap-2">
-                                    <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
-                                       <div>Loading learners...</div>
-                                  </div>
-                                </td>
-                              </tr>
-                               ) : learnerDetails.length > 0 ? (
-                                 (() => {
-                                   // console.log('=== RENDERING LEARNERS ===');
-                                   // console.log('learnerDetails length:', learnerDetails.length);
-                                   // console.log('learnerDetails:', learnerDetails);
-                                   return learnerDetails.map((learner: any, index: number) => {
-                                     // Debug: Log each learner being rendered
-                                     // console.log(`Rendering learner ${index}:`, learner);
-                                     // console.log(`Learner name: ${learner.learner_name || learner.full_name || 'N/A'}`);
-                                     // console.log(`Learner email: ${learner.email || 'N/A'}`);
-                                     // console.log(`Learner department: ${learner.department || 'N/A'}`);
-                                     // console.log(`Learner status: ${learner.status || 'N/A'}`);
-                                     // console.log(`Learner completion_rate: ${learner.completion_rate || 'N/A'}`);
-                                     // console.log(`Learner avg_progress: ${learner.avg_progress || 'N/A'}`);
-                                     // console.log(`Learner avg_score: ${learner.avg_score || 'N/A'}`);
-                                     // console.log(`Learner started_on: ${learner.started_on || 'N/A'}`);
-                                     // console.log(`Learner completed_on: ${learner.completed_on || 'N/A'}`);
-                                   
-                                   return (
-                                     <tr key={index} className="border-b hover:bg-muted/50">
-                                       <td className="p-3 text-sm font-medium bg-muted/50">{learner.learner_name || learner.full_name || 'N/A'}</td>
-                                       <td className="p-3 text-sm bg-muted/50">{learner.email || 'N/A'}</td>
-                                       <td className="p-3 text-sm bg-muted/50">{learner.department || 'N/A'}</td>
-                                       <td className="p-3 text-sm bg-muted/50">
-                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                           learner.status === 'completed' ? 'bg-primary/10 text-primary' :
-                                           learner.status === 'in_progress' ? 'bg-primary/10 text-primary' :
-                                           learner.status === 'not_started' ? 'bg-muted text-muted-foreground' :
-                                           'bg-muted text-muted-foreground'
-                                         }`}>
-                                      {learner.status === 'completed' ? 'Completed' : 
-                                            learner.status === 'in_progress' ? 'In Progress' :
-                                            learner.status === 'not_started' ? 'Not Started' : 'N/A'}
-                                         </span>
+                              {loadingLearners ? (
+                                <tr>
+                                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                      <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
+                                      <div>Loading learners...</div>
+                                    </div>
                                   </td>
-                                       <td className="p-3 text-sm bg-muted/50">{learner.avg_progress ? `${Math.round(learner.avg_progress)}%` : '0%'}</td>
-                                       <td className="p-3 text-sm bg-muted/50">{learner.avg_score || 'N/A'}</td>
-                                       <td className="p-3 text-sm bg-muted/50">
-                                         {learner.started_on ? 
-                                           new Date(learner.started_on).toLocaleString('en-GB', {
-                                             day: '2-digit',
-                                             month: '2-digit',
-                                             year: 'numeric',
-                                             hour: '2-digit',
-                                             minute: '2-digit',
-                                             second: '2-digit',
-                                             hour12: false
-                                           }) : 'Not started'
-                                         }
-                                       </td>
-                                       <td className="p-3 text-sm bg-muted/50">
-                                         {learner.completed_on ? 
-                                           new Date(learner.completed_on).toLocaleString('en-GB', {
-                                             day: '2-digit',
-                                             month: '2-digit',
-                                             year: 'numeric',
-                                             hour: '2-digit',
-                                             minute: '2-digit',
-                                             second: '2-digit',
-                                             hour12: false
-                                           }) : 'Not completed'
-                                         }
-                                       </td>
                                 </tr>
-                                   );
-                                 });
-                               })()
-                            ) : (
-                              <tr>
-                                   <td colSpan={8} className="p-8 text-center text-muted-foreground">
-                                  No learners found for this filter.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                    </table>
+                              ) : learnerDetails.length > 0 ? (
+                                (() => {
+                                  // console.log('=== RENDERING LEARNERS ===');
+                                  // console.log('learnerDetails length:', learnerDetails.length);
+                                  // console.log('learnerDetails:', learnerDetails);
+                                  return learnerDetails.map((learner: any, index: number) => {
+                                    // Debug: Log each learner being rendered
+                                    // console.log(`Rendering learner ${index}:`, learner);
+                                    // console.log(`Learner name: ${learner.learner_name || learner.full_name || 'N/A'}`);
+                                    // console.log(`Learner email: ${learner.email || 'N/A'}`);
+                                    // console.log(`Learner department: ${learner.department || 'N/A'}`);
+                                    // console.log(`Learner status: ${learner.status || 'N/A'}`);
+                                    // console.log(`Learner completion_rate: ${learner.completion_rate || 'N/A'}`);
+                                    // console.log(`Learner avg_progress: ${learner.avg_progress || 'N/A'}`);
+                                    // console.log(`Learner avg_score: ${learner.avg_score || 'N/A'}`);
+                                    // console.log(`Learner started_on: ${learner.started_on || 'N/A'}`);
+                                    // console.log(`Learner completed_on: ${learner.completed_on || 'N/A'}`);
+
+                                    return (
+                                      <tr key={index} className="border-b hover:bg-muted/50">
+                                        <td className="p-3 text-sm font-medium bg-muted/50">{learner.learner_name || learner.full_name || 'N/A'}</td>
+                                        <td className="p-3 text-sm bg-muted/50">{learner.email || 'N/A'}</td>
+                                        <td className="p-3 text-sm bg-muted/50">{learner.department || 'N/A'}</td>
+                                        <td className="p-3 text-sm bg-muted/50">
+                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${learner.status === 'completed' ? 'bg-primary/10 text-primary' :
+                                              learner.status === 'in_progress' ? 'bg-primary/10 text-primary' :
+                                                learner.status === 'not_started' ? 'bg-muted text-muted-foreground' :
+                                                  'bg-muted text-muted-foreground'
+                                            }`}>
+                                            {learner.status === 'completed' ? 'Completed' :
+                                              learner.status === 'in_progress' ? 'In Progress' :
+                                                learner.status === 'not_started' ? 'Not Started' : 'N/A'}
+                                          </span>
+                                        </td>
+                                        <td className="p-3 text-sm bg-muted/50">{learner.avg_progress ? `${Math.round(learner.avg_progress)}%` : '0%'}</td>
+                                        <td className="p-3 text-sm bg-muted/50">{learner.avg_score || 'N/A'}</td>
+                                        <td className="p-3 text-sm bg-muted/50">
+                                          {learner.started_on ?
+                                            new Date(learner.started_on).toLocaleString('en-GB', {
+                                              day: '2-digit',
+                                              month: '2-digit',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                              second: '2-digit',
+                                              hour12: false
+                                            }) : 'Not started'
+                                          }
+                                        </td>
+                                        <td className="p-3 text-sm bg-muted/50">
+                                          {learner.completed_on ?
+                                            new Date(learner.completed_on).toLocaleString('en-GB', {
+                                              day: '2-digit',
+                                              month: '2-digit',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                              second: '2-digit',
+                                              hour12: false
+                                            }) : 'Not completed'
+                                          }
+                                        </td>
+                                      </tr>
+                                    );
+                                  });
+                                })()
+                              ) : (
+                                <tr>
+                                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                                    No learners found for this filter.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
                 ) : (
                   <div className="space-y-6">
                     {/* Learner Information */}
@@ -4413,15 +4399,15 @@ export default function AnalyticsDashboard() {
                           <span>{Math.round(sidebarContent.data.completion_rate)}%</span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2">
-                          <div 
+                          <div
                             className="bg-primary h-2 rounded-full transition-all duration-300"
                             style={{ width: `${Math.min(sidebarContent.data.completion_rate, 100)}%` }}
                           />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
+                )}
               </div>
             </div>
           </div>
@@ -4432,11 +4418,11 @@ export default function AnalyticsDashboard() {
       {showQuizDetailsModal && (
         <div className="fixed inset-0 z-50 flex items-end">
           {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/50" 
+          <div
+            className="fixed inset-0 bg-black/50"
             onClick={closeQuizDetailsModal}
           />
-          
+
           {/* Modal - Large Screen */}
           <div className="relative bg-background w-full h-3/4 overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="flex h-full flex-col">
@@ -4492,7 +4478,7 @@ export default function AnalyticsDashboard() {
                           <span>Time Limit: {quizDetailsData.time_limit}</span>
                           <span>Time Spent: {quizDetailsData.time_spent}</span>
                         </div>
-                        
+
                         <div className="border rounded-lg overflow-hidden">
                           <table className="w-full">
                             <thead className="bg-muted/50">
@@ -4522,9 +4508,8 @@ export default function AnalyticsDashboard() {
                                     </div>
                                   </td>
                                   <td className="p-3 text-sm">
-                                    <div className={`flex items-center gap-1 ${
-                                      qa.is_correct ? 'text-green-600' : 'text-red-600'
-                                    }`}>
+                                    <div className={`flex items-center gap-1 ${qa.is_correct ? 'text-green-600' : 'text-red-600'
+                                      }`}>
                                       {qa.is_correct ? (
                                         <>
                                           <CheckCircle className="h-4 w-4" />
@@ -4555,186 +4540,186 @@ export default function AnalyticsDashboard() {
             </div>
           </div>
         </div>
-        )}
+      )}
 
-        {/* Q&A Details Modal */}
-        {showQaDetailsModal && (
-          <div className="fixed inset-0 z-50 flex items-end">
-            {/* Backdrop */}
-            <div 
-              className="fixed inset-0 bg-black/50" 
-              onClick={closeQaDetailsModal}
-            />
-            
-            {/* Modal - Large Screen */}
-            <div className="relative bg-background w-full h-3/4 overflow-hidden animate-in slide-in-from-bottom duration-300">
-              <div className="flex h-full flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between border-b p-4 flex-shrink-0 bg-background">
-                  <div>
-                    <h3 className="text-xl font-bold">
-                      Q&A Details
-                      <span className="text-sm font-normal text-muted-foreground ml-2">
-                        - {qaDetailsData?.date_attended || 'N/A'}
-                      </span>
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Detailed Q&A results for {qaDetailsData?.user || 'Unknown User'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {qaScoreFilter === 'pending' && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleAddScore}
-                        className="h-8"
-                      >
-                        Add Score
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={exportQaToPDF}
-                      className="h-8 px-3"
-                    >
-                      Export to PDF
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={closeQaDetailsModal}
-                      className="h-8 w-8 p-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
+      {/* Q&A Details Modal */}
+      {showQaDetailsModal && (
+        <div className="fixed inset-0 z-50 flex items-end">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={closeQaDetailsModal}
+          />
+
+          {/* Modal - Large Screen */}
+          <div className="relative bg-background w-full h-3/4 overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="flex h-full flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b p-4 flex-shrink-0 bg-background">
+                <div>
+                  <h3 className="text-xl font-bold">
+                    Q&A Details
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      - {qaDetailsData?.date_attended || 'N/A'}
+                    </span>
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Detailed Q&A results for {qaDetailsData?.user || 'Unknown User'}
+                  </p>
                 </div>
+                <div className="flex items-center gap-2">
+                  {qaScoreFilter === 'pending' && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleAddScore}
+                      className="h-8"
+                    >
+                      Add Score
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportQaToPDF}
+                    className="h-8 px-3"
+                  >
+                    Export to PDF
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={closeQaDetailsModal}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
 
-                {/* Content - Scrollable */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {loadingQaDetails ? (
-                    <div className="flex flex-col items-center justify-center py-8">
-                      <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
-                      <div className="mt-2">Loading Q&A details...</div>
-                    </div>
-                  ) : qaDetailsData ? (
-                    <>
-                      {/* Summary Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div className="bg-muted/50 border border-muted rounded-lg p-4">
-                          <div className="text-sm font-medium text-muted-foreground">User</div>
-                          <div className="text-lg font-bold">{qaDetailsData.user || 'N/A'}</div>
-                        </div>
-                        <div className="bg-muted/50 border border-muted rounded-lg p-4">
-                          <div className="text-sm font-medium text-muted-foreground">Score (%)</div>
-                          <div className="text-lg font-bold">
-                            Max Score: {qaDetailsData.max_score || 'N/A'}<br/>
-                            Score: {qaDetailsData.score || 'N/A'} ({qaDetailsData.percentage_score || 0}%)
-                          </div>
-                        </div>
-                        <div className="bg-muted/50 border border-muted rounded-lg p-4">
-                          <div className="text-sm font-medium text-muted-foreground">Date</div>
-                          <div className="text-lg font-bold">{qaDetailsData.date_attended || 'N/A'}</div>
-                        </div>
-                        <div className="bg-muted/50 border border-muted rounded-lg p-4">
-                          <div className="text-sm font-medium text-muted-foreground">Module</div>
-                          <div className="text-lg font-bold">{qaDetailsData.module?.name1 || qaDetailsData.module?.name || 'N/A'}</div>
+              {/* Content - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {loadingQaDetails ? (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
+                    <div className="mt-2">Loading Q&A details...</div>
+                  </div>
+                ) : qaDetailsData ? (
+                  <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-muted/50 border border-muted rounded-lg p-4">
+                        <div className="text-sm font-medium text-muted-foreground">User</div>
+                        <div className="text-lg font-bold">{qaDetailsData.user || 'N/A'}</div>
+                      </div>
+                      <div className="bg-muted/50 border border-muted rounded-lg p-4">
+                        <div className="text-sm font-medium text-muted-foreground">Score (%)</div>
+                        <div className="text-lg font-bold">
+                          Max Score: {qaDetailsData.max_score || 'N/A'}<br />
+                          Score: {qaDetailsData.score || 'N/A'} ({qaDetailsData.percentage_score || 0}%)
                         </div>
                       </div>
+                      <div className="bg-muted/50 border border-muted rounded-lg p-4">
+                        <div className="text-sm font-medium text-muted-foreground">Date</div>
+                        <div className="text-lg font-bold">{qaDetailsData.date_attended || 'N/A'}</div>
+                      </div>
+                      <div className="bg-muted/50 border border-muted rounded-lg p-4">
+                        <div className="text-sm font-medium text-muted-foreground">Module</div>
+                        <div className="text-lg font-bold">{qaDetailsData.module?.name1 || qaDetailsData.module?.name || 'N/A'}</div>
+                      </div>
+                    </div>
 
-                      {/* Answer Analysis */}
-                      <div>
-                        <h4 className="text-lg font-semibold mb-3">Answer Analysis</h4>
-                        <div className="space-y-3">
-                          <div className="flex gap-4 text-sm text-muted-foreground">
-                            <span>Time Limit: N/A</span>
-                            <span>Time Spent: {qaDetailsData.time_spent || 'N/A'}</span>
-                          </div>
-                          
-                          <div className="border rounded-lg overflow-hidden">
-                            <table className="w-full">
-                              <thead>
-                                <tr className="border-b bg-muted/50">
-                                  <th className="text-left p-3 font-medium text-sm text-muted-foreground">Question</th>
-                                  <th className="text-left p-3 font-medium text-sm text-muted-foreground">Answer</th>
-                                  <th className="text-left p-3 font-medium text-sm text-muted-foreground">Suggested Answer</th>
-                                  <th className="text-left p-3 font-medium text-sm text-muted-foreground">Alloted</th>
-                                  <th className="text-left p-3 font-medium text-sm text-muted-foreground">Q. Score</th>
+                    {/* Answer Analysis */}
+                    <div>
+                      <h4 className="text-lg font-semibold mb-3">Answer Analysis</h4>
+                      <div className="space-y-3">
+                        <div className="flex gap-4 text-sm text-muted-foreground">
+                          <span>Time Limit: N/A</span>
+                          <span>Time Spent: {qaDetailsData.time_spent || 'N/A'}</span>
+                        </div>
+
+                        <div className="border rounded-lg overflow-hidden">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Question</th>
+                                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Answer</th>
+                                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Suggested Answer</th>
+                                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Alloted</th>
+                                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Q. Score</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {qaDetailsData.question_answer_responses?.map((response: any, index: number) => (
+                                <tr key={index} className="border-b hover:bg-muted/30">
+                                  <td className="p-3 text-sm">
+                                    <div
+                                      className="max-w-md"
+                                      title={response.question || 'N/A'}
+                                    >
+                                      {response.question?.replace(/<[^>]*>/g, '') || 'N/A'}
+                                    </div>
+                                  </td>
+                                  <td className="p-3 text-sm">
+                                    <div
+                                      className="max-w-xs"
+                                      title={response.answer || 'N/A'}
+                                    >
+                                      {response.answer?.replace(/<[^>]*>/g, '') || 'N/A'}
+                                    </div>
+                                  </td>
+                                  <td className="p-3 text-sm">
+                                    <div
+                                      className="max-w-xs"
+                                      title={response.suggested_answer || 'N/A'}
+                                    >
+                                      {response.suggested_answer?.replace(/<[^>]*>/g, '') || 'N/A'}
+                                    </div>
+                                  </td>
+                                  <td className="p-3 text-sm w-28">
+                                    <Input
+                                      type="number"
+                                      value={qaAllotedMarks[index] ?? 0}
+                                      onChange={(e) => handleAllotedChange(index, e.target.value, response.question_score ?? 0)}
+                                      className="h-8"
+                                      min={0}
+                                      max={response.question_score ?? 0}
+                                    />
+                                  </td>
+                                  <td className="p-3 text-sm">{response.question_score ?? 0}</td>
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {qaDetailsData.question_answer_responses?.map((response: any, index: number) => (
-                                  <tr key={index} className="border-b hover:bg-muted/30">
-                                    <td className="p-3 text-sm">
-                                      <div 
-                                        className="max-w-md" 
-                                        title={response.question || 'N/A'}
-                                      >
-                                        {response.question?.replace(/<[^>]*>/g, '') || 'N/A'}
-                                      </div>
-                                    </td>
-                                    <td className="p-3 text-sm">
-                                      <div 
-                                        className="max-w-xs" 
-                                        title={response.answer || 'N/A'}
-                                      >
-                                        {response.answer?.replace(/<[^>]*>/g, '') || 'N/A'}
-                                      </div>
-                                    </td>
-                                    <td className="p-3 text-sm">
-                                      <div 
-                                        className="max-w-xs" 
-                                        title={response.suggested_answer || 'N/A'}
-                                      >
-                                        {response.suggested_answer?.replace(/<[^>]*>/g, '') || 'N/A'}
-                                      </div>
-                                    </td>
-                                    <td className="p-3 text-sm w-28">
-                                      <Input
-                                        type="number"
-                                        value={qaAllotedMarks[index] ?? 0}
-                                        onChange={(e) => handleAllotedChange(index, e.target.value, response.question_score ?? 0)}
-                                        className="h-8"
-                                        min={0}
-                                        max={response.question_score ?? 0}
-                                      />
-                                    </td>
-                                    <td className="p-3 text-sm">{response.question_score ?? 0}</td>
-                                  </tr>
-                                )) || (
+                              )) || (
                                   <tr className="border-b hover:bg-muted/30">
                                     <td className="p-3 text-sm">
-                                      <div 
-                                        className="max-w-md" 
+                                      <div
+                                        className="max-w-md"
                                         title={qaDetailsData.question_answer?.question || 'N/A'}
                                       >
                                         {qaDetailsData.question_answer?.question?.replace(/<[^>]*>/g, '') || 'N/A'}
                                       </div>
                                     </td>
                                     <td className="p-3 text-sm">
-                                      <div 
-                                        className="max-w-xs" 
+                                      <div
+                                        className="max-w-xs"
                                         title={qaDetailsData.question_answer?.answer || 'N/A'}
                                       >
                                         {qaDetailsData.question_answer?.answer?.replace(/<[^>]*>/g, '') || 'N/A'}
                                       </div>
                                     </td>
                                     <td className="p-3 text-sm">
-                                      <div 
-                                        className="max-w-xs" 
+                                      <div
+                                        className="max-w-xs"
                                         title={qaDetailsData.question_answer?.suggested_answer || 'N/A'}
                                       >
                                         {qaDetailsData.question_answer?.suggested_answer?.replace(/<[^>]*>/g, '') || 'N/A'}
                                       </div>
                                     </td>
                                     <td className="p-3 text-sm w-28">
-                                      <Input 
-                                        type="number" 
-                                        value={qaAllotedMarks[0] ?? 0} 
-                                        onChange={(e)=>handleAllotedChange(0, e.target.value, qaDetailsData.question_answer?.question_score ?? 0)} 
-                                        className="h-8" 
+                                      <Input
+                                        type="number"
+                                        value={qaAllotedMarks[0] ?? 0}
+                                        onChange={(e) => handleAllotedChange(0, e.target.value, qaDetailsData.question_answer?.question_score ?? 0)}
+                                        className="h-8"
                                         min={0}
                                         max={qaDetailsData.question_answer?.question_score ?? 0}
                                       />
@@ -4742,117 +4727,117 @@ export default function AnalyticsDashboard() {
                                     <td className="p-3 text-sm">{qaDetailsData.question_answer?.question_score ?? 0}</td>
                                   </tr>
                                 )}
-                                <tr className="border-t-2 font-semibold bg-muted/30">
-                                  <td className="p-3 text-sm font-medium" colSpan={3}>Total</td>
-                                  <td className="p-3 text-sm font-medium">{qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0)}</td>
-                                  <td className="p-3 text-sm text-right pr-4">Max: {qaDetailsData.max_score ?? 0}</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                          <div className="flex justify-end mt-3">
-                            <Button onClick={handleSaveAllotedScores}>Save Scores</Button>
-                          </div>
+                              <tr className="border-t-2 font-semibold bg-muted/30">
+                                <td className="p-3 text-sm font-medium" colSpan={3}>Total</td>
+                                <td className="p-3 text-sm font-medium">{qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0)}</td>
+                                <td className="p-3 text-sm text-right pr-4">Max: {qaDetailsData.max_score ?? 0}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="flex justify-end mt-3">
+                          <Button onClick={handleSaveAllotedScores}>Save Scores</Button>
                         </div>
                       </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No Q&A details available
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Add Score Modal */}
-        {showAddScoreModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
-            <div 
-              className="fixed inset-0 bg-black/50" 
-              onClick={() => setShowAddScoreModal(false)}
-            />
-            
-            {/* Modal */}
-            <div className="relative bg-background rounded-lg shadow-lg w-full max-w-md mx-4 animate-in fade-in duration-200">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Add Score</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAddScoreModal(false)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                {scoreUpdateSuccess ? (
-                  <div className="text-center py-4">
-                    <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                      <CheckCircle className="h-6 w-6 text-primary" />
-                    </div>
-                    <h4 className="text-lg font-semibold text-primary mb-2">Score Added Successfully!</h4>
-                    <p className="text-sm text-muted-foreground">
-                      The score has been updated for this user.
-                    </p>
-                  </div>
+                  </>
                 ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium">Enter Score</label>
-                      <Input
-                        type="number"
-                        placeholder="Enter score"
-                        value={scoreValue}
-                        onChange={handleScoreInputChange}
-                        min="0"
-                        max={qaDetailsData?.max_score || 100}
-                        className={`mt-1 ${scoreError ? 'border-red-500 focus:border-red-500' : ''}`}
-                      />
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Max score: {qaDetailsData?.max_score || 'N/A'}
-                      </p>
-                      {scoreError && (
-                        <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
-                          <AlertCircle className="h-4 w-4" />
-                          {scoreError}
-                        </p>
-                      )}
-                    </div>
-                    
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowAddScoreModal(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        variant="default"
-                        onClick={handleSaveScore}
-                        disabled={loadingAddScore || !scoreValue || !!scoreError}
-                      >
-                        {loadingAddScore ? (
-                          <>
-                            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                            Saving...
-                          </>
-                        ) : (
-                          'Save Score'
-                        )}
-                      </Button>
-                    </div>
+                  <div className="text-center py-8 text-muted-foreground">
+                    No Q&A details available
                   </div>
                 )}
               </div>
             </div>
           </div>
-        )}
-      </div>
-    );
-  }
+        </div>
+      )}
+
+      {/* Add Score Modal */}
+      {showAddScoreModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={() => setShowAddScoreModal(false)}
+          />
+
+          {/* Modal */}
+          <div className="relative bg-background rounded-lg shadow-lg w-full max-w-md mx-4 animate-in fade-in duration-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Add Score</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAddScoreModal(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {scoreUpdateSuccess ? (
+                <div className="text-center py-4">
+                  <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                    <CheckCircle className="h-6 w-6 text-primary" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-primary mb-2">Score Added Successfully!</h4>
+                  <p className="text-sm text-muted-foreground">
+                    The score has been updated for this user.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Enter Score</label>
+                    <Input
+                      type="number"
+                      placeholder="Enter score"
+                      value={scoreValue}
+                      onChange={handleScoreInputChange}
+                      min="0"
+                      max={qaDetailsData?.max_score || 100}
+                      className={`mt-1 ${scoreError ? 'border-red-500 focus:border-red-500' : ''}`}
+                    />
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Max score: {qaDetailsData?.max_score || 'N/A'}
+                    </p>
+                    {scoreError && (
+                      <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-4 w-4" />
+                        {scoreError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowAddScoreModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="default"
+                      onClick={handleSaveScore}
+                      disabled={loadingAddScore || !scoreValue || !!scoreError}
+                    >
+                      {loadingAddScore ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Score'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
