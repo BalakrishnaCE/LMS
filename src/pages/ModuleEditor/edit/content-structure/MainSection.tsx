@@ -1284,7 +1284,7 @@ function SortableContentBlock({ id, content, chapter, setModule, onEditChange, s
         case 'audio':
         case 'Audio Content':
           doctype = 'Audio Content';
-          fields = { title: data.title, attach: data.attach };
+          fields = { title: data.title, attach: data.attach, audio_script: data.audio_script };
           break;
         case 'file':
         case 'File Attach':

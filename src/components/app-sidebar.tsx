@@ -125,7 +125,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarHeader>
         <SidebarContent>
           <NavMain items={navData.navMain} />
-          {!isLMSAdmin && <NavAiChat />}
+          <NavAiChat />
         </SidebarContent>
         <SidebarFooter>
           <NavUser user={navData.user} />

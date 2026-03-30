@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 // API Base URL for Frappe backend
 const API_BASE_URL = "/api/method/novel_lms.lms_ai_bot.main.chat";
 
-type ConversationStep = 'department' | 'module' | 'lesson' | 'chapter' | 'qa';
+type ConversationStep = 'department' | 'faq_topic' | 'module' | 'lesson' | 'chapter' | 'qa';
 
 interface Department {
     id: string;
@@ -52,6 +52,13 @@ interface Chapter {
     value: string;
 }
 
+interface FaqTopic {
+    id: string;
+    name: string;
+    label: string;
+    value: string;
+}
+
 interface Message {
     id: string;
     text: string;
@@ -66,7 +73,16 @@ interface ChatContext {
     chapter?: Chapter;
 }
 
-const formatMessageText = (text: string) => {
+const formatMessageText = (text: string | any) => {
+    if (!text) return [""];
+    if (typeof text !== 'string') {
+        try {
+            text = JSON.stringify(text);
+        } catch (e) {
+            text = String(text);
+        }
+    }
+
     const formatInline = (str: string, lineIndex: number) => {
         const parts: React.ReactNode[] = [];
         let currentIndex = 0;
@@ -94,7 +110,7 @@ const formatMessageText = (text: string) => {
     const formattedText = text.replace(/([^\n])\s*(###)/g, '$1\n$2');
 
     const lines = formattedText.split('\n');
-    return lines.map((line, index) => {
+    return lines.map((line:any, index:any) => {
         const trimmed = line.trim();
         if (trimmed.startsWith('###')) {
             const headingText = line.replace(/^###\s*/, '');
@@ -174,6 +190,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
     const [modules, setModules] = useState<Module[]>([]);
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [chapters, setChapters] = useState<Chapter[]>([]);
+    const [faqTopics, setFaqTopics] = useState<FaqTopic[]>([]);
 
     // Chat state (for Q&A mode)
     const [messages, setMessages] = useState<Message[]>([]);
@@ -480,12 +497,12 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             }
 
             const data = await response.json();
-            // const allOption: Department = { id: 'all', name: 'All Departments', label: 'All Departments', value: 'all' };
-            setDepartments([...(data.message || [])]);
+            const faqOption: Department = { id: 'faq', name: 'FAQ', label: 'FAQ', value: 'faq' };
+            setDepartments([faqOption, ...(data.message || [])]);
         } catch (error) {
             console.error('Error fetching departments:', error);
-            // const allOption: Department = { id: 'all', name: 'All Departments', label: 'All Departments', value: 'all' };
-            setDepartments([]);
+            const faqOption: Department = { id: 'faq', name: 'FAQ', label: 'FAQ', value: 'faq' };
+            setDepartments([faqOption]);
         } finally {
             setIsLoading(false);
         }
@@ -577,11 +594,51 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         }
     };
 
+    const fetchFaqTopics = async () => {
+        try {
+            setIsLoading(true);
+            const response = await fetch('/api/method/novel_lms.novel_lms.api.ai_chat_helper.get_faq_topics', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch FAQ topics');
+
+            const data = await response.json();
+            setFaqTopics(data.message || []);
+        } catch (error) {
+            console.error('Error fetching FAQ topics:', error);
+            setFaqTopics([]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleFaqTopicSelect = (topic: FaqTopic) => {
+        // Set context with FAQ department and selected topic as module
+        setContext({
+            department: { id: 'faq', name: 'FAQ', label: 'FAQ', value: 'faq' },
+            module: { id: topic.id, name: topic.name, description: '', label: topic.name, value: topic.value }
+        });
+
+        // Go directly to QA mode so the user can type their queries
+        setMessages([{
+            id: '1',
+            text: `Hi ${user?.full_name || user?.name || 'Learner'}! You've selected the **${topic.name}** FAQ topic. Go ahead and ask your question!`,
+            sender: 'ai',
+            timestamp: new Date()
+        }]);
+        setCurrentStep('qa');
+    };
+
     const handleDepartmentSelect = async (dept: Department) => {
         setContext({ department: dept });
-        // setIsDepartmentExpanded(false); // REMOVED
 
-        if (dept.id === 'all') {
+        if (dept.id === 'faq') {
+            // FAQ selected – fetch FAQ topics
+            await fetchFaqTopics();
+            setCurrentStep('faq_topic');
+        } else if (dept.id === 'all') {
             setCurrentStep('qa');
             setMessages([{
                 id: '1',
@@ -592,7 +649,6 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         } else {
             await fetchDepartmentModules(dept.id);
             setCurrentStep('module');
-            // setIsModuleExpanded(false); // REMOVED
         }
     };
 
@@ -696,8 +752,8 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    department: context.department?.id !== 'all' ? context.department?.id : undefined,
-                    module: context.module?.id !== 'all' ? context.module?.id : undefined,
+                    department: (context.department?.id !== 'all' && context.department?.id !== 'faq') ? context.department?.id : undefined,
+                    module: (context.module?.id !== 'all' && context.department?.id !== 'faq') ? context.module?.id : undefined,
                     lesson: context.lesson?.id !== 'all' ? context.lesson?.id : undefined,
                     chapter: context.chapter?.id !== 'all' ? context.chapter?.id : undefined
                 })
@@ -840,6 +896,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         setMessages([]);
         setInputValue("");
         setChatId(null);
+        setFaqTopics([]);
 
         // Clear localStorage
         localStorage.removeItem('novel_lms_ai_chat_state');
@@ -852,7 +909,11 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
 
     const handleBack = () => {
-        if (currentStep === 'module') {
+        if (currentStep === 'faq_topic') {
+            setCurrentStep('department');
+            setContext({});
+            setFaqTopics([]);
+        } else if (currentStep === 'module') {
             setCurrentStep('department');
             setContext(prev => ({ ...prev, module: undefined }));
         } else if (currentStep === 'lesson') {
@@ -862,9 +923,29 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             setCurrentStep('lesson');
             setContext(prev => ({ ...prev, chapter: undefined }));
         } else if (currentStep === 'qa') {
-            setCurrentStep('chapter');
-            setContext(prev => ({ ...prev, chapter: undefined }));
-            setMessages([]);
+            if (context.department?.id === 'faq') {
+                setCurrentStep('faq_topic');
+                setContext(prev => ({ ...prev, module: undefined }));
+                setMessages([]);
+            }
+
+            else if (!context.lesson) {
+                setCurrentStep('module');
+                setContext(prev => ({ ...prev, module: undefined }));
+                setMessages([]);
+            }
+
+            else if (!context.chapter) {
+                setCurrentStep('lesson');
+                setContext(prev => ({ ...prev, lesson: undefined }));
+                setMessages([]);
+            }
+
+            else {
+                setCurrentStep('chapter');
+                setContext(prev => ({ ...prev, chapter: undefined }));
+                setMessages([]);
+            }
         }
     };
 
@@ -918,6 +999,55 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                                     className="option-button group"
                                                 >
                                                     <span>{dept.name}</span>
+                                                    <ChevronRight className="option-icon" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            case 'faq_topic':
+                return (
+                    <div className="greeting-wrapper">
+                        <div className="greeting-card">
+                            <div className="greeting-content">
+                                <div className="greeting-header">
+                                    <div className="greeting-header-inner">
+                                        <div className="greeting-title-wrapper">
+                                            <div className="greeting-title-row">
+                                                <h3 className="greeting-title">
+                                                    FAQ Topics 📋
+                                                </h3>
+                                            </div>
+                                            <p className="greeting-subtitle">
+                                                Select a topic to view frequently asked questions
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="options-container">
+                                    {isLoading ? (
+                                        <div className="state-container">
+                                            <Loader2 className="spinner" />
+                                        </div>
+                                    ) : faqTopics.length === 0 ? (
+                                        <div className="empty-message">
+                                            No FAQ topics available yet.
+                                        </div>
+                                    ) : (
+                                        <div className="options-list">
+                                            {faqTopics.map((topic) => (
+                                                <button
+                                                    key={topic.id}
+                                                    onClick={() => handleFaqTopicSelect(topic)}
+                                                    className="option-button group"
+                                                >
+                                                    <span>{topic.name}</span>
                                                     <ChevronRight className="option-icon" />
                                                 </button>
                                             ))}
@@ -1109,8 +1239,8 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 <div className="ai-chat-header">
                     {sidebarControl}
 
-                    {/* Back Button */}
-                    {currentStep !== 'department' && (
+                    {/* Back Button - hidden once user has sent first message in conversation */}
+                    {currentStep !== 'department' && !(currentStep === 'qa' && (chatId || messages.some(m => m.sender === 'user'))) && (
                         <Button
                             variant="ghost"
                             size="icon"

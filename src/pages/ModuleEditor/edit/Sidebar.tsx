@@ -68,6 +68,7 @@ interface ModuleSidebarProps {
   setActiveLessonId?: (id: string) => void;
   activeChapterId?: string | null;
   setActiveChapterId?: (id: string) => void;
+  onRefresh?: () => void;
 }
 
 interface LearnerRow {
@@ -893,7 +894,7 @@ function SortableLesson({ lesson, activeLessonId, setActiveLessonId, setActiveCh
   );
 }
 
-export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFinishSetup, isMobile, onLessonAdded, activeLessonId, setActiveLessonId, activeChapterId, setActiveChapterId }: ModuleSidebarProps) {
+export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFinishSetup, isMobile, onLessonAdded, activeLessonId, setActiveLessonId, activeChapterId, setActiveChapterId, onRefresh }: ModuleSidebarProps) {
   const [, setLocation] = useLocation();
   const { getPreviousModulePath } = useNavigation();
   const { updateDoc, loading: saving } = useFrappeUpdateDoc();
@@ -921,20 +922,6 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     limit: 150,
   });
 
-  // In Sidebar component, add a refetch function for moduleInfo
-  // Use the same API endpoint as ModuleEdit to avoid CORS issues
-  const { data: freshModuleData, mutate: refetchModuleInfo, error: refetchError } = useFrappeGetCall(
-    'novel_lms.novel_lms.api.module_management.get_module_with_details',
-    { module_id: moduleInfo?.id || "" },
-    { 
-      swrConfig: { revalidateOnFocus: false },
-      enabled: !!moduleInfo?.id // Only fetch if we have a valid module ID
-    }
-  );
-  
-  // Extract the module info from the API response
-  const freshModuleInfo = freshModuleData?.data || freshModuleData?.message || freshModuleData;
-
   // Initialize edit state and learners when moduleInfo changes
   useEffect(() => {
     if (moduleInfo) {
@@ -952,14 +939,6 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       setHasChanges(false);
     }
   }, [moduleInfo]);
-
-  // Handle refetch errors
-  useEffect(() => {
-    if (refetchError) {
-      console.warn("Failed to refetch module info:", refetchError);
-      // Don't show error to user as this is just a background refresh
-    }
-  }, [refetchError]);
 
   // Check for changes in module info and content structure
   useEffect(() => {
@@ -1039,21 +1018,10 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
       await updateDoc("LMS Module", moduleInfo.id, updateData);     
       toast.success("Module saved successfully");
       setTimeout(() => {
-        window.location.reload();
+        onRefresh && onRefresh();
       }, 1000)
       setHasChanges(false);
       setShowSettings(false);
-      // Refetch the latest module info from backend
-      try {
-        await refetchModuleInfo();
-        if (freshModuleInfo) {
-          setEditState({ ...freshModuleInfo });
-          setLearners(freshModuleInfo.learners || []);
-        }
-      } catch (refetchErr) {
-        console.warn("Failed to refetch module info after save:", refetchErr);
-        // Continue without updating the state - the save was successful
-      }
       onFinishSetup?.(editState);
     } catch (err) {
       console.error("Save error:", err);

@@ -12,6 +12,7 @@ import {
 import { navigate } from "wouter/use-browser-location"
 import { useUser } from "@/hooks/use-user"
 import { getRelativePath, getFullPath, BASE_PATH, ROUTES } from "@/config/routes"
+import { AI_ALLOWED_USERS } from "@/config/ai-users"
 
 export type NavItemIcon = Icon | React.ComponentType<{ className?: string }>
 
@@ -28,7 +29,8 @@ export function NavMain({
   items: NavMainItem[]
 }) {
   const [location] = useLocation();
-  const { isLMSAdmin } = useUser();
+  const { isLMSAdmin, user } = useUser();
+  const isAiAllowed = user?.email && AI_ALLOWED_USERS.includes(user.email.toLowerCase());
 
   // Get the current path without the base path
   const currentPath = getRelativePath(location);
@@ -38,6 +40,15 @@ export function NavMain({
   
   // Check if we're on the edit page to highlight Quick Create
   const isEditPage = currentPath === ROUTES.EDIT || currentPath.startsWith(ROUTES.EDIT + '/');
+
+  // Filter items based on AI access
+  const filteredItems = items.filter(item => {
+    // If the item points to AI chat and user is not allowed, hide it
+    if (item.url === ROUTES.AI_CHAT && !isAiAllowed) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <SidebarGroup>
@@ -71,7 +82,7 @@ export function NavMain({
         </SidebarMenu>
 
         <SidebarMenu>
-          {items.map((item) => {
+          {filteredItems.map((item) => {
             // Special case: if we're on admin dashboard and this is the Dashboard item, make it active
             const isActive = (isAdminDashboard && item.url === ROUTES.HOME) || currentPath === item.url;
             return (

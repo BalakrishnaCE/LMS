@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/collapsible"
 import { getFullPath, ROUTES } from "@/config/routes"
 import { useUser } from "@/hooks/use-user"
+import { AI_ALLOWED_USERS } from "@/config/ai-users"
 
 interface ChatSession {
     id: string;
@@ -90,6 +91,10 @@ export function NavAiChat() {
 
     const currentChatId = location.split('/').pop();
     const isAiPage = location.includes(ROUTES.AI_CHAT);
+
+    const isAiAllowed = user?.email && AI_ALLOWED_USERS.includes(user.email.toLowerCase());
+
+    if (!isAiAllowed) return null;
 
     return (
         <SidebarGroup>

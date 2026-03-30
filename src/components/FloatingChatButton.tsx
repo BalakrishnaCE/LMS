@@ -6,6 +6,7 @@ import { useUser } from "@/hooks/use-user";
 import { useLocation } from "wouter";
 import { BASE_PATH } from "@/config/routes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AI_ALLOWED_USERS } from "@/config/ai-users";
 
 const DEFAULT_WIDTH = 360;
 const DEFAULT_HEIGHT = 550;
@@ -18,7 +19,11 @@ const FloatingChatButton = () => {
     const [size, setSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
     const { theme } = useTheme();
     const { user, isLMSAdmin } = useUser();
-    const [location, setLocation] = useLocation();
+     
+     // Check if AI is allowed for this user
+     const isAiAllowed = user?.email && AI_ALLOWED_USERS.includes(user.email.toLowerCase());
+     
+     const [location, setLocation] = useLocation();
     const isDragging = useRef(false);
     const startPos = useRef({ x: 0, y: 0 });
     const startSize = useRef({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
@@ -161,9 +166,9 @@ const FloatingChatButton = () => {
         }
     }, [location]);
 
-    // Only show for logged-in learners, not for admins or on login page
+    // Only show for logged-in users who are in the allowed list
     // Also hide when on the /ai page (new window)
-    if (!user || isLMSAdmin || location.startsWith('/ai')) {
+    if (!isAiAllowed || location.startsWith('/ai')) {
         return null;
     }
 
