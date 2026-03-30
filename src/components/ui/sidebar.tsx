@@ -265,6 +265,8 @@ function Sidebar({
   )
 }
 
+
+
 function SidebarTrigger({
   className,
   onClick,
@@ -383,14 +385,34 @@ function SidebarSeparator({
 function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      data-slot="sidebar-content"
-      data-sidebar="content"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+        // Native scroll so scrollbar-gutter:stable works (no overlay scrollbar)
+        "flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]",
+        "group-data-[collapsible=icon]:overflow-hidden",
+        // Scrollbar styling via Tailwind arbitrary variants – no CSS file needed
+        // Chromium / Safari
+        "[&::-webkit-scrollbar]:w-1.5",
+        "[&::-webkit-scrollbar-track]:bg-transparent",
+        "[&::-webkit-scrollbar-thumb]:rounded-full",
+        "[&::-webkit-scrollbar-thumb]:bg-black/20",
+        "[&::-webkit-scrollbar-thumb:hover]:bg-black/35",
+        // Dark mode
+        "dark:[&::-webkit-scrollbar-thumb]:bg-white/20",
+        "dark:[&::-webkit-scrollbar-thumb:hover]:bg-white/35",
+        // Firefox
+        "[scrollbar-width:thin]",
+        "[scrollbar-color:rgba(0,0,0,0.2)_transparent]",
+        "dark:[scrollbar-color:rgba(255,255,255,0.2)_transparent]",
         className
       )}
-      {...props}
-    />
+    >
+      <div
+        data-slot="sidebar-content"
+        data-sidebar="content"
+        className="flex flex-col gap-2 p-2"
+        {...props}
+      />
+    </div>
   )
 }
 
@@ -399,7 +421,7 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-group"
       data-sidebar="group"
-      className={cn("relative flex w-full min-w-0 flex-col p-2", className)}
+      className={cn("relative flex w-full min-w-0 flex-col p-2 group-data-[collapsible=icon]:px-0", className)}
       {...props}
     />
   )
@@ -581,7 +603,7 @@ function SidebarMenuAction({
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
-          "peer-data-[active=true]/menu-button:text-sidebar-accent-foreground group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 md:opacity-0",
+        "peer-data-[active=true]/menu-button:text-sidebar-accent-foreground group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 md:opacity-0",
         className
       )}
       {...props}

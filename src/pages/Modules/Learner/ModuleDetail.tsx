@@ -1,16 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useUser } from "@/hooks/use-user";
 import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
-import { useLearnerCompletionData, CompletionData, useLearnerDashboard } from "@/lib/api";
+import { useLearnerCompletionData, CompletionData, useLearnerDashboard, LearnerDashboardData } from "@/lib/api";
 import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar";
 import { CompletionScreen } from "@/pages/Modules/Learner/components/CompletionScreen";
 import { Button } from "@/components/ui/button";
 import ContentRenderer from "@/pages/Modules/Learner/components/ContentRenderer";
-import { BookOpen, ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { ROUTES, LMS_API_BASE_URL, getFullPath } from "@/config/routes";
+import { motion, AnimatePresence } from "framer-motion";
 import Lottie from "lottie-react";
-import emptyAnimation from '@/assets/Empty.json';
+import learningAnimation from "@/assets/learning-bg.json";
+// emptyAnimation import removed - not currently used
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
 import { toast } from "sonner";
@@ -21,7 +23,8 @@ interface Content {
     name: string;
     content_type: string;
     content_reference: string;
-    data?: any; // Content data from the module API
+    title?: string;
+    data?: Record<string, unknown>; // Content data from the module API
     progress?: "Not Started" | "In Progress" | "Completed";
 }
 
@@ -48,14 +51,39 @@ interface ModuleProgress {
     started_on?: string;
 }
 
-interface Module {
+interface CourseModule {
     name: string;
     name1: string;
     description: string;
     lessons: Lesson[];
-    progress?: ModuleProgress;
+    progress?: ModuleProgress & { overall_progress?: number; current_position?: { chapter?: string; type?: string; reference_id?: string; start_time?: string }; completion_details?: Record<string, unknown> };
     image?: string;
 }
+
+interface UserInfo {
+    name?: string;
+    email?: string;
+    user?: string;
+    user_id?: string;
+    id?: string;
+}
+
+interface QuizProgressRecord {
+    quiz_id?: string;
+    name?: string;
+    score: number;
+    max_score: number;
+}
+
+interface QAProgressRecord {
+    question_answer?: string;
+    name?: string;
+    score: number;
+    max_score: number;
+    score_added?: number;
+}
+
+
 
 interface ApiResponse<T> {
     data: T;
@@ -64,7 +92,7 @@ interface ApiResponse<T> {
 // ModuleApiResponse interface removed - now using direct type checking
 
 
-function getInitialProgress(module: Module): ModuleProgress {
+function getInitialProgress(module: CourseModule): ModuleProgress {
     if (!module.lessons?.length) {
         return {
             status: "Not Started",
@@ -80,7 +108,7 @@ function getInitialProgress(module: Module): ModuleProgress {
 }
 
 // Utility: Check for Quiz/QA content and completion
-function getQuizQAContents(module: Module) {
+function getQuizQAContents(module: CourseModule) {
     const quizQAContents: { content: Content; lessonIdx: number; chapterIdx: number; }[] = [];
     module.lessons.forEach((lesson, lessonIdx) => {
         lesson.chapters.forEach((chapter, chapterIdx) => {
@@ -95,25 +123,29 @@ function getQuizQAContents(module: Module) {
 }
 
 // Utility: Get incomplete Quiz/QA titles (fetch all progress for user, filter in JS)
-async function getIncompleteQuizQATitles(module: Module, user: any) {
+async function getIncompleteQuizQATitles(module: CourseModule, user: UserInfo) {
     const quizQAContents = getQuizQAContents(module);
     const incompleteTitles: string[] = [];
     // Fetch all quiz progress for user
-    let quizProgressList: any[] = [];
-    let qaProgressList: any[] = [];
+    let quizProgressList: QuizProgressRecord[] = [];
+    let qaProgressList: QAProgressRecord[] = [];
     try {
-        const quizRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Quiz Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"name\",\"quiz_id\"]`, { credentials: 'include' });
+        const quizRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Quiz Progress?filters=[["user","=","${user?.name}"]]&fields=["score","max_score","name","quiz_id"]`, { credentials: 'include' });
         quizProgressList = (await quizRes.json())?.data || [];
-    } catch {}
+    } catch {
+        // Silently handle quiz progress fetch failure
+    }
     try {
-        const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"score_added\",\"name\",\"question_answer\"]`, { credentials: 'include' });
+        const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[["user","=","${user?.name}"]]&fields=["score","max_score","score_added","name","question_answer"]`, { credentials: 'include' });
         qaProgressList = (await qaRes.json())?.data || [];
-    } catch {}
+    } catch {
+        // Silently handle QA progress fetch failure
+    }
     for (const { content } of quizQAContents) {
         let displayTitle = content.name;
-        if ((content as any).title) {
-            displayTitle = (content as any).title;
-        } else if ((content as any).content_type) {
+        if (content.title) {
+            displayTitle = content.title;
+        } else if (content.content_type) {
             displayTitle = `${content.content_type}`;
         }
         if (content.content_type === "Quiz") {
@@ -133,71 +165,71 @@ async function getIncompleteQuizQATitles(module: Module, user: any) {
 }
 
 // Utility: Check Quiz/QA completion (fetch all progress for user, filter in JS)
-async function checkQuizQACompletion(module: Module, user: any) {
+async function checkQuizQACompletion(module: CourseModule, user: UserInfo) {
     const quizQAContents = getQuizQAContents(module);
     if (quizQAContents.length === 0) return { allCompleted: true, scores: [] };
-    let quizProgressList: any[] = [];
-    let qaProgressList: any[] = [];
+    let quizProgressList: QuizProgressRecord[] = [];
+    let qaProgressList: QAProgressRecord[] = [];
     try {
-        const quizRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Quiz Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"name\",\"quiz_id\"]`, { credentials: 'include' });
+        const quizRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Quiz Progress?filters=[["user","=","${user?.name}"]]&fields=["score","max_score","name","quiz_id"]`, { credentials: 'include' });
         quizProgressList = (await quizRes.json())?.data || [];
 
-    } catch (error) {
-        console.error('Error fetching quiz progress:', error);
+    } catch (err) {
+        console.error('Error fetching quiz progress:', err);
     }
     try {
-        const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[[\"user\",\"=\",\"${user?.name}\"]]&fields=[\"score\",\"max_score\",\"score_added\",\"name\",\"question_answer\"]`, { credentials: 'include' });
+        const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[["user","=","${user?.name}"]]&fields=["score","max_score","name","question_answer"]`, { credentials: 'include' });
         qaProgressList = (await qaRes.json())?.data || [];
-        
-    } catch (error) {
-        console.error('Error fetching QA progress:', error);
+
+    } catch (err) {
+        console.error('Error fetching QA progress:', err);
     }
-    const scores: Array<{title: string, score: number, maxScore: number, type: string}> = [];
+    const scores: Array<{ title: string, score: number, maxScore: number, type: string }> = [];
     let allCompleted = true;
-    
+
     // Handle data mismatch: If we have progress records but no matching content,
     // add them as generic scores to show user's actual progress
     const hasQuizContent = quizQAContents.some(c => c.content.content_type === "Quiz");
     const hasQAContent = quizQAContents.some(c => c.content.content_type === "Question Answer");
-    
+
     // Add quiz scores if we have quiz progress but no matching content
     if (hasQuizContent && quizProgressList.length > 0) {
-        const hasMatchingQuiz = quizQAContents.some(c => 
-            c.content.content_type === "Quiz" && 
+        const hasMatchingQuiz = quizQAContents.some(c =>
+            c.content.content_type === "Quiz" &&
             quizProgressList.some(p => p.quiz_id === c.content.name || p.quiz_id === c.content.content_reference)
         );
-        
+
         if (!hasMatchingQuiz) {
             console.log('Quiz content exists but no matching progress found. Adding available quiz scores.');
             quizProgressList.forEach(progress => {
                 if (progress.score > 0 || progress.max_score > 0) {
-                    scores.push({ 
-                        title: 'Quiz', 
-                        score: progress.score, 
-                        maxScore: progress.max_score || 0, 
-                        type: 'Quiz' 
+                    scores.push({
+                        title: 'Quiz',
+                        score: progress.score,
+                        maxScore: progress.max_score || 0,
+                        type: 'Quiz'
                     });
                 }
             });
         }
     }
-    
+
     // Add QA scores if we have QA progress but no matching content
     if (hasQAContent && qaProgressList.length > 0) {
-        const hasMatchingQA = quizQAContents.some(c => 
-            c.content.content_type === "Question Answer" && 
+        const hasMatchingQA = quizQAContents.some(c =>
+            c.content.content_type === "Question Answer" &&
             qaProgressList.some(p => p.question_answer === c.content.name || p.question_answer === c.content.content_reference)
         );
-        
+
         if (!hasMatchingQA) {
             console.log('QA content exists but no matching progress found. Adding available QA scores.');
             qaProgressList.forEach(progress => {
                 if (progress.score_added === 1 && (progress.score > 0 || progress.max_score > 0)) {
-                    scores.push({ 
-                        title: 'Question Answer', 
-                        score: progress.score, 
-                        maxScore: progress.max_score || 0, 
-                        type: 'Question Answer' 
+                    scores.push({
+                        title: 'Question Answer',
+                        score: progress.score,
+                        maxScore: progress.max_score || 0,
+                        type: 'Question Answer'
                     });
                 }
             });
@@ -206,9 +238,9 @@ async function checkQuizQACompletion(module: Module, user: any) {
     for (const { content } of quizQAContents) {
         console.log('Processing content:', content);
         let displayTitle = content.name;
-        if ((content as any).title) {
-            displayTitle = (content as any).title;
-        } else if ((content as any).content_type) {
+        if (content.title) {
+            displayTitle = content.title;
+        } else if (content.content_type) {
             displayTitle = `${content.content_type}`;
         }
         if (content.content_type === "Quiz") {
@@ -225,15 +257,15 @@ async function checkQuizQACompletion(module: Module, user: any) {
             if (!progress) {
                 // If no specific match found, use the first available quiz progress
                 // This handles cases where module content doesn't match progress records
-                progress = quizProgressList.length > 0 ? quizProgressList[0] : null;
-               
+                progress = quizProgressList.length > 0 ? quizProgressList[0] : undefined;
+
             }
-            
+
             if (!progress || typeof progress.score !== 'number') {
                 allCompleted = false;
             } else {
-               
-                scores.push({ title: displayTitle, score: progress.score, maxScore: progress.max_score || 0, type: 'Quiz' });
+
+                scores.push({ title: displayTitle, score: progress.score, maxScore: progress.max_score ?? 0, type: 'Quiz' });
             }
         } else if (content.content_type === "Question Answer") {
             // Only require a progress record to exist, not score_added
@@ -245,8 +277,8 @@ async function checkQuizQACompletion(module: Module, user: any) {
             if (!progress) {
                 // If no specific match found, use the first available QA progress
                 // This handles cases where module content doesn't match progress records
-                progress = qaProgressList.length > 0 ? qaProgressList[0] : null;
-                
+                progress = qaProgressList.length > 0 ? qaProgressList[0] : undefined;
+
             }
             console.log('QA progress for', content.name, 'content_reference:', content.content_reference, 'found:', progress);
             if (!progress) {
@@ -254,8 +286,8 @@ async function checkQuizQACompletion(module: Module, user: any) {
             } else {
                 // Only show score if score_added is set
                 if (progress.score_added === 1) {
-                    
-                    scores.push({ title: displayTitle, score: progress.score, maxScore: progress.max_score || 0, type: 'Question Answer' });
+
+                    scores.push({ title: displayTitle, score: progress.score, maxScore: progress.max_score ?? 0, type: 'Question Answer' });
                 }
             }
         }
@@ -263,8 +295,8 @@ async function checkQuizQACompletion(module: Module, user: any) {
     return { allCompleted, scores };
 }
 
-function getAllQuizQAItems(module: Module) { 
-    const items: Array<{title: string, type: string}> = [];
+function getAllQuizQAItems(module: CourseModule) {
+    const items: Array<{ title: string, type: string }> = [];
     if (!module || !Array.isArray(module.lessons)) return items;
     module.lessons.forEach((lesson) => {
         if (!lesson || !Array.isArray(lesson.chapters)) return
@@ -273,9 +305,9 @@ function getAllQuizQAItems(module: Module) {
             chapter.contents.forEach((content) => {
                 if (content.content_type === "Quiz" || content.content_type === "Question Answer") {
                     let displayTitle = content.name;
-                    if ((content as any).title) {
-                        displayTitle = (content as any).title;
-                    } else if ((content as any).content_type) {
+                    if (content.title) {
+                        displayTitle = content.title;
+                    } else if (content.content_type) {
                         displayTitle = `${content.content_type}`;
                     }
                     items.push({ title: displayTitle, type: content.content_type });
@@ -287,7 +319,8 @@ function getAllQuizQAItems(module: Module) {
 }
 
 // Production approach for progress calculation
-function getOverallProgress(module: Module, currentLessonIdx: number, currentChapterIdx: number, progress?: ModuleProgress | { progress: number; status: string; current_lesson: string; current_chapter: string; completed_on?: string; started_on?: string; } | null) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function getOverallProgress(module: CourseModule, currentLessonIdx: number, currentChapterIdx: number, progress?: ModuleProgress | { progress: number; status: string; current_lesson: string; current_chapter: string; completed_on?: string; started_on?: string; } | null) {
     // If we have progress data, use the centralized calculation
     if (progress) {
         const progressData = {
@@ -297,48 +330,52 @@ function getOverallProgress(module: Module, currentLessonIdx: number, currentCha
         };
         return calculateModuleProgress(progressData);
     }
-    
+
+
     // Fallback to chapter-based calculation if no progress data
     if (!module?.lessons?.length) return 0;
-    
+
     let totalChapters = 0;
     let completedChapters = 0;
-    
+
     // Calculate based on current position and completed chapters
     module.lessons.forEach((lesson, lessonIdx) => {
         lesson.chapters.forEach((chapter, chapterIdx) => {
             totalChapters += 1;
-            
+
             // Mark as completed if:
             // 1. Chapter has explicit "Completed" status
             // 2. Chapter is before current position
             // 3. Chapter is at current position and we've moved past it
-            if (chapter.progress === "Completed" || 
-                (lessonIdx < currentLessonIdx) || 
+            if (chapter.progress === "Completed" ||
+                (lessonIdx < currentLessonIdx) ||
                 (lessonIdx === currentLessonIdx && chapterIdx < currentChapterIdx)) {
                 completedChapters += 1;
             }
         });
     });
-    
+
     return totalChapters === 0 ? 0 : Math.round((completedChapters / totalChapters) * 100);
 }
 
 export default function ModuleDetail() {
     const params = useParams<{ moduleName: string }>();
     const moduleName = params.moduleName;
+    const [, setLocation] = useLocation();
     const { user, isLoading: userLoading, isLMSAdmin } = useUser();
-    const [isLoading, setIsLoading] = useState(true);
-    const [module, setModule] = useState<Module | null>(null);
+    const [module, setModule] = useState<CourseModule | null>(null);
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [progress, setProgress] = useState<ModuleProgress | null>(null);
     const [completed, setCompleted] = useState(false);
     const [started, setStarted] = useState(false);
+
+
     // Initialize current position based on user's actual progress
     const [currentLessonIdx, setCurrentLessonIdx] = useState(0);
     const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
     const [reviewing, setReviewing] = useState(false);
-    const [quizQAScores, setQuizQAScores] = useState<Array<{title: string, score: number, maxScore: number, type: string}>>([]);
+    const [quizQAScores, setQuizQAScores] = useState<Array<{ title: string, score: number, maxScore: number, type: string }>>([]);
+
 
     // Console logging: Component mount
 
@@ -355,9 +392,9 @@ export default function ModuleDetail() {
     });
 
     // Get user identifier with multiple fallbacks for Administrator compatibility
-    const getUserIdentifier = () => {
+    const getUserIdentifier = (): string | null => {
         if (!user) return null;
-        return user.email || user.name || (user as any).user || (user as any).user_id || (user as any).id || user;
+        return user.email || user.name || (user as UserInfo).user || (user as UserInfo).user_id || (user as UserInfo).id || String(user);
     };
 
     const userIdentifier = getUserIdentifier();
@@ -373,13 +410,12 @@ export default function ModuleDetail() {
             componentMountCount: 'tracking'
         });
     }, [userLoading, userIdentifier, user]);
-    
-    // Track API call trigger
+
     useEffect(() => {
-        const shouldCallAPI = !!(userIdentifier && moduleName && !userLoading && userIdentifier !== '');
-       
+        // API call trigger tracking removed as it was unused
     }, [userIdentifier, moduleName, userLoading]);
-    
+
+
     // Persistent progress state - Production approach
     const [savedProgress, setSavedProgress] = useState<{
         progress: number;
@@ -392,10 +428,11 @@ export default function ModuleDetail() {
 
     // Fetch module data with retry mechanism - only when user and moduleName are available
     // For admins, use get_module_with_details API; for learners, use LearnerModuleData
-    const { data: moduleListData, error: moduleListError, isLoading: moduleDataLoading, mutate: refetchModuleData } = useFrappeGetCall<any>(
-        isLMSAdmin 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: moduleListData, error: moduleListError, isLoading: moduleDataLoading, mutate: refetchModuleData } = useFrappeGetCall<Record<string, any>>(
+        isLMSAdmin
             ? "novel_lms.novel_lms.api.module_management.get_module_with_details"
-            : "novel_lms.novel_lms.api.module_management.LearnerModuleData",
+            : "novel_lms.novel_lms.api.module_management.get_learner_module_data",
         isLMSAdmin
             ? { module_id: moduleName }
             : {
@@ -408,10 +445,10 @@ export default function ModuleDetail() {
             enabled: !!(userIdentifier && moduleName && !userLoading && userIdentifier !== '') // Only call API when user is loaded and moduleName exists
         }
     );
-    
+
     // Console logging: API call states
     useEffect(() => {
-        
+
     }, [moduleDataLoading, moduleListData, moduleListError, userIdentifier, moduleName, userLoading]);
 
     // Simplified retry mechanism - only retry on actual errors, not empty results
@@ -428,7 +465,7 @@ export default function ModuleDetail() {
     // Retry API call when user becomes available (fixes timing issue)
     useEffect(() => {
         if (userIdentifier && moduleName && !userLoading && !moduleListData && !moduleDataLoading && !moduleListError) {
-           
+
             refetchModuleData();
         }
     }, [userIdentifier, moduleName, userLoading, moduleListData, moduleDataLoading, moduleListError, refetchModuleData]);
@@ -447,50 +484,46 @@ export default function ModuleDetail() {
             hasError: !!moduleListError,
             timestamp: new Date().toISOString()
         });
-    }, [moduleName, userIdentifier, moduleDataLoading, moduleListData, moduleListError]);
-    
-    
+    }, [moduleName, userIdentifier, moduleDataLoading, moduleListData, moduleListError, user]);
+
+
     // Extract module data only when API call is complete - Fixed extraction paths
     let moduleData = null;
     if (moduleListData && !moduleDataLoading) {
-        
-        
-        const response = moduleListData as any;
-        
-        
+
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const response = moduleListData as Record<string, any>;
+
+
         // For admin users using get_module_with_details API, the response structure is different
         if (isLMSAdmin && response?.message) {
             // get_module_with_details returns data directly in message field or message.data
             moduleData = response.message.data || response.message;
-            
+
         }
         // For learner users using LearnerModuleData API
         else if (response?.message?.message?.modules && Array.isArray(response.message.message.modules) && response.message.message.modules.length > 0) {
             moduleData = response.message.message.modules[0];
-            
+
         }
         // Try message.modules (wrapped by frappe-react-sdk)
         else if (response?.message?.modules && Array.isArray(response.message.modules) && response.message.modules.length > 0) {
             moduleData = response.message.modules[0];
-          
-        }
-        // Try message.message.modules (double-wrapped response) - NEW FIX
-        else if (response?.message?.message?.modules && Array.isArray(response.message.message.modules) && response.message.message.modules.length > 0) {
-            moduleData = response.message.message.modules[0];
-            
+
         }
         else {
-            
+            // No matching response format found
+            console.log('No matching response format for module data');
         }
-        
+
         // Log extracted data for debugging
         if (moduleData) {
-            
-            
+
+
             // Check if contents have data
             if (moduleData.lessons?.[0]?.chapters?.[0]?.contents?.[0]) {
-                const firstContent = moduleData.lessons[0].chapters[0].contents[0];
-               
+                // Content data is available for the first chapter
             }
         }
     }
@@ -508,28 +541,28 @@ export default function ModuleDetail() {
     const { call: startModule } = useFrappePostCall('novel_lms.novel_lms.api.progress_tracking.add_learner_progress');
     // Fetch progress and module structure
     const shouldFetchProgress = started && !!moduleData && !!userIdentifier && userIdentifier !== '' && !!moduleName && !userLoading;
-    const { data: progressData } = useFrappeGetCall<ApiResponse<{ module: Module }>>("novel_lms.novel_lms.api.progress_tracking.get_learner_progress", {
-        user: userIdentifier,
+    const { data: progressData } = useFrappeGetCall<ApiResponse<{ module: CourseModule }>>("novel_lms.novel_lms.api.progress_tracking.get_learner_progress", {
+        user: userIdentifier as string,
         module: moduleName
     }, {
         enabled: shouldFetchProgress
     });
 
-    
+
     // Post call for updating progress
     const { call: updateProgress, loading: updateLoading } = useFrappePostCall('novel_lms.novel_lms.api.progress_tracking.update_learner_progress');
-    
+
     // Phase 2: Completion data API hook with refetch capability - Only enabled when user is available
     const { data: completionDataResponse, error: completionDataError, mutate: refetchCompletionData } = useLearnerCompletionData(
-        userIdentifier || '',
+        (userIdentifier as string) || '',
         moduleName || '',
         { enabled: !!(userIdentifier && userIdentifier !== '' && moduleName && !userLoading) } // Only enabled when user is properly loaded
     );
 
     // Fetch dashboard data ONLY for sidebar progress - isolated to this component
     // This doesn't affect the main dashboard page (Modules.tsx) which has its own dashboard API call
-    const { data: dashboardData, error: dashboardError, mutate: refetchDashboard } = useLearnerDashboard(
-        userIdentifier || '',
+    const { data: dashboardData, mutate: refetchDashboard } = useLearnerDashboard(
+        (userIdentifier as string) || '',
         { enabled: !!(userIdentifier && userIdentifier !== '' && !userLoading && !isLMSAdmin) }
     );
 
@@ -542,122 +575,132 @@ export default function ModuleDetail() {
                 if (data.completed_lessons !== undefined) {
                     // This is the correct structure from our API
                     setCompletionData(data);
-                    
+
                 } else {
                     // This might be from a different API call, ignore it
-                 
+
                 }
             }
-        } catch (error) {
-            
+        } catch {
+            // Completion data processing errors are non-critical
         }
     }, [completionDataResponse]);
 
     // Phase 2: Force completion data refresh when resuming
     useEffect(() => {
         if (started && userIdentifier && moduleName && !isLMSAdmin) {
-            
+
             refetchCompletionData();
         }
     }, [started, userIdentifier, moduleName, isLMSAdmin, refetchCompletionData]);
-    
+
     // Force refresh completion data when module changes (navigation back from dashboard)
     useEffect(() => {
         if (moduleName && userIdentifier && !isLMSAdmin) {
-           
             refetchCompletionData();
         }
     }, [moduleName, userIdentifier, isLMSAdmin, refetchCompletionData]);
 
+    console.log('🎬 ModuleDetail State:', {
+        started,
+        reviewing,
+        isLMSAdmin,
+        hasModule: !!module,
+        progressStatus: progress?.status,
+        moduleDataLoading,
+        userLoading,
+        moduleName
+    });
+
     // Fix resume bug: Set current position based on user's actual progress
     useEffect(() => {
         if (module?.lessons && !isLMSAdmin) {
-            
+
             // If module is completed, don't set position - let completion screen show
             if (module.progress?.status === "Completed") {
-                
+
                 return;
             }
-            
+
             // PRIORITY 1: Use module data's current_position (MOST RELIABLE)
-            if ((module.progress as any)?.current_position?.chapter) {
-                const currentChapterName = (module.progress as any).current_position.chapter;
-                
+            if (module.progress?.current_position?.chapter) {
+                const currentChapterName = module.progress.current_position.chapter;
+
                 // Find the lesson containing this chapter
-                const lessonIdx = module.lessons.findIndex(lesson => 
+                const lessonIdx = module.lessons.findIndex(lesson =>
                     lesson.chapters?.some(chapter => chapter.name === currentChapterName)
                 );
-                
+
                 if (lessonIdx !== -1) {
                     // Find the chapter index within that lesson
                     const chapterIdx = module.lessons[lessonIdx].chapters?.findIndex(
                         chapter => chapter.name === currentChapterName
                     ) ?? 0;
-                    
-                   
+
+
                     setCurrentLessonIdx(lessonIdx);
                     setCurrentChapterIdx(chapterIdx);
                     return;
                 }
             }
-            
+
             // PRIORITY 2: Use completion data's in_progress_chapters as fallback
             if (completionData?.in_progress_chapters?.length > 0) {
                 const currentChapterName = completionData.in_progress_chapters[0];
-                
-                
+
+
                 // Find the lesson containing this chapter
-                const lessonIdx = module.lessons.findIndex(lesson => 
+                const lessonIdx = module.lessons.findIndex(lesson =>
                     lesson.chapters?.some(chapter => chapter.name === currentChapterName)
                 );
-                
+
                 if (lessonIdx !== -1) {
                     // Find the chapter index within that lesson
                     const chapterIdx = module.lessons[lessonIdx].chapters?.findIndex(
                         chapter => chapter.name === currentChapterName
                     ) ?? 0;
-                    
-                    
+
+
                     setCurrentLessonIdx(lessonIdx);
                     setCurrentChapterIdx(chapterIdx);
                     return;
                 }
             }
-            
+
             // PRIORITY 3: Use completion data's current_position as final fallback
             if (completionData?.current_position) {
-                
-                
+
+
                 if (completionData.current_position.type === 'Chapter') {
                     const currentChapterName = completionData.current_position.reference_id;
-                    
+
                     // Find the lesson containing this chapter
-                    const lessonIdx = module.lessons.findIndex(lesson => 
+                    const lessonIdx = module.lessons.findIndex(lesson =>
                         lesson.chapters?.some(chapter => chapter.name === currentChapterName)
                     );
-                    
+
                     if (lessonIdx !== -1) {
                         // Find the chapter index within that lesson
                         const chapterIdx = module.lessons[lessonIdx].chapters?.findIndex(
                             chapter => chapter.name === currentChapterName
                         ) ?? 0;
-                        
-                        
+
+
                         setCurrentLessonIdx(lessonIdx);
                         setCurrentChapterIdx(chapterIdx);
                         return;
                     }
                 }
             }
-            
-            
+
+
         }
     }, [module?.progress, module?.lessons, completionData, isLMSAdmin]);
 
     // Phase 2: Immediate API call on mount to prevent 0% progress
     useEffect(() => {
         if (userIdentifier && moduleName && !isLMSAdmin) {
-            
+
             refetchCompletionData();
         }
     }, [userIdentifier, moduleName, isLMSAdmin, refetchCompletionData]);
@@ -665,7 +708,7 @@ export default function ModuleDetail() {
     // Retry completion data API when user becomes available (fixes timing issue)
     useEffect(() => {
         if (userIdentifier && userIdentifier !== '' && moduleName && !userLoading && !completionDataResponse && !completionDataError && !isLMSAdmin) {
-           
+
             refetchCompletionData();
         }
     }, [userIdentifier, moduleName, userLoading, completionDataResponse, completionDataError, isLMSAdmin, refetchCompletionData]);
@@ -680,40 +723,40 @@ export default function ModuleDetail() {
 
     // Phase 2: Debug logging for hook dependencies
     useEffect(() => {
-        
+
     }, [userIdentifier, moduleName, isLMSAdmin, reviewing, started, completionDataResponse, completionDataError]);
 
     // Phase 2: Helper function to check if a lesson is completed based on its chapters
     const isLessonCompletedByChapters = (lessonName: string, completedChapters: string[]) => {
         if (!module?.lessons) return false;
-        
+
         const lesson = module.lessons.find(l => l.name === lessonName);
         if (!lesson?.chapters || lesson.chapters.length === 0) return false;
-        
+
         // Check if all chapters in the lesson are completed
         return lesson.chapters.every(chapter => completedChapters.includes(chapter.name));
     };
 
     // Phase 3: Frontend-only locking using calculated completionData
-    const buildIsAccessible = (completionData: CompletionData | null, moduleData: Module | null) => {
+    const buildIsAccessible = (completionData: CompletionData | null, moduleData: CourseModule | null) => {
         if (!moduleData?.lessons?.length) return () => false;
 
         // Check if module is completed - if so, allow access to everything
         if (moduleData.progress?.status === "Completed") {
-            console.log('🎯 Module is completed - allowing access to all content');
+            console.log('🎯 CourseModule is completed - allowing access to all content');
             return () => true; // Allow access to all lessons and chapters
         }
 
         // Use calculated data from getSidebarCompletionData (not empty API arrays)
         const completedLessons = new Set(completionData?.completed_lessons ?? []);
         const completedChapters = new Set(completionData?.completed_chapters ?? []);
-        
+
         console.log('🔍 buildIsAccessible using calculated data:', {
             completedLessons: Array.from(completedLessons),
             completedChapters: Array.from(completedChapters),
             inProgressChapters: completionData?.in_progress_chapters
         });
-        
+
         // Get current position from completionData OR from in_progress_chapters OR from UI state as fallback
         const currentChapter = completionData?.current_position?.type === 'Chapter'
             ? completionData.current_position.reference_id
@@ -764,12 +807,12 @@ export default function ModuleDetail() {
     // Phase 2: Function to track chapter start (In Progress)
     const trackChapterStart = async (lessonName: string, chapterName: string) => {
         if (!user || !moduleName) return;
-        
+
         try {
             // Check if chapter is already completed
             const isChapterCompleted = completionData?.completed_chapters?.includes(chapterName) || false;
             const isChapterInProgress = completionData?.in_progress_chapters?.includes(chapterName) || false;
-            
+
             if (!isChapterCompleted && !isChapterInProgress) {
                 // Track as "In Progress"
                 await updateProgress({
@@ -779,37 +822,53 @@ export default function ModuleDetail() {
                     chapter: chapterName,
                     status: "In Progress"
                 });
-                
+
                 // Update local completion data
                 setCompletionData(prev => ({
                     ...prev,
                     in_progress_chapters: [...(prev?.in_progress_chapters || []), chapterName]
                 }));
-                
+
                 // Force refresh completion data to get latest progress
                 refetchCompletionData();
-                
-                
+
+
             }
-        } catch (error) {
-            
+        } catch {
+            // Chapter tracking errors are non-critical
         }
     };
 
+    // NEW: Merge image from dashboardData if available
+    useEffect(() => {
+        if (dashboardData?.message && Array.isArray(dashboardData.message) && moduleName && module && !module.image) {
+            const dashboardModule = dashboardData.message.find((item: LearnerDashboardData) =>
+                (item.module?.name === moduleName) || ((item.module as { name1?: string })?.name1 === moduleName)
+            );
+            if (dashboardModule?.module?.image) {
+                console.log('🖼️ Syncing module image from dashboard data:', dashboardModule.module.image);
+                setModule(prev => prev ? { ...prev, image: dashboardModule.module.image } : null);
+            }
+        }
+    }, [dashboardData, moduleName, module]);
+
     // Update module data when fetched - Consolidated state setting with Admin priority
     useEffect(() => {
-        
+
         if (moduleData && !module) { // Only set if module is not already set to prevent race conditions
-            
+
             setModule(moduleData);
-            
-            // For Administrator, immediately set started to true to bypass welcome screen
-            if (isLMSAdmin) {
-                setStarted(true);
-                
-            } else if (moduleData.progress?.status === "In Progress" || moduleData.progress?.status === "Completed") {
-                setStarted(true);
+
+            if (moduleData.progress) {
                 setProgress(moduleData.progress);
+                // For Administrator, immediately set started to true to bypass welcome screen
+                if (isLMSAdmin) {
+                    setStarted(true);
+                } else if (moduleData.progress.status === "In Progress" || moduleData.progress.status === "Completed") {
+                    setStarted(true);
+                }
+            } else if (isLMSAdmin) {
+                setStarted(true);
             }
         }
     }, [moduleData, isLMSAdmin, module]);
@@ -821,7 +880,7 @@ export default function ModuleDetail() {
             if (progressData.data.module.progress) {
                 const moduleProgress = progressData.data.module.progress;
                 setProgress(moduleProgress);
-                
+
                 // Save progress to persistent state
                 setSavedProgress({
                     progress: moduleProgress.progress || 0,
@@ -836,8 +895,9 @@ export default function ModuleDetail() {
     }, [progressData]);
 
     // Safely check progress status
+    // Safely check progress status and set completed state
     useEffect(() => {
-        if (progress?.status !== "Not Started") {
+        if (progress?.status === "In Progress" || progress?.status === "Completed") {
             setStarted(true);
         }
         // IMPORTANT: Always set completed state when progress status is "Completed"
@@ -853,13 +913,13 @@ export default function ModuleDetail() {
     useEffect(() => {
         if (savedProgress && module?.lessons?.length) {
             // Restore current position from saved progress
-            const lessonIdx = savedProgress.current_lesson 
+            const lessonIdx = savedProgress.current_lesson
                 ? module.lessons.findIndex(l => l.name === savedProgress.current_lesson)
                 : 0;
             const chapterIdx = savedProgress.current_chapter && lessonIdx >= 0
                 ? module.lessons[lessonIdx]?.chapters?.findIndex(c => c.name === savedProgress.current_chapter) || 0
                 : 0;
-            
+
             if (lessonIdx >= 0) {
                 setCurrentLessonIdx(lessonIdx);
                 setCurrentChapterIdx(Math.max(0, chapterIdx));
@@ -870,27 +930,27 @@ export default function ModuleDetail() {
     // Sync UI indices with progress (only when progress has valid current_lesson/chapter)
     useEffect(() => {
         if (progress && (module?.lessons?.length ?? 0) > 0) {
-          if (progress.status === "Completed") {
-            // For completed modules, default to first lesson/chapter
-            setCurrentLessonIdx(0);
-            setCurrentChapterIdx(0);
-       
-          } else if (progress.current_lesson && progress.current_chapter) {
-            // For in-progress modules, use progress data
-            let lessonIdx = module?.lessons?.findIndex(l => l.name === progress.current_lesson) ?? 0;
-            if (lessonIdx < 0) lessonIdx = 0;
-            const lesson = module?.lessons?.[lessonIdx];
-            let chapterIdx = lesson?.chapters?.length
-              ? lesson.chapters.findIndex(c => c.name === progress.current_chapter)
-              : 0;
-            if (chapterIdx < 0) chapterIdx = 0;
-            
-            console.log('🔄 Syncing UI indices with progress:', { lessonIdx, chapterIdx, current_lesson: progress.current_lesson, current_chapter: progress.current_chapter });
-            setCurrentLessonIdx(lessonIdx);
-            setCurrentChapterIdx(chapterIdx);
-          }
+            if (progress.status === "Completed") {
+                // For completed modules, default to first lesson/chapter
+                setCurrentLessonIdx(0);
+                setCurrentChapterIdx(0);
+
+            } else if (progress.current_lesson && progress.current_chapter) {
+                // For in-progress modules, use progress data
+                let lessonIdx = module?.lessons?.findIndex(l => l.name === progress.current_lesson) ?? 0;
+                if (lessonIdx < 0) lessonIdx = 0;
+                const lesson = module?.lessons?.[lessonIdx];
+                let chapterIdx = lesson?.chapters?.length
+                    ? lesson.chapters.findIndex(c => c.name === progress.current_chapter)
+                    : 0;
+                if (chapterIdx < 0) chapterIdx = 0;
+
+                console.log('🔄 Syncing UI indices with progress:', { lessonIdx, chapterIdx, current_lesson: progress.current_lesson, current_chapter: progress.current_chapter });
+                setCurrentLessonIdx(lessonIdx);
+                setCurrentChapterIdx(chapterIdx);
+            }
         }
-      }, [progress, module]);
+    }, [progress, module]);
 
     // Force progress recalculation when completion data changes
     useEffect(() => {
@@ -902,35 +962,35 @@ export default function ModuleDetail() {
     const getUnifiedProgress = () => {
         // If module is completed, return 100%
         if (progress?.status === "Completed") return 100;
-        
+
         // PRIORITY 1: Use module progress data (most reliable when completion data is incomplete)
-        if (module?.progress && (module.progress as any)?.overall_progress !== undefined) {
-            
-            return (module.progress as any).overall_progress;
+        if (module?.progress?.overall_progress !== undefined) {
+
+            return module.progress.overall_progress;
         }
-        
+
         // PRIORITY 2: Use completion data only if it's valid and not 0
         if (completionData?.overall_progress !== undefined && completionData.overall_progress > 0) {
-            
+
             return completionData.overall_progress;
         }
-        
+
         // Fallback: Calculate from completion data arrays
         if (completionData?.total_chapters && completionData.total_chapters > 0) {
             const completedCount = completionData.completed_chapters?.length || 0;
             const progressPercentage = Math.round((completedCount / completionData.total_chapters) * 100 * 100) / 100;
-           
+
             return progressPercentage;
         }
-        
+
         // Final fallback: Use module progress data if available, otherwise 0
-        if (module?.progress && (module.progress as any)?.overall_progress !== undefined) {
-           
-            return (module.progress as any).overall_progress;
+        if (module?.progress?.overall_progress !== undefined) {
+
+            return module.progress.overall_progress;
         }
-        
+
         // If no progress data available, return 0
-       
+
         return 0;
     };
     // Add this new function after getUnifiedProgress()
@@ -940,12 +1000,12 @@ export default function ModuleDetail() {
         if (progress?.status === "Completed") {
             return 100;
         }
-        
+
         // PRIORITY 1: Use dashboard API progress (most dynamic and accurate from Progress Tracker)
         // This is ONLY used for sidebar progress, doesn't affect main dashboard
         if (dashboardData?.message && Array.isArray(dashboardData.message) && moduleName) {
             const moduleProgress = dashboardData.message.find(
-                (item: any) => item.module?.name === moduleName || item.progress?.module === moduleName
+                (item: LearnerDashboardData) => item.module?.name === moduleName || (item.progress as { module?: string })?.module === moduleName
             );
             // Dashboard API returns progress in item.progress.progress
             if (moduleProgress?.progress?.progress !== undefined && moduleProgress.progress.progress !== null) {
@@ -953,64 +1013,65 @@ export default function ModuleDetail() {
                 return moduleProgress.progress.progress;
             }
         }
-        
+
         // PRIORITY 2: Fallback to completion data calculation
         if (!sidebarCompletionData) return getUnifiedProgress();
-        
+
         const completedChapters = sidebarCompletionData.completed_chapters?.length || 0;
-        
+
         // Calculate total chapters from module data instead of API data
         const totalChapters = module?.lessons?.reduce((total, lesson) => total + lesson.chapters.length, 0) || 0;
-        
+
         // If all chapters are completed, return 100% (especially important for review mode)
         if (totalChapters > 0 && completedChapters === totalChapters) {
             return 100;
         }
-        
+
         if (totalChapters === 0) return 0;
-        
+
         const progressPercentage = Math.round((completedChapters / totalChapters) * 100 * 100) / 100;
         console.log('📊 Using sidebar completion data progress (fallback):', progressPercentage, `(${completedChapters}/${totalChapters})`);
-        
+
         return progressPercentage;
     };
     // Phase 2: Use unified progress calculation - Single Source of Truth
-    const overallProgress = getUnifiedProgress();
-    
+    getUnifiedProgress();
+
+
     // Convert completion data to sidebar-compatible format with real-time updates
     const getSidebarCompletionData = () => {
         if (isLMSAdmin) return undefined;
-        
+
         // Use real completion data if available, but calculate completed items if arrays are empty
         if (completionData) {
             console.log('🔍 Using real completion data for sidebar:', completionData);
-            
+
             // If completion data has empty arrays, calculate completed items from in_progress_chapters
-            let completedChapters = completionData.completed_chapters || [];
-            let completedLessons = completionData.completed_lessons || [];
-            
+            const completedChapters = completionData.completed_chapters || [];
+            const completedLessons = completionData.completed_lessons || [];
+
             // If arrays are empty, calculate completed items from module data or in_progress_chapters
             if (completedChapters.length === 0 && completedLessons.length === 0) {
                 let currentChapterName = null;
-                
+
                 // Try to get current chapter from in_progress_chapters first
                 if (completionData.in_progress_chapters?.length > 0) {
                     currentChapterName = completionData.in_progress_chapters[0];
-                   
+
                 }
                 // Fallback to module data current position
-                else if (module?.progress && (module.progress as any)?.current_position?.chapter) {
-                    currentChapterName = (module.progress as any).current_position.chapter;
-                    
+                else if (module?.progress?.current_position?.chapter) {
+                    currentChapterName = module.progress.current_position.chapter;
+
                 }
-                
+
                 if (currentChapterName && module?.lessons) {
                     let foundCurrentChapter = false;
-                    
-                    module.lessons.forEach((lesson: any) => {
+
+                    module.lessons.forEach((lesson: Lesson) => {
                         let lessonCompleted = true;
-                        
-                        lesson.chapters.forEach((chapter: any) => {
+
+                        lesson.chapters.forEach((chapter: Chapter) => {
                             if (chapter.name === currentChapterName) {
                                 foundCurrentChapter = true;
                                 lessonCompleted = false;
@@ -1022,13 +1083,13 @@ export default function ModuleDetail() {
                                 lessonCompleted = false;
                             }
                         });
-                        
+
                         // If all chapters in lesson are completed, mark lesson as completed
                         if (lessonCompleted && lesson.chapters.length > 0) {
                             completedLessons.push(lesson.name);
                         }
                     });
-                    
+
                     console.log('🔍 Calculated completed items:', {
                         completedChapters,
                         completedLessons,
@@ -1036,7 +1097,7 @@ export default function ModuleDetail() {
                     });
                 }
             }
-            
+
             return {
                 completed_lessons: completedLessons,
                 completed_chapters: completedChapters,
@@ -1047,26 +1108,26 @@ export default function ModuleDetail() {
                 overall_progress: completionData.overall_progress || 0
             };
         }
-        
+
         // Fallback to module progress data
         if (!module?.progress) return undefined;
-        
-        const moduleProgress = module.progress as any;
-        const completionDetails = moduleProgress.completion_details || {};
+
+        const moduleProgress = module.progress;
+        const completionDetails = moduleProgress?.completion_details || {};
         const currentPosition = moduleProgress.current_position;
-        
+
         // Calculate completed chapters based on current position
         const completedChapters: string[] = [];
         const completedLessons: string[] = [];
         const inProgressChapters: string[] = [];
-        
+
         // Check if module is completed
         if (moduleProgress.status === "Completed") {
             // If module is completed, mark ALL chapters and lessons as completed
-           
-            module.lessons.forEach((lesson: any) => {
+
+            module.lessons.forEach((lesson: Lesson) => {
                 completedLessons.push(lesson.name);
-                lesson.chapters.forEach((chapter: any) => {
+                lesson.chapters.forEach((chapter: Chapter) => {
                     completedChapters.push(chapter.name);
                 });
             });
@@ -1074,14 +1135,14 @@ export default function ModuleDetail() {
             // Normal logic for in-progress modules
             const currentChapterName = currentPosition.chapter;
             let foundCurrentChapter = false;
-            
+
             // Go through all lessons and chapters to determine completion status
-            module.lessons.forEach((lesson: any) => {
+            module.lessons.forEach((lesson: Lesson) => {
                 let lessonCompleted = true;
-                
-                lesson.chapters.forEach((chapter: any) => {
+
+                lesson.chapters.forEach((chapter: Chapter) => {
                     const chapterName = chapter.name;
-                    
+
                     if (chapterName === currentChapterName) {
                         foundCurrentChapter = true;
                         inProgressChapters.push(chapterName);
@@ -1094,50 +1155,50 @@ export default function ModuleDetail() {
                         lessonCompleted = false;
                     }
                 });
-                
+
                 // If all chapters in lesson are completed, mark lesson as completed
                 if (lessonCompleted && lesson.chapters.length > 0) {
                     completedLessons.push(lesson.name);
                 }
             });
         }
-        
-        
-        
+
+
+
         return {
             completed_lessons: completedLessons,
             completed_chapters: completedChapters,
             in_progress_chapters: inProgressChapters,
-            current_position: currentPosition,
+            current_position: currentPosition || null,
             total_lessons: module?.lessons?.length || 0,
-            total_chapters: completionDetails.total_lesson_chapter_items || 0,
-            overall_progress: moduleProgress.overall_progress || 0
+            total_chapters: (completionDetails as Record<string, number>).total_lesson_chapter_items || 0,
+            overall_progress: moduleProgress?.overall_progress || 0
         };
     };
-    
+
     const sidebarCompletionData = getSidebarCompletionData();
-    
+
     // Make sidebar progress reactive to dashboard data changes
     // This is isolated to sidebar only and doesn't affect main dashboard
     const sidebarProgress = useMemo(() => {
         return getCompletionBasedProgress();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         dashboardData?.message, // Dashboard API data changes - key for dynamic updates
         moduleName, // Current module
         progress?.status, // Progress status changes
         sidebarCompletionData?.completed_chapters?.length, // Completed chapters count changes
-        module?.lessons // Module structure changes
+        module?.lessons // CourseModule structure changes
     ]);
-    
+
     // Create the sidebar isAccessible function using sidebar completion data
-    const sidebarIsAccessible = buildIsAccessible(sidebarCompletionData || null, module);
-    
+    const sidebarIsAccessible = buildIsAccessible((sidebarCompletionData as CompletionData) || null, module);
+
     // Phase 2: Show loading state only if completion data is actually loading and not available
-    const isCompletionDataLoading = !completionDataResponse && !completionDataError && userIdentifier && userIdentifier !== '' && moduleName && !completionData;
-    
+
     // Phase 2: Debug progress calculation
-    
-    
+
+
     // Synchronize completion data with module progress for real-time updates
     useEffect(() => {
         if (completionData && progress) {
@@ -1151,8 +1212,9 @@ export default function ModuleDetail() {
                 };
             });
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [completionData]);
-    
+
     // Update sidebar completion data when completion data changes for real-time sidebar updates
     useEffect(() => {
         if (completionData) {
@@ -1161,7 +1223,7 @@ export default function ModuleDetail() {
             // The getSidebarCompletionData function will be called again with updated completionData
         }
     }, [completionData, module?.progress]);
-    
+
     // Refetch dashboard data when progress updates to keep sidebar progress in sync
     // This is isolated to this component and doesn't affect main dashboard
     useEffect(() => {
@@ -1173,12 +1235,49 @@ export default function ModuleDetail() {
             return () => clearTimeout(timeoutId);
         }
     }, [progress?.status, userIdentifier, isLMSAdmin, refetchDashboard]);
-    
+
     // Debug sidebar data
-    
+
 
 
     // Navigation handlers
+    const handleLessonClick = (lessonName: string) => {
+        if (!module?.lessons) return;
+        const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
+        if (lessonIdx !== -1) {
+            setCurrentLessonIdx(lessonIdx);
+            setCurrentChapterIdx(0);
+        }
+    };
+
+    const handleChapterClick = async (lessonName: string, chapterName: string) => {
+        if (!module?.lessons) return;
+        const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
+        if (lessonIdx === -1) return;
+
+        const chapterIdx = module.lessons[lessonIdx].chapters.findIndex(c => c.name === chapterName);
+        if (chapterIdx === -1) return;
+
+        setCurrentLessonIdx(lessonIdx);
+        setCurrentChapterIdx(chapterIdx);
+
+        if (!reviewing && !isLMSAdmin && userIdentifier) {
+            await trackChapterStart(lessonName, chapterName);
+
+            setSavedProgress(prev => ({
+                ...(prev || {
+                    progress: 0,
+                    status: "In Progress",
+                    current_lesson: "",
+                    current_chapter: "",
+                    completed_on: undefined,
+                    started_on: new Date().toISOString()
+                }),
+                current_lesson: lessonName,
+                current_chapter: chapterName
+            }));
+        }
+    };
     const handlePrevious = async () => {
         if (!module?.lessons?.length) return;
         let lessonIdx = currentLessonIdx;
@@ -1199,7 +1298,7 @@ export default function ModuleDetail() {
                 chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
                 status: "In Progress"
             });
-            
+
             // Update both progress states
             const newProgress: ModuleProgress = {
                 ...progress!,
@@ -1208,7 +1307,7 @@ export default function ModuleDetail() {
                 status: "In Progress"
             };
             setProgress(newProgress);
-            
+
             // Update saved progress state
             setSavedProgress(prev => ({
                 ...prev,
@@ -1217,7 +1316,7 @@ export default function ModuleDetail() {
                 status: "In Progress",
                 progress: prev?.progress || 0
             }));
-            
+
             // Update module progress to reflect current chapter
             if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
                 const updatedModule = { ...module };
@@ -1226,7 +1325,7 @@ export default function ModuleDetail() {
                 }
                 setModule(updatedModule);
             }
-            
+
             // Force refresh completion data to get latest progress
             refetchCompletionData();
             // Refetch dashboard data to update sidebar progress (isolated to this component)
@@ -1236,27 +1335,27 @@ export default function ModuleDetail() {
 
     const handleNext = async () => {
         if (!module?.lessons?.length) return;
-        
+
         // Check review mode FIRST, before checking completed status
         // This allows navigation in review mode even when module is completed
         if (reviewing) {
             let lessonIdx = currentLessonIdx;
             let chapterIdx = currentChapterIdx;
             const currentLesson = module.lessons[lessonIdx];
-            
+
             // Safety check: ensure currentLesson exists
             if (!currentLesson || !currentLesson.chapters || currentLesson.chapters.length === 0) {
                 console.warn('Review mode: Invalid lesson or chapter data', { lessonIdx, chapterIdx, currentLesson });
                 return;
             }
-            
-            console.log('Review mode: handleNext called', { 
-                lessonIdx, 
-                chapterIdx, 
+
+            console.log('Review mode: handleNext called', {
+                lessonIdx,
+                chapterIdx,
                 totalChapters: currentLesson.chapters.length,
                 totalLessons: module.lessons.length
             });
-            
+
             if (chapterIdx < currentLesson.chapters.length - 1) {
                 // Move to next chapter in the same lesson
                 chapterIdx += 1;
@@ -1277,7 +1376,7 @@ export default function ModuleDetail() {
             }
             return;
         }
-        
+
         // Only check completed status if NOT in review mode
         if (completed) {
             return;
@@ -1287,22 +1386,21 @@ export default function ModuleDetail() {
             setCompleted(true);
             return;
         }
-        
+
         let lessonIdx = currentLessonIdx;
         let chapterIdx = currentChapterIdx;
         const currentLesson = module.lessons[lessonIdx];
         const currentChapter = currentLesson.chapters[chapterIdx];
-        
+
         // Phase 2: Smart completion checking - only update if not already completed
         const isCurrentChapterCompleted = completionData?.completed_chapters?.includes(currentChapter.name) || false;
-        const isCurrentLessonCompleted = completionData?.completed_lessons?.includes(currentLesson.name) || false;
-        
-        
-        
+
+
+
         // If this is the last chapter of the last lesson, check Quiz/QA completion
         const isLastLesson = lessonIdx === module.lessons.length - 1;
         const isLastChapter = chapterIdx === currentLesson.chapters.length - 1;
-        
+
         if (isLastLesson && isLastChapter) {
             const { allCompleted, scores } = await checkQuizQACompletion(module, user);
             if (!allCompleted) {
@@ -1323,7 +1421,7 @@ export default function ModuleDetail() {
             }
             setQuizQAScores(scores);
             setCompleted(true);
-            
+
             const completedProgress: ModuleProgress = {
                 ...progress!,
                 status: "Completed",
@@ -1331,7 +1429,7 @@ export default function ModuleDetail() {
                 progress: 100
             };
             setProgress(completedProgress);
-            
+
             // Update saved progress state to ensure completion screen stays visible
             setSavedProgress(prev => ({
                 ...prev,
@@ -1341,7 +1439,7 @@ export default function ModuleDetail() {
                 current_lesson: currentLesson.name,
                 current_chapter: currentChapter.name
             }));
-            
+
             // Only update backend if not already completed
             if (!isCurrentChapterCompleted) {
                 await updateProgress({
@@ -1351,24 +1449,24 @@ export default function ModuleDetail() {
                     chapter: currentChapter.name,
                     status: "Completed"
                 });
-                
+
                 // Optimistic Update: Immediately update UI with real-time progress calculation
                 setCompletionData(prev => {
                     const newCompletedChapters = [...(prev?.completed_chapters || []), currentChapter.name];
                     const newInProgressChapters = (prev?.in_progress_chapters || []).filter(ch => ch !== currentChapter.name);
                     const newOverallProgress = prev?.total_chapters ? Math.round((newCompletedChapters.length / prev.total_chapters) * 100 * 100) / 100 : 0;
-                    
+
                     // Check if current lesson is now completed
                     const isCurrentLessonNowCompleted = isLessonCompletedByChapters(currentLesson.name, newCompletedChapters);
                     const newCompletedLessons = [...(prev?.completed_lessons || [])];
-                    
+
                     if (isCurrentLessonNowCompleted && !newCompletedLessons.includes(currentLesson.name)) {
                         newCompletedLessons.push(currentLesson.name);
-                        
+
                     }
-                    
-                    
-                    
+
+
+
                     return {
                         ...prev,
                         completed_chapters: newCompletedChapters,
@@ -1381,8 +1479,8 @@ export default function ModuleDetail() {
             return;
         }
         // If this is the last chapter of the last lesson, don't auto-complete
-        // Let user click "Complete Module" button instead
-        
+        // Let user click "Complete CourseModule" button instead
+
         // Mark current chapter as completed (but module is still "In Progress" unless it's the last chapter)
         await updateProgress({
             user: user.email,
@@ -1391,7 +1489,7 @@ export default function ModuleDetail() {
             chapter: currentChapter.name,
             status: "Completed"
         });
-        
+
         // Optimistically update completionData for immediate sidebar icon updates
         // This ensures the completed chapter shows checkmark icon and is unlocked immediately
         setCompletionData(prev => {
@@ -1400,21 +1498,21 @@ export default function ModuleDetail() {
             if (!newCompletedChapters.includes(currentChapter.name)) {
                 newCompletedChapters.push(currentChapter.name);
             }
-            
+
             // Remove from in_progress if it was there
             const newInProgressChapters = (prev?.in_progress_chapters || []).filter(ch => ch !== currentChapter.name);
-            
+
             // Check if current lesson is now completed
             const isCurrentLessonNowCompleted = isLessonCompletedByChapters(currentLesson.name, newCompletedChapters);
             const newCompletedLessons = [...(prev?.completed_lessons || [])];
-            
+
             if (isCurrentLessonNowCompleted && !newCompletedLessons.includes(currentLesson.name)) {
                 newCompletedLessons.push(currentLesson.name);
             }
-            
+
             // Calculate overall progress
             const newOverallProgress = prev?.total_chapters ? Math.round((newCompletedChapters.length / prev.total_chapters) * 100 * 100) / 100 : 0;
-            
+
             return {
                 ...prev,
                 completed_chapters: newCompletedChapters,
@@ -1423,14 +1521,14 @@ export default function ModuleDetail() {
                 overall_progress: newOverallProgress
             };
         });
-        
+
         // Update local module state immediately for responsive UI
         const updatedModule = { ...module };
         if (updatedModule.lessons[lessonIdx]?.chapters[chapterIdx]) {
             updatedModule.lessons[lessonIdx].chapters[chapterIdx].progress = "Completed";
         }
         setModule(updatedModule);
-        
+
         // Update both progress states - keep status as "In Progress" since module is not completed yet
         const newProgress: ModuleProgress = {
             ...progress!,
@@ -1439,7 +1537,7 @@ export default function ModuleDetail() {
             status: "In Progress"  // Changed from "Completed" - module is only completed when all chapters are done
         };
         setProgress(newProgress);
-        
+
         // Update saved progress state - keep status as "In Progress"
         setSavedProgress(prev => ({
             ...prev,
@@ -1448,25 +1546,25 @@ export default function ModuleDetail() {
             status: "In Progress",  // Changed from "Completed" - module is only completed when all chapters are done
             progress: prev?.progress || 0
         }));
-        
+
         if (chapterIdx < currentLesson.chapters.length - 1) {
             // Move to next chapter in the same lesson
             chapterIdx += 1;
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
-            
+
             const nextChapter = currentLesson.chapters[chapterIdx];
-            
+
             // Optimistically update completionData to reflect new current chapter position
             setCompletionData(prev => {
                 const newInProgressChapters = [...(prev?.in_progress_chapters || [])];
                 const completedChapters = new Set(prev?.completed_chapters || []);
-                
+
                 // Add next chapter to in_progress if not already there and not completed
                 if (nextChapter && !newInProgressChapters.includes(nextChapter.name) && !completedChapters.has(nextChapter.name)) {
                     newInProgressChapters.unshift(nextChapter.name);
                 }
-                
+
                 return {
                     ...prev,
                     in_progress_chapters: newInProgressChapters,
@@ -1477,7 +1575,7 @@ export default function ModuleDetail() {
                     }
                 };
             });
-            
+
             // Update progress for next chapter
             await updateProgress({
                 user: user.email,
@@ -1486,7 +1584,7 @@ export default function ModuleDetail() {
                 chapter: currentLesson.chapters[chapterIdx].name,
                 status: "In Progress"
             });
-            
+
             // Update local progress state
             setProgress({
                 ...progress!,
@@ -1494,7 +1592,7 @@ export default function ModuleDetail() {
                 current_chapter: currentLesson.chapters[chapterIdx].name,
                 status: "In Progress"
             });
-            
+
             // Update saved progress state
             setSavedProgress(prev => ({
                 ...prev,
@@ -1503,7 +1601,7 @@ export default function ModuleDetail() {
                 status: "In Progress",
                 progress: prev?.progress || 0
             }));
-            
+
             // Update module progress to reflect current chapter
             if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
                 const updatedModule = { ...module };
@@ -1514,7 +1612,7 @@ export default function ModuleDetail() {
             }
             return;
         }
-        
+
         // At the end of the last chapter in the lesson, mark lesson as completed
         if (lessonIdx < module.lessons.length - 1) {
             // Move to next lesson and its first chapter
@@ -1522,19 +1620,19 @@ export default function ModuleDetail() {
             chapterIdx = 0;
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
-            
+
             const nextChapter = module.lessons[lessonIdx].chapters[chapterIdx];
-            
+
             // Optimistically update completionData to reflect new current chapter position
             setCompletionData(prev => {
                 const newInProgressChapters = [...(prev?.in_progress_chapters || [])];
                 const completedChapters = new Set(prev?.completed_chapters || []);
-                
+
                 // Add next chapter to in_progress if not already there and not completed
                 if (nextChapter && !newInProgressChapters.includes(nextChapter.name) && !completedChapters.has(nextChapter.name)) {
                     newInProgressChapters.unshift(nextChapter.name);
                 }
-                
+
                 return {
                     ...prev,
                     in_progress_chapters: newInProgressChapters,
@@ -1545,7 +1643,7 @@ export default function ModuleDetail() {
                     }
                 };
             });
-            
+
             // Update progress for next lesson's first chapter
             await updateProgress({
                 user: user.email,
@@ -1554,7 +1652,7 @@ export default function ModuleDetail() {
                 chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
                 status: "In Progress"
             });
-            
+
             // Update local progress state
             setProgress({
                 ...progress!,
@@ -1562,7 +1660,7 @@ export default function ModuleDetail() {
                 current_chapter: module.lessons[lessonIdx].chapters[chapterIdx].name,
                 status: "In Progress"
             });
-            
+
             // Update saved progress state
             setSavedProgress(prev => ({
                 ...prev,
@@ -1571,7 +1669,7 @@ export default function ModuleDetail() {
                 status: "In Progress",
                 progress: prev?.progress || 0
             }));
-            
+
             // Update module progress to reflect current chapter
             if (module.lessons[lessonIdx]?.chapters[chapterIdx]) {
                 const updatedModule = { ...module };
@@ -1586,25 +1684,25 @@ export default function ModuleDetail() {
 
     const handleFinishModule = async () => {
         if (!module?.lessons?.length || !user) return;
-        
+
         try {
             // CRITICAL: Check if all quizzes and question answers are completed before allowing module completion
             const { allCompleted, scores } = await checkQuizQACompletion(module, user);
             if (!allCompleted) {
                 const incompleteTitles = await getIncompleteQuizQATitles(module, user);
-                
+
                 // Build error message with specific quiz/QA titles
                 const quizQAContents = getQuizQAContents(module);
                 const incompleteQuizzes: string[] = [];
                 const incompleteQAs: string[] = [];
-                
+
                 // Separate incomplete items by type
                 for (const title of incompleteTitles) {
                     const matchingContent = quizQAContents.find(c => {
-                        const contentTitle = (c.content as any).title || c.content.name;
+                        const contentTitle = c.content.title || c.content.name;
                         return contentTitle === title;
                     });
-                    
+
                     if (matchingContent) {
                         if (matchingContent.content.content_type === "Quiz") {
                             incompleteQuizzes.push(title);
@@ -1613,7 +1711,7 @@ export default function ModuleDetail() {
                         }
                     }
                 }
-                
+
                 // Build error message
                 const errorParts: string[] = [];
                 if (incompleteQuizzes.length > 0) {
@@ -1622,11 +1720,11 @@ export default function ModuleDetail() {
                 if (incompleteQAs.length > 0) {
                     errorParts.push(`Complete the question answer: ${incompleteQAs.join(", ")}`);
                 }
-                
-                const errorMessage = errorParts.length > 0 
+
+                const errorMessage = errorParts.length > 0
                     ? errorParts.join(". ") + "."
                     : "You must complete all Quiz and Question/Answer sections before completing this module.";
-                
+
                 toast.warning(
                     <div>
                         <div>{errorMessage}</div>
@@ -1641,20 +1739,20 @@ export default function ModuleDetail() {
                 );
                 return; // Stop execution - don't mark module as completed
             }
-            
+
             // All quizzes and QAs are completed - proceed with module completion
             console.log('Completing module - showing completion screen');
-            
+
             // ALWAYS set completed state to true FIRST - this ensures completion screen shows immediately
             // This works even if module is already completed (second click, third click, etc.)
             setCompleted(true);
-            
+
             // Reset reviewing state to false so completion screen can show
             setReviewing(false);
-            
+
             // Store quiz/QA scores for completion screen
             setQuizQAScores(scores);
-            
+
             const completedProgress: ModuleProgress = {
                 ...progress!,
                 status: "Completed",
@@ -1662,7 +1760,7 @@ export default function ModuleDetail() {
                 progress: 100
             };
             setProgress(completedProgress);
-            
+
             // Update saved progress state - ensures completion persists
             setSavedProgress(prev => ({
                 ...prev,
@@ -1672,7 +1770,7 @@ export default function ModuleDetail() {
                 current_lesson: prev?.current_lesson || "",
                 current_chapter: prev?.current_chapter || ""
             }));
-            
+
             // Now call updateProgress to mark module as completed in backend
             await updateProgress({
                 user: user.email,
@@ -1681,17 +1779,17 @@ export default function ModuleDetail() {
                 chapter: module.lessons[currentLessonIdx]?.chapters?.[currentChapterIdx]?.name || module.lessons[0]?.chapters?.[0]?.name,
                 status: "Completed"
             });
-            
-            
-            
+
+
+
         } catch (error) {
             console.error("Failed to mark module as completed:", error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            
+
             // Even on error, keep completion screen showing
             // Don't reset completed state - let user see completion screen
             if (errorMessage.includes('TimestampMismatchError') || errorMessage.includes('Document has been modified')) {
-                toast.error("Module completion is being processed. Please wait a moment.");
+                toast.error("CourseModule completion is being processed. Please wait a moment.");
             } else {
                 toast.error("Failed to complete module. Please try again.");
             }
@@ -1712,7 +1810,19 @@ export default function ModuleDetail() {
             setTimeout(() => {
                 setIsTransitioning(false);
                 setStarted(true);
-                setProgress(getInitialProgress(module));
+                if (module) {
+                    // Update local state immediately with current time
+                    const initialProgress = getInitialProgress(module);
+                    setProgress({
+                        ...initialProgress,
+                        started_on: new Date().toISOString()
+                    });
+
+                    // Refresh dashboard data to ensure backend sync
+                    if (refetchDashboard) {
+                        refetchDashboard();
+                    }
+                }
             }, 500);
         } catch (e) {
             console.error("Failed to start module:", e);
@@ -1720,413 +1830,64 @@ export default function ModuleDetail() {
         }
     };
 
-    // Sidebar click handlers (for learners)
-    const handleLessonClick = (lessonName: string) => {
-        if (!module?.lessons?.length) return;
-        
-        // Check if lesson is accessible using sidebar completion data
-        const isAccessible = sidebarIsAccessible(lessonName);
-        console.log('🔍 Lesson accessibility check:', { lessonName, isAccessible, sidebarCompletionData });
-        
-        
-        // Skip accessibility check for completed modules
-        if (progress?.status !== "Completed" && !isAccessible) {
-            toast.error("Complete previous lessons to unlock this content");
-            return;
-        }
+    // --- RENDER LOGIC ---
 
-        if (!isAccessible) {
-            toast.error("Complete previous lessons to unlock this content");
-            return;
-        }
-        const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
-        if (lessonIdx !== -1) {
-            setCurrentLessonIdx(lessonIdx);
-            setCurrentChapterIdx(0);
-            // Update progress state so sidebar highlight matches
-            if (progress && progress.status !== "Completed") {
-                setProgress({
-                    ...progress,
-                    current_lesson: module.lessons[lessonIdx].name,
-                    current_chapter: module.lessons[lessonIdx].chapters[0]?.name || "",
-                    status: "In Progress"
-                });
-                // Optionally, call updateProgress API here to persist
-                if (user) {
-                    updateProgress({
-                        user: userIdentifier,
-                        module: moduleName,
-                        lesson: module.lessons[lessonIdx].name,
-                        chapter: module.lessons[lessonIdx].chapters[0]?.name || "",
-                        status: "In Progress"
-                    });
-                }
-            }
-            
-            // Force refresh completion data to get latest progress
-            refetchCompletionData();
-            // Refetch dashboard data to update sidebar progress (isolated to this component)
-            refetchDashboard();
-        }
-    };
-
-    const handleChapterClick = (lessonName: string, chapterName: string) => {
-        if (!module?.lessons?.length) return;
-        
-        // Check if chapter is accessible using sidebar completion data
-        const isAccessible = sidebarIsAccessible(lessonName, chapterName);
-        console.log('🔍 Chapter accessibility check:', { lessonName, chapterName, isAccessible, sidebarCompletionData });
-        // Skip accessibility check for completed modules
-        if (progress?.status !== "Completed" && !isAccessible) {
-            toast.error("Complete previous chapters to unlock this content");
-            return;
-        }
-        
-        
-        if (!isAccessible) {
-            toast.error("Complete previous chapters to unlock this content");
-            return;
-        }
-        
-        const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
-        if (lessonIdx !== -1) {
-            const lesson = module.lessons[lessonIdx];
-            const chapterIdx = lesson?.chapters?.findIndex(c => c.name === chapterName) ?? -1;
-            if (chapterIdx !== -1) {
-                setCurrentLessonIdx(lessonIdx);
-                setCurrentChapterIdx(chapterIdx);
-                // Update progress state so sidebar highlight matches
-                if (progress && progress.status !== "Completed") {
-                    setProgress({
-                        ...progress,
-                        current_lesson: module.lessons[lessonIdx].name,
-                        current_chapter: module.lessons[lessonIdx].chapters[chapterIdx]?.name || "",
-                        status: "In Progress"
-                    });
-                    // Track chapter start
-                    trackChapterStart(lessonName, chapterName);
-                }
-                
-                // Force refresh completion data to get latest progress
-                refetchCompletionData();
-            }
-        }
-    };
-
-    useEffect(() => {
-        if (moduleListData || moduleListError) {
-            setIsLoading(false);
-        }
-    }, [moduleListData, moduleListError]);
-
-    useEffect(() => {
-        if (module && user && (progress?.status === "Completed" || savedProgress?.status === "Completed")) {
-            (async () => {
-                const { scores } = await checkQuizQACompletion(module, user);
-                setQuizQAScores(scores);
-            })();
-        }
-    }, [module, user, progress?.status, savedProgress?.status]);
-
-    // --- ADMIN: UI-only navigation, no progress, no welcome, no completion ---
-    if (isLMSAdmin) {
-        if (isLoading || userLoading || moduleDataLoading) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full">
-                    <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
-                    <div className="mt-4 text-muted-foreground">Loading module details...</div>
-                </div>
-            );
-        }
-        if (moduleListError) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full">
-                    <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
-                    <div className="mt-4 text-red-500">Error loading module details.</div>
-                </div>
-            );
-        }
-        // Don't show "Module not found" if we have moduleData extracted but module state hasn't been set yet
-        // This prevents the flash of "Module not found" during the brief moment between extraction and state update
-        if (!module && !moduleData) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full">
-                    <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
-                    <div className="mt-4 text-muted-foreground">Module not found</div>
-                </div>
-            );
-        }
-        // If we have moduleData but module state isn't set yet, show loading to prevent flash
-        if (!module && moduleData) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full">
-                    <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
-                    <div className="mt-4 text-muted-foreground">Loading module details...</div>
-                </div>
-            );
-        }
-        // TypeScript guard: module should be set at this point, but add check for safety
-        if (!module) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full">
-                    <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
-                    <div className="mt-4 text-muted-foreground">Loading module details...</div>
-                </div>
-            );
-        }
-        const currentLesson = module.lessons?.[currentLessonIdx];
-        const currentChapter = currentLesson?.chapters?.[currentChapterIdx];
-        const isFirst = currentLessonIdx === 0 && currentChapterIdx === 0;
-        const isLast = currentLessonIdx === (module.lessons?.length ?? 0) - 1 && 
-                      currentChapterIdx === (currentLesson?.chapters?.length ?? 0) - 1;
-        // Sidebar click handlers for admin
-        const handleLessonClick = (lessonName: string) => {
-            if (!module?.lessons?.length) return;
-            const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
-            if (lessonIdx !== -1) {
-                setCurrentLessonIdx(lessonIdx);
-                setCurrentChapterIdx(0);
-            }
-        };
-        const handleChapterClick = (lessonName: string, chapterName: string) => {
-            if (!module?.lessons?.length) return;
-            const lessonIdx = module.lessons.findIndex(l => l.name === lessonName);
-            if (lessonIdx !== -1) {
-                const lesson = module.lessons[lessonIdx];
-                const chapterIdx = lesson?.chapters?.findIndex(c => c.name === chapterName) ?? -1;
-                if (chapterIdx !== -1) {
-                    setCurrentLessonIdx(lessonIdx);
-                    setCurrentChapterIdx(chapterIdx);
-                }
-            }
-        };
-        // UI-only navigation
-        const handlePrevious = () => {
-            if (!module?.lessons?.length) return;
-            let lessonIdx = currentLessonIdx;
-            let chapterIdx = currentChapterIdx;
-            if (chapterIdx > 0) {
-                chapterIdx -= 1;
-            } else if (lessonIdx > 0) {
-                lessonIdx -= 1;
-                chapterIdx = module.lessons[lessonIdx].chapters.length - 1;
-            }
-            setCurrentLessonIdx(lessonIdx);
-            setCurrentChapterIdx(chapterIdx);
-        };
-        const handleNext = () => {
-            if (!module?.lessons?.length) return;
-            let lessonIdx = currentLessonIdx;
-            let chapterIdx = currentChapterIdx;
-            const currentLesson = module.lessons[lessonIdx];
-            if (chapterIdx < currentLesson.chapters.length - 1) {
-                chapterIdx += 1;
-            } else if (lessonIdx < module.lessons.length - 1) {
-                lessonIdx += 1;
-                chapterIdx = 0;
-            }
-            setCurrentLessonIdx(lessonIdx);
-            setCurrentChapterIdx(chapterIdx);
-        };
-        return (
-            <div className="flex h-screen bg-muted gap-6 w-full overflow-hidden">
-                {/* Sidebar on the left - Fixed and scrollable */}
-                <div className="w-80 border-r flex-shrink-0 h-full overflow-y-auto">
-                    <ModuleSidebar
-                        module={module}
-                        progress={null} // no progress for admin
-                        started={true}
-                        overallProgress={0}
-                        onLessonClick={handleLessonClick}
-                        onChapterClick={handleChapterClick}
-                        currentLessonName={currentLesson?.name}
-                        currentChapterName={currentChapter?.name}
-                        mode='admin'
-                        completionData={undefined} // no completion data for admin
-                        isAccessible={() => true} // admin can access everything
-                    />
-                </div>
-                {/* Main Content - Scrollable */}
-                <div className="flex-1 flex justify-center items-start p-8 overflow-y-auto h-full">
-                    <div className="w-full rounded-xl shadow p-8 bg-card">
-                        {currentLesson && currentChapter && module && (
-                            <div className="space-y-8">
-                                {/* Admin Preview Indicator */}
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-2xl font-bold mb-2">{currentLesson.lesson_name}</h2>
-                                        <h3 className="text-xl font-semibold">{currentChapter.title}</h3>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-md">
-                                            <BookOpen className="h-4 w-4" />
-                                            <span>Admin Preview</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* Chapter Contents */}
-                                {currentChapter.contents && currentChapter.contents.length > 0 && (
-                                    <div className="space-y-6">
-                                        {currentChapter.contents.map((content, idx) => {
-                                            // Debug the actual content structure
-                                            if (idx === 0) {
-                                                console.log('🔍 FIRST CONTENT OBJECT DETAILED INSPECTION:', {
-                                                    content,
-                                                    allKeys: Object.keys(content),
-                                                    hasContent_reference: 'content_reference' in content,
-                                                    content_reference_value: content.content_reference,
-                                                    name: content.name,
-                                                    contentType: content.content_type,
-                                                    hasData: !!content.data
-                                                });
-                                            }
-                                            
-                                            return (
-                                                <ContentRenderer
-                                                    key={content.name}
-                                                    contentType={content.content_type}
-                                                    contentReference={content.content_reference || content.name}
-                                                    moduleId={module.name}
-                                                    contentData={content.data}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                                
-                                {/* Navigation */}
-                                <div className="flex justify-between items-center mt-8 pt-6 border-t">
-                                    <Button 
-                                        onClick={handlePrevious} 
-                                        disabled={isFirst}
-                                        variant="outline"
-                                        className="gap-2"
-                                    >
-                                        <ArrowLeft className="h-4 w-4" />
-                                        Previous
-                                    </Button>
-                                    <div className="text-sm text-muted-foreground">
-                                        Lesson {currentLessonIdx + 1} of {module.lessons.length} • 
-                                        Chapter {currentChapterIdx + 1} of {currentLesson.chapters.length}
-                                    </div>
-                                    <Button 
-                                        onClick={handleNext} 
-                                        disabled={isLast}
-                                        className="gap-2"
-                                    >
-                                        Next
-                                        <ArrowRight className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    }
-    // --- END ADMIN LOGIC ---
-
-    // --- LEARNER LOGIC (default, as before) ---
-    if (isLoading || userLoading || moduleDataLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full">
-                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
-                <div className="mt-4 text-muted-foreground">Loading module details...</div>
-            </div>
-        );
-    }
+    // 1. Error state
     if (moduleListError) {
         return (
-            <div className="flex flex-col items-center justify-center h-full">
-                <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
-                <div className="mt-4 text-red-500">Error loading module details.</div>
+            <div className="flex flex-col items-center justify-center min-h-screen w-full bg-background p-6 text-center">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="max-w-md space-y-6"
+                >
+                    <Lottie animationData={errorAnimation} loop style={{ width: 200, height: 200 }} className="mx-auto" />
+                    <div className="space-y-2">
+                        <h2 className="text-2xl font-bold text-destructive">Oops! Something went wrong</h2>
+                        <p className="text-muted-foreground">We couldn't load the module details. This might be a temporary connection issue.</p>
+                    </div>
+                    <Button onClick={() => window.location.reload()} variant="outline" className="mt-4">
+                        Try Reloading
+                    </Button>
+                </motion.div>
             </div>
         );
     }
-    
-    // Additional loading check for moduleDataLoading (redundant but safe)
-    if (moduleDataLoading) {
+
+    // 2. Unified Loading state - shows during initial fetch or when module data is being processed
+    if (userLoading || moduleDataLoading || !module) {
         return (
-            <div className="flex flex-col items-center justify-center h-full">
-                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
-                <div className="mt-4 text-muted-foreground">Loading module details...</div>
+            <div className="flex flex-col items-center justify-center min-h-screen w-full bg-background">
+                <Lottie animationData={loadingAnimation} loop style={{ width: 140, height: 140 }} />
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
+                    className="mt-6 text-primary font-semibold tracking-wide uppercase text-sm"
+                >
+                    Preparing your learning journey...
+                </motion.div>
             </div>
         );
     }
-    
-    // Debug logging for module state
-    console.log('🔍 Current module state:', { 
-        module, 
-        hasModule: !!module, 
-        moduleName: module?.name,
-        moduleDataLoading,
-        moduleListData: !!moduleListData,
-        moduleListError: !!moduleListError,
-        isLoading,
-        userLoading
-    });
-    
-    // More robust module not found handling - only show error after all loading is complete
-    // Check: we have completed loading, have data from API, but no module extracted
-    const hasCompletedLoading = !moduleDataLoading && !isLoading && !userLoading;
-    const hasApiData = !!moduleListData;
-    const hasApiError = !!moduleListError;
-    const apiResponse = moduleListData as any;
-    const canExtractModule = hasApiData && !hasApiError && apiResponse && 
-        (apiResponse?.message?.modules?.length > 0 || apiResponse?.message?.message?.modules?.length > 0);
-    
-    // Don't show "Module not found" if we have moduleData extracted but module state hasn't been set yet
-    // This prevents the flash of "Module not found" during the brief moment between extraction and state update
-    if (!module && moduleData) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full">
-                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
-                <div className="mt-4 text-muted-foreground">Loading module details...</div>
-            </div>
-        );
-    }
-    
-    if (!module && hasCompletedLoading && hasApiData && canExtractModule && !moduleData) {
-        
-        return (
-            <div className="flex flex-col items-center justify-center h-full">
-                <Lottie animationData={emptyAnimation} loop style={{ width: 180, height: 180 }} />
-                <div className="mt-4 text-muted-foreground">Module not found</div>
-            </div>
-        );
-    }
-    
-    // Final loading state check - if we still don't have module data and we're not loading, show loading
-    if (!module && !moduleDataLoading && !isLoading && !moduleListData && !moduleListError && !moduleData) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full">
-                <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
-                <div className="mt-4 text-muted-foreground">Loading module details...</div>
-            </div>
-        );
-    }
-    const currentLesson = module?.lessons?.[currentLessonIdx];
+
+    const currentLesson = module.lessons?.[currentLessonIdx];
     const currentChapter = currentLesson?.chapters?.[currentChapterIdx];
     const isFirst = currentLessonIdx === 0 && currentChapterIdx === 0;
 
-    // If module is completed, show completion screen immediately
-    // Check both completed state and progress status to ensure completion screen stays visible
+    // 3. Completion Screen state
     const isModuleCompleted = completed || savedProgress?.status === "Completed" || progress?.status === "Completed";
     if (isModuleCompleted && !reviewing) {
-        const allQuizQAItems = module ? getAllQuizQAItems(module) : [];
+        const allQuizQAItems = getAllQuizQAItems(module);
         return (
-            <div className="flex min-h-screen bg-muted gap-6 w-full items-center justify-center">
+            <div className="flex min-h-screen bg-muted w-full items-center justify-center p-4">
                 <CompletionScreen
                     onReview={() => {
                         setReviewing(true);
                         setCurrentLessonIdx(0);
                         setCurrentChapterIdx(0);
-                        // Don't reset completed state when reviewing
                     }}
                     onBack={() => {
-                        // Navigate back to modules list
                         window.location.href = getFullPath(ROUTES.LEARNER_MODULES);
                     }}
                     moduleName={moduleName}
@@ -2139,8 +1900,141 @@ export default function ModuleDetail() {
         );
     }
 
+    // 4. Main Content / Welcome Screen
     return (
-        <div className="flex h-screen bg-muted gap-6 w-full overflow-hidden">
+        <AnimatePresence mode="wait">
+            {!started && !reviewing && !isLMSAdmin ? (
+                <motion.div
+                    key="welcome"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.4 }}
+                    className="min-h-screen w-full bg-white relative flex flex-col items-center overflow-y-auto"
+                >
+                    {/* Back Button - Fixed Top Left */}
+                    <div className="absolute left-8 top-8 z-10">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="rounded-full h-12 w-12 border-border shadow hover:bg-primary/10 bg-white transition-all"
+                            onClick={() => setLocation(ROUTES.LEARNER_MODULES)}
+                        >
+                            <ArrowLeft className="h-6 w-6" />
+                        </Button>
+                    </div>
+
+                    {/* Main Content Container - Centered Flow */}
+                    <div className="flex flex-col items-center w-full mx-auto px-4 space-y-6 min-h-screen justify-center py-12">
+
+                        {/* Title Section - In Flow */}
+                        <div className="text-center max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <h1 className="text-3xl font-bold tracking-tight leading-tight text-foreground">
+                                {module?.name1}
+                            </h1>
+                        </div>
+
+                        {/* Illustration Segment */}
+                        <div className="w-full flex justify-center animate-in zoom-in duration-500 delay-150">
+                            <div className="relative flex items-center justify-center">
+                                {/* Fixed size container based on viewport as requested */}
+                                <div className="w-[35vw] h-[35vh] min-w-[240px] min-h-[240px] max-w-[500px] max-h-[500px]">
+                                    <Lottie
+                                        animationData={learningAnimation}
+                                        loop
+                                        style={{ width: "100%", height: "100%" }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Module Info & Action Group */}
+                        <div className="flex flex-col items-center gap-6 w-full max-w-2xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
+                            {/* Info Card */}
+                            <div className="flex gap-6 items-start w-fit mx-auto">
+                                {/* Thumbnail */}
+                                <div className="flex-shrink-0 shadow-lg rounded-2xl overflow-hidden border border-border">
+                                    {module?.image ? (
+                                        <img
+                                            src={(() => {
+                                                const path = module.image;
+                                                if (!path) return '';
+                                                const trimmed = path.trim();
+
+                                                // If already a full URL, return as is
+                                                if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                                                    return trimmed;
+                                                }
+
+                                                // Ensure path starts with / if it doesn't already
+                                                const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+
+                                                // Determine base URL
+                                                const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                                const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+
+                                                return `${cleanBaseUrl}${relativePath}`;
+                                            })()}
+                                            alt={module.name1}
+                                            className="w-32 h-32 object-cover bg-white"
+                                            onError={(e) => {
+                                                // Fallback to placeholder on error
+                                                e.currentTarget.style.display = 'none';
+                                                const parent = e.currentTarget.parentElement;
+                                                if (parent) {
+                                                    // This will trigger the parent's fallback check next cycle or we can swap content
+                                                    // Since we're in React, it's better to use a state, but for a quick fix:
+                                                    parent.innerHTML = `<div class="w-32 h-32 flex items-center justify-center bg-[#E6F2F2] text-[#008080] text-5xl font-bold">${module?.name1?.charAt(0).toUpperCase()}</div>`;
+                                                }
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="w-32 h-32 flex items-center justify-center bg-[#E6F2F2] text-[#008080] text-5xl font-bold">
+                                            {module?.name1?.charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Info Text */}
+                                <div className="text-left pt-1">
+                                    <h2 className="text-2xl font-bold text-foreground leading-tight">About this module</h2>
+                                    {module?.description && (
+                                        <div
+                                            className="text-muted-foreground text-sm mt-1.5 leading-relaxed line-clamp-3"
+                                            dangerouslySetInnerHTML={{ __html: module.description }}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Start Button */}
+                            <Button
+                                size="lg"
+                                className="h-auto px-8 py-4 text-base font-bold rounded-xl shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transform hover:-translate-y-0.5 transition-all duration-200"
+                                onClick={handleStartModule}
+                                disabled={isTransitioning}
+                            >
+                                {isTransitioning ? (
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <span>Preparing...</span>
+                                    </div>
+                                ) : (
+                                    "Start Learning"
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </motion.div>
+
+            ) : (
+                <motion.div
+                    key="main-content"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="flex h-screen bg-muted gap-6 w-full overflow-hidden"
+                >
                     {/* Sidebar on the left - Fixed and scrollable */}
                     <div className="w-80 border-r flex-shrink-0 h-full overflow-y-auto">
                         <ModuleSidebar
@@ -2164,40 +2058,25 @@ export default function ModuleDetail() {
                             {(() => {
                                 // Check if module is still loading
                                 const isModuleLoading = moduleDataLoading || !module;
-                                
+
                                 // Check if we're in started/reviewing state but don't have lesson/chapter data yet
                                 const needsContent = (started || reviewing) && module;
                                 const hasContent = currentLesson && currentChapter && module?.lessons && module.lessons.length > 0;
                                 const isContentLoading = needsContent && !hasContent;
-                                
+
                                 // Also check if module exists but lessons array is empty or not yet populated
                                 const hasEmptyLessons = module && (!module.lessons || module.lessons.length === 0);
-                                
+
                                 // Show loading if module is loading OR if we need content but don't have it OR if lessons are empty
                                 const shouldShowLoading = isModuleLoading || isContentLoading || (needsContent && hasEmptyLessons);
-                                
-                                // Debug logging (remove in production if needed)
-                                if (shouldShowLoading) {
-                                    console.log('Showing loading state:', {
-                                        isModuleLoading,
-                                        isContentLoading,
-                                        hasEmptyLessons,
-                                        started,
-                                        reviewing,
-                                        hasModule: !!module,
-                                        hasCurrentLesson: !!currentLesson,
-                                        hasCurrentChapter: !!currentChapter,
-                                        lessonsCount: module?.lessons?.length || 0
-                                    });
-                                }
-                                
+
                                 if (shouldShowLoading) {
                                     return (
                                         <div className="flex flex-col items-center justify-center py-16 min-h-[400px] w-full">
-                                            <Lottie 
-                                                animationData={loadingAnimation} 
-                                                loop 
-                                                style={{ width: 120, height: 120 }} 
+                                            <Lottie
+                                                animationData={loadingAnimation}
+                                                loop
+                                                style={{ width: 120, height: 120 }}
                                             />
                                             <div className="mt-4 text-muted-foreground text-center">
                                                 {isModuleLoading ? 'Loading module details...' : 'Loading lesson content...'}
@@ -2207,7 +2086,7 @@ export default function ModuleDetail() {
                                 }
                                 return null;
                             })()}
-                            
+
                             {/* Show content when all data is ready */}
                             {!moduleDataLoading && (started || reviewing) && currentLesson && currentChapter && module && (
                                 <div className="space-y-8">
@@ -2215,42 +2094,21 @@ export default function ModuleDetail() {
                                     <div>
                                         <h2 className="text-2xl font-bold mb-2">{currentLesson.lesson_name}</h2>
                                         <h3 className="text-xl font-semibold mb-6">{currentChapter.title}</h3>
-                                        {/* Debug chapter data */}
-                                        {(() => {
-                                            console.log('Chapter data debug:', {
-                                                title: currentChapter.title,
-                                                name: currentChapter.name,
-                                                allFields: Object.keys(currentChapter)
-                                            });
-                                            return null;
-                                        })()}
                                     </div>
                                     {/* Chapter Contents */}
-                                    {(() => {
-                                        console.log("ModuleDetail: currentChapter debug", {
-                                            currentChapter,
-                                            contents: currentChapter?.contents,
-                                            contentsLength: currentChapter?.contents?.length,
-                                            contentsTypes: currentChapter?.contents?.map(c => c.content_type),
-                                            firstContent: currentChapter?.contents?.[0],
-                                            firstContentData: currentChapter?.contents?.[0]?.data,
-                                            allContentsData: currentChapter?.contents?.map(c => ({ name: c.name, type: c.content_type, hasData: !!c.data, dataKeys: c.data ? Object.keys(c.data) : [] }))
-                                        });
-                                        return null;
-                                    })()}
                                     {currentChapter.contents && currentChapter.contents.length > 0 ? (
                                         <div className="space-y-6">
-                                            {currentChapter.contents.map((content) => (
+                                            {currentChapter.contents.map((content: Content) => (
                                                 <ContentRenderer
                                                     key={content.name}
                                                     contentType={content.content_type}
                                                     contentReference={content.content_reference || content.name}
                                                     moduleId={module.name}
                                                     contentData={content.data}
-                                                    onProgressUpdate={(progress) => {
+                                                    onProgressUpdate={() => {
                                                         // Content progress updated
                                                     }}
-                                                    onContentComplete={(contentRef) => {
+                                                    onContentComplete={() => {
                                                         // Content completed
                                                     }}
                                                 />
@@ -2263,8 +2121,8 @@ export default function ModuleDetail() {
                                     )}
                                     {/* Navigation */}
                                     <div className="flex justify-between items-center mt-8 pt-6 border-t">
-                                        <Button 
-                                            onClick={handlePrevious} 
+                                        <Button
+                                            onClick={handlePrevious}
                                             disabled={isFirst}
                                             variant="outline"
                                             className="gap-2"
@@ -2273,10 +2131,10 @@ export default function ModuleDetail() {
                                             Previous
                                         </Button>
                                         <div className="text-sm text-muted-foreground">
-                                            Lesson {currentLessonIdx + 1} of {module.lessons.length} • 
+                                            Lesson {currentLessonIdx + 1} of {module.lessons.length} •
                                             Chapter {currentChapterIdx + 1} of {currentLesson.chapters.length}
                                         </div>
-                                        <Button 
+                                        <Button
                                             onClick={() => {
                                                 const isLastLesson = currentLessonIdx === module.lessons.length - 1;
                                                 const isLastChapter = currentChapterIdx === (module.lessons[currentLessonIdx]?.chapters?.length || 0) - 1;
@@ -2294,7 +2152,7 @@ export default function ModuleDetail() {
                                                 const isLastLesson = currentLessonIdx === module.lessons.length - 1;
                                                 const isLastChapter = currentChapterIdx === (module.lessons[currentLessonIdx]?.chapters?.length || 0) - 1;
                                                 const isLastChapterOfLastLesson = isLastLesson && isLastChapter;
-                                                return updateLoading ? "Updating..." : (isLastChapterOfLastLesson ? "Complete Module" : "Next");
+                                                return updateLoading ? "Updating..." : (isLastChapterOfLastLesson ? "Complete CourseModule" : "Next");
                                             })()}
                                             <ArrowRight className="h-4 w-4" />
                                         </Button>
@@ -2303,6 +2161,8 @@ export default function ModuleDetail() {
                             )}
                         </div>
                     </div>
-                </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
     );
 }

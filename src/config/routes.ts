@@ -34,5 +34,8 @@ export const ROUTES = {
   EDIT_MODULE: (moduleId: string) => `/edit/${moduleId}`,
   QUIZ: '/quiz',
   QUIZ_QUESTIONS: '/quiz-questions',
+  AI_CHAT: '/ai',
   FAQ: '/faq'
-} as const; 
+} as const;
+
+

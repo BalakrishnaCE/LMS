@@ -9,14 +9,15 @@ import LoadingAnimation from '@/assets/Loading.json';
 import ErrorAnimation from '@/assets/Error.json';
 
 interface AudioContentEditorProps {
-  content: { title: string; attach: string };
-  onSave: (content: { title: string; attach: string }) => void;
+  content: { title: string; attach: string; audio_script?: string };
+  onSave: (content: { title: string; attach: string; audio_script?: string }) => void;
   onCancel?: () => void;
 }
 
 const AudioContentEditor: React.FC<AudioContentEditorProps> = ({ content, onSave, onCancel }) => {
   const [title, setTitle] = useState(content.title || '');
   const [attach, setAttach] = useState(content.attach || '');
+  const [audioScript, setAudioScript] = useState(content.audio_script || '');
   
   // Create preview URL from stored content (handle both relative and full URLs)
   // Uses lms.noveloffice.org as base URL in both development and production
@@ -89,8 +90,17 @@ const AudioContentEditor: React.FC<AudioContentEditorProps> = ({ content, onSave
         {!loading && !error && <Input type="file" accept="audio/*" onChange={handleFileChange} disabled={loading} />}
         {preview && <audio src={preview} controls className="w-full mt-2 rounded" />}
       </div>
+      <div>
+        <Label>Audio Script</Label>
+        <textarea
+          className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 mt-2"
+          placeholder="Enter the audio script here..."
+          value={audioScript}
+          onChange={(e) => setAudioScript(e.target.value)}
+        />
+      </div>
       <div className="flex gap-2 justify-start">
-        <Button onClick={() => onSave({ title: title || fileName, attach })} disabled={!attach || loading}>Save</Button>
+        <Button onClick={() => onSave({ title: title || fileName, attach, audio_script: audioScript })} disabled={!attach || !audioScript.trim() || loading}>Save</Button>
         {onCancel && <Button variant="outline" onClick={onCancel}>Cancel</Button>}
       </div>
     </div>

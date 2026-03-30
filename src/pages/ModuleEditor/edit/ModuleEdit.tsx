@@ -208,6 +208,7 @@ export default function ModuleEdit() {
           module={module}
           isMobile={isMobile}
           onLessonAdded={mutate}
+          onRefresh={mutate}
           activeLessonId={activeLessonId}
           setActiveLessonId={setActiveLessonId}
           activeChapterId={activeChapterId}

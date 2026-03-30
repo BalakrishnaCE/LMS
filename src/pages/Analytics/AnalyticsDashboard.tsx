@@ -812,23 +812,23 @@ export default function AnalyticsDashboard() {
       // Export Learner Analytics (if available)
       if (finalDataWithFallback?.learner_analytics && finalDataWithFallback.learner_analytics.length > 0) {
         const learnerData = finalDataWithFallback.learner_analytics.map((learner: any) => ({
-          'Learner Name': learner.learner_name || learner.full_name || 'N/A',
+          'Learner Name': learner.full_name || learner.name || 'N/A',
           'Email': learner.email || 'N/A',
           'Department': learner.department || 'N/A',
           'Status': learner.status || 'N/A',
-          'Modules Enrolled': learner.modules_enrolled || 0,
-          'Modules Completed': learner.modules_completed || 0,
+          'Modules Enrolled': learner.total_modules || 0,
+          'Modules Completed': learner.completed_modules || 0,
           'Completion Rate': learner.completion_rate || 0,
           'Average Progress': learner.avg_progress || 0,
           'Average Score': learner.avg_score || 0,
           'Total Time Spent': learner.total_time_spent || 0,
           'Achievements Count': learner.achievements_count || 0,
-          'Last Activity': learner.last_activity || 'N/A',
+          'Last Activity': learner.last_login || 'N/A',
           'Mobile No': learner.mobile_no || 'N/A',
           'Creation Date': learner.creation || 'N/A',
           'Last Login': learner.last_login || 'N/A',
           'User Image': learner.user_image || 'N/A',
-          'Roles': learner.roles?.join(', ') || 'N/A'
+          'Roles': 'N/A' // we didn't add roles to bulk query since not on User doctype
         }));
         
         const learnerHeaders = [

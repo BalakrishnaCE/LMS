@@ -247,6 +247,18 @@ function FetchingContentRenderer({ contentType, contentReference, moduleId }: {
                 e.currentTarget.style.display = 'none';
               }}
             />
+            {content.audio_script && (
+              <div className="mt-6 rounded-lg border bg-card text-card-foreground shadow-sm">
+                <div className="flex flex-col space-y-1.5 p-6">
+                  <h3 className="text-xl font-semibold leading-none tracking-tight">Audio Script</h3>
+                </div>
+                <div className="p-6 pt-0">
+                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-muted-foreground">
+                    {content.audio_script}
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         );
       case "Quiz":
