@@ -41,12 +41,12 @@ interface Quiz {
 }
 
 // Admin Quiz Preview Component - Shows questions with correct answers in dialog
-function AdminQuizPreview({ 
-  quiz, 
-  onClose 
-}: { 
-  quiz: Quiz; 
-  onClose: () => void; 
+function AdminQuizPreview({
+  quiz,
+  onClose
+}: {
+  quiz: Quiz;
+  onClose: () => void;
 }) {
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,13 +59,13 @@ function AdminQuizPreview({
         console.log('No quiz reference provided');
         return;
       }
-      
+
       setLoading(true);
       setError(null);
-      
+
       try {
         console.log('Fetching quiz with questions for admin preview:', quiz.name);
-        
+
         // Use the custom API that handles permissions and includes questions
         const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.content_access.get_content_with_permissions`, {
           method: 'POST',
@@ -77,16 +77,16 @@ function AdminQuizPreview({
             content_reference: quiz.name
           })
         });
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch quiz: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         // Handle different response structures
         let quizData = null;
-        
+
         // Check if it's the custom API response structure
         if (data.message?.success && data.message?.data) {
           quizData = data.message.data;
@@ -103,9 +103,9 @@ function AdminQuizPreview({
         else if (data.success && data.data) {
           quizData = data.data;
         }
-        
+
         if (quizData) {
-          
+
           if (quizData.questions && quizData.questions.length > 0) {
             setQuestions(quizData.questions);
             console.log('Valid questions loaded for admin preview:', quizData.questions.length);
@@ -188,14 +188,14 @@ function AdminQuizPreview({
 }
 
 // Quiz Dialog Component for learners
-function QuizDialog({ 
-  quiz, 
-  onClose, 
+function QuizDialog({
+  quiz,
+  onClose,
   onComplete,
   moduleId
-}: { 
-  quiz: Quiz; 
-  onClose: () => void; 
+}: {
+  quiz: Quiz;
+  onClose: () => void;
   onComplete: () => void;
   moduleId?: string;
 }) {
@@ -241,25 +241,25 @@ function QuizDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!quiz?.questions || quiz.questions.length === 0) {
       console.error('No questions available to submit');
       return;
     }
-    
+
     try {
       setIsSaving(true);
-      
+
       // Format answers for the API: { question_id: { marked_ans: string, correct_ans: string } }
       const formattedAnswers: { [key: string]: { marked_ans: string; correct_ans: string } } = {};
       let correctCount = 0;
       let totalCount = 0;
-      
+
       quiz.questions.forEach(question => {
         totalCount += 1;
         const userAnswer = answers[question.name] || '';
         let correctAnswer = '';
-        
+
         // Find the correct answer from options
         // Options can have either 'correct' or 'is_correct' field depending on API response
         if (question.options && question.options.length > 0) {
@@ -271,19 +271,19 @@ function QuizDialog({
           if (correctOption) {
             correctAnswer = correctOption.option_text || '';
           }
-          
+
           // Check if user's answer is correct
           if (userAnswer && correctAnswer && userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase()) {
             correctCount += 1;
           }
         }
-        
+
         // Format answer for API - ensure correct_ans is always sent
         formattedAnswers[question.name] = {
           marked_ans: userAnswer,
           correct_ans: correctAnswer
         };
-        
+
         // Debug log to verify correct answer is found
         if (!correctAnswer) {
           console.warn(`No correct answer found for question ${question.name}`, {
@@ -293,7 +293,7 @@ function QuizDialog({
           });
         }
       });
-      
+
       // Save to API using the proper update_quiz_progress endpoint
       console.log('Submitting quiz with:', {
         quiz_id: quiz.name,
@@ -301,7 +301,7 @@ function QuizDialog({
         answersCount: Object.keys(formattedAnswers).length,
         formattedAnswers: formattedAnswers
       });
-      
+
       // Debug: Check if all questions have correct answers
       const questionsWithoutCorrectAnswer = Object.entries(formattedAnswers)
         .filter(([_, ans]) => !ans.correct_ans || ans.correct_ans === '')
@@ -309,53 +309,53 @@ function QuizDialog({
       if (questionsWithoutCorrectAnswer.length > 0) {
         console.warn('Questions without correct answers:', questionsWithoutCorrectAnswer);
       }
-      
+
       const result = await updateQuizProgress({
         quiz_id: quiz.name,
         answers: formattedAnswers,
         module: moduleId || undefined
       });
-      
+
       console.log('Quiz progress saved successfully:', result);
-      
+
       // Get score and max_score from API response
       const savedScore = result?.message?.score || 0;
       const savedMaxScore = result?.message?.max_score || totalCount;
-      
+
       // Refetch progress status to get detailed quiz_data
       let actualCorrectCount = correctCount;
       let actualTotalCount = totalCount;
-      
+
       if (refetchProgress) {
         const refetchedData = await refetchProgress();
         const progressData = refetchedData?.message;
-        
+
         // Calculate correct answers from quiz_data if available
         if (progressData?.quiz_data && progressData.quiz_data.length > 0) {
           actualCorrectCount = progressData.quiz_data.filter(q => q.is_correct).length;
           actualTotalCount = progressData.quiz_data.length;
         }
       }
-      
+
       // Update UI state
       // Use actual correct count for score if available, otherwise use API score
       // The API score might be weighted by question scores, so we use correct count for display
       const displayScore = actualCorrectCount > 0 ? actualCorrectCount : savedScore;
       const displayMaxScore = actualTotalCount > 0 ? actualTotalCount : savedMaxScore;
-      
+
       setScore(displayScore);
       setMaxScore(displayMaxScore);
       setCorrectAnswers(actualCorrectCount);
       setTotalQuestions(actualTotalCount);
       setSubmitted(true);
       setHasAttempted(true);
-      
+
     } catch (error) {
       console.error('Failed to save quiz progress:', error);
       // Calculate score locally for display if API fails
       let correctCount = 0;
       let totalCount = 0;
-      
+
       if (quiz?.questions) {
         totalCount = quiz.questions.length;
         quiz.questions.forEach(question => {
@@ -368,7 +368,7 @@ function QuizDialog({
           }
         });
       }
-      
+
       setScore(correctCount);
       setMaxScore(totalCount);
       setCorrectAnswers(correctCount);
@@ -388,18 +388,18 @@ function QuizDialog({
   // Check if quiz has already been attempted using API
   useEffect(() => {
     if (progressLoading || hasAttempted || !quiz?.name) return;
-    
+
     const progressData = quizProgressStatus?.message;
-    
+
     if (progressData?.completed) {
       // Quiz has been completed - show previous results
       const savedScore = progressData.score || 0;
       const savedMaxScore = progressData.max_score || 0;
-      
+
       // Calculate correct answers from quiz_data if available
       let correctCount = 0;
       let totalCount = quiz?.questions?.length || 0;
-      
+
       if (progressData.quiz_data && progressData.quiz_data.length > 0) {
         // Use actual quiz_data from database
         correctCount = progressData.quiz_data.filter(q => q.is_correct).length;
@@ -408,7 +408,7 @@ function QuizDialog({
         // Fallback: estimate from score (not as accurate)
         correctCount = Math.round((savedScore / savedMaxScore) * totalCount) || 0;
       }
-      
+
       setScore(savedScore);
       setMaxScore(savedMaxScore);
       setCorrectAnswers(correctCount);
@@ -443,12 +443,12 @@ function QuizDialog({
     // Use correctAnswers/totalQuestions for accurate percentage display
     const percent = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
     const scoreColor = percent >= 70 ? '#10b981' : percent >= 50 ? '#f59e0b' : '#ef4444';
-    
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+        <div className="bg-background rounded-lg p-8 max-w-md w-full mx-4">
           <h2 className="text-2xl font-bold text-center mb-6">Quiz Completed!</h2>
-          
+
           {/* Score Circle */}
           <div className="flex justify-center mb-6">
             <div className="relative flex items-center justify-center" style={{ width: 140, height: 140 }}>
@@ -470,7 +470,7 @@ function QuizDialog({
               </div>
             </div>
           </div>
-          
+
           <div className="text-center mb-6">
             <p className="text-lg">You got {correctAnswers} out of {totalQuestions} questions correct</p>
             <p className="text-sm text-gray-600 mt-2">
@@ -485,7 +485,7 @@ function QuizDialog({
               </p>
             )}
           </div>
-          
+
           <div className="flex justify-center">
             <Button onClick={handleComplete} className="px-6">
               Close
@@ -508,34 +508,34 @@ function QuizDialog({
             </span>
           )}
         </div>
-        
+
         {/* Content */}
         <div className="flex-1 overflow-auto p-4">
           {/* Quiz Description */}
           {quiz.description && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <div className="mb-6 p-4 bg-muted rounded-lg">
               <div className="text-sm" dangerouslySetInnerHTML={{ __html: quiz.description }} />
             </div>
           )}
-          
+
           {/* Quiz Questions */}
           <form onSubmit={handleSubmit} className="space-y-8">
             {quiz.questions.map((question, index) => (
               <div key={question.name} className="space-y-4 p-4 border rounded-lg">
                 <h3 className="text-lg font-semibold">
-                  Question {index + 1}: 
-                  <span 
-                    className="ml-2 font-normal" 
-                    dangerouslySetInnerHTML={{ 
-                      __html: question.question_text?.replace(/<[^>]+>/g, '') || 'No question text available' 
-                    }} 
+                  Question {index + 1}:
+                  <span
+                    className="ml-2 font-normal"
+                    dangerouslySetInnerHTML={{
+                      __html: question.question_text?.replace(/<[^>]+>/g, '') || 'No question text available'
+                    }}
                   />
                 </h3>
-                
+
                 <div className="space-y-2">
                   {question.options && question.options.length > 0 ? (
                     question.options.map((option, optionIndex) => (
-                      <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded">
+                      <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-muted rounded">
                         <input
                           type="radio"
                           name={`question-${question.name}`}
@@ -551,15 +551,15 @@ function QuizDialog({
                     <p className="text-gray-500 italic">No options available for this question.</p>
                   )}
                 </div>
-                
+
                 <div className="text-xs text-gray-500">
                   Score: {question.score || 0} points
                 </div>
               </div>
             ))}
-            
+
             <div className="flex justify-end pt-4">
-              <Button 
+              <Button
                 type="submit"
                 disabled={Object.keys(answers).length !== quiz.questions.length || isSaving}
                 className="px-8 py-2"
@@ -574,17 +574,17 @@ function QuizDialog({
   );
 }
 
-export default function Quiz({ 
-  quizReference, 
-  content, 
-  contentReference, 
+export default function Quiz({
+  quizReference,
+  content,
+  contentReference,
   moduleId: _moduleId,
   onComplete,
   isCompleted: _isCompleted
 }: QuizProps) {
   const { isLoading: userLoading } = useFrappeAuth();
   const { isLMSAdmin, isLoading: permissionsLoading } = useLMSUserPermissions();
-  
+
 
   // Fetch the main quiz document using content access API
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -607,16 +607,16 @@ export default function Quiz({
           content_reference: quizData.name
         })
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch quiz questions: ${response.status}`);
       }
-      
+
       const data = await response.json();
       console.log('Quiz questions API response:', data);
-      
+
       let questionsData = null;
-      
+
       // Handle different response structures
       if (data.message?.success && data.message?.data) {
         questionsData = data.message.data;
@@ -627,9 +627,9 @@ export default function Quiz({
       } else if (data.success && data.data) {
         questionsData = data.data;
       }
-      
+
       console.log('Processed questions data:', questionsData);
-      
+
       if (questionsData && questionsData.questions) {
         console.log('Setting quiz with full questions data');
         setQuiz(questionsData);
@@ -650,7 +650,7 @@ export default function Quiz({
       console.log('Content questions structure:', content.questions?.[0]);
       console.log('Has quiz_question field:', !!content.questions?.[0]?.quiz_question);
       console.log('Has question_text field:', !!content.questions?.[0]?.question_text);
-      
+
       // Check if content has complete question data
       if (content.questions && content.questions.length > 0 && content.questions[0].quiz_question && !content.questions[0].question_text) {
         console.log('Content has incomplete questions, fetching full data');
@@ -666,10 +666,10 @@ export default function Quiz({
     const fetchQuiz = async () => {
       const ref = contentReference || quizReference;
       if (!ref) return;
-      
+
       setQuizLoading(true);
       setQuizError(null);
-      
+
       try {
         const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.content_access.get_content_with_permissions`, {
           method: 'POST',
@@ -681,16 +681,16 @@ export default function Quiz({
             content_reference: ref
           })
         });
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch quiz: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         // Handle different response structures
         let quizData = null;
-        
+
         // Check if it's the custom API response structure
         if (data.message?.success && data.message?.data) {
           quizData = data.message.data;
@@ -707,13 +707,13 @@ export default function Quiz({
         else if (data.success && data.data) {
           quizData = data.data;
         }
-        
+
         if (quizData) {
           console.log('Quiz data received:', quizData);
           console.log('First question structure:', quizData.questions?.[0]);
           console.log('Has quiz_question field:', !!quizData.questions?.[0]?.quiz_question);
           console.log('Has question_text field:', !!quizData.questions?.[0]?.question_text);
-          
+
           // If questions don't have full data (only quiz_question references), fetch them separately
           if (quizData.questions && quizData.questions.length > 0 && quizData.questions[0].quiz_question && !quizData.questions[0].question_text) {
             console.log('Quiz questions need to be fetched separately - only references found');
@@ -760,12 +760,12 @@ export default function Quiz({
       <div className="mt-4 text-muted-foreground">Loading...</div>
     </div>
   );
-  
+
   if (quizError || !quiz) {
-    const isPermissionError = quizError?.message?.includes('403') || 
-                             quizError?.message?.includes('FORBIDDEN') ||
-                             quizError?.message?.includes('Permission');
-    
+    const isPermissionError = quizError?.message?.includes('403') ||
+      quizError?.message?.includes('FORBIDDEN') ||
+      quizError?.message?.includes('Permission');
+
     if (isPermissionError) {
       return (
         <div className="flex flex-col items-center justify-center p-8">
@@ -777,7 +777,7 @@ export default function Quiz({
         </div>
       );
     }
-    
+
     return (
       <div className="flex flex-col items-center justify-center p-8">
         <Lottie animationData={errorAnimation} loop style={{ width: 120, height: 120 }} />
@@ -805,7 +805,7 @@ export default function Quiz({
   if (isLMSAdmin) {
     return (
       <div className="w-full">
-        <AdminQuizPreview quiz={quiz} onClose={() => {}} />
+        <AdminQuizPreview quiz={quiz} onClose={() => { }} />
       </div>
     );
   }
@@ -818,7 +818,7 @@ export default function Quiz({
           Start Quiz
         </Button>
       </div>
-      
+
       {/* Instruction Dialog */}
       <InstructionDialog
         open={showInstructions}
@@ -830,7 +830,7 @@ export default function Quiz({
         timeLimit={quiz?.time_limit_mins || 0}
         description={quiz?.description || ''}
       />
-      
+
       {/* Quiz Dialog */}
       {showQuiz && quiz && (
         <QuizDialog

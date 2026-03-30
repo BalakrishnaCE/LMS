@@ -32,10 +32,10 @@ export default function TextContent({
   // Check if content body is empty or just whitespace
   const bodyContent = content.body || content.value || "";
   const hasContent = bodyContent.trim() !== "" && bodyContent.trim() !== "<p></p>" && bodyContent.trim() !== "<p><br></p>";
-  
+
   // Filter out placeholder titles like "txt", "text", etc.
-  const shouldShowTitle = content.title && 
-    !content.title.match(/^chapter-?\d*-text$/i) && 
+  const shouldShowTitle = content.title &&
+    !content.title.match(/^chapter-?\d*-text$/i) &&
     !content.title.match(/^chapter-?\d*-.*text$/i) &&
     content.title.toLowerCase().trim() !== "txt" &&
     content.title.toLowerCase().trim() !== "text" &&
@@ -56,7 +56,7 @@ export default function TextContent({
         {shouldShowTitle && (
           <h2 className="text-2xl font-bold">{content.title}</h2>
         )}
-        
+
         {hasContent && (
           <>
             <style>{`
@@ -81,8 +81,28 @@ export default function TextContent({
               .text-content-prose p {
                 margin: 1em 0;
               }
+              /* Table Styles */
+              .text-content-prose table {
+                border-collapse: collapse;
+                margin: 1em 0;
+                width: 100%;
+                table-layout: fixed;
+              }
+              .text-content-prose th,
+              .text-content-prose td {
+                border: 1px solid var(--primary) !important;
+                padding: 8px;
+                vertical-align: top;
+                min-width: 1em;
+              }
+              .text-content-prose th {
+                font-weight: bold;
+                background-color: var(--muted);
+                text-align: left;
+                opacity: 0.9;
+              }
             `}</style>
-            <div 
+            <div
               className="prose dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground prose-blockquote:text-foreground prose-ol:text-foreground prose-ul:text-foreground text-content-prose"
               style={{ whiteSpace: 'pre-wrap' }}
               dangerouslySetInnerHTML={{ __html: bodyContent }}

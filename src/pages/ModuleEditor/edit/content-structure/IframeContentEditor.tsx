@@ -6,8 +6,8 @@ import { Globe, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface IframeContentEditorProps {
-  content: { 
-    title: string; 
+  content: {
+    title: string;
     url: string;
   };
   onSave: (data: any) => void;
@@ -15,8 +15,8 @@ interface IframeContentEditorProps {
 }
 
 export default function IframeContentEditor({ content, onSave, onCancel }: IframeContentEditorProps) {
-  const safeContent = content || { 
-    title: '', 
+  const safeContent = content || {
+    title: '',
     url: ''
   };
 
@@ -73,7 +73,7 @@ export default function IframeContentEditor({ content, onSave, onCancel }: Ifram
               placeholder="Enter a descriptive title for this embedded content"
             />
           </div>
-          
+
           <div>
             <Label htmlFor="url" className='mb-3'>URL</Label>
             <Input
@@ -93,29 +93,29 @@ export default function IframeContentEditor({ content, onSave, onCancel }: Ifram
               </div>
             )}
           </div>
-        {/* Preview */}
-        {url && isValidUrl(url) && (
-        <div className="">
-          <div className="font-bold mb-2">{content.title}</div>
-            <div className="border rounded-lg overflow-hidden bg-muted/30">
-              <div className="p-3 bg-muted/50 border-b">
-                <div className="flex items-center gap-2 text-sm">
-                  <Globe className="h-4 w-4" />
-                  <span className="font-medium">{content.title || 'Embedded Content'}</span>
+          {/* Preview */}
+          {url && isValidUrl(url) && (
+            <div className="">
+              <div className="font-bold mb-2">{content.title}</div>
+              <div className="border rounded-lg overflow-hidden bg-muted/30">
+                <div className="p-3 bg-muted/50 border-b">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Globe className="h-4 w-4" />
+                    <span className="font-medium">{content.title || 'Embedded Content'}</span>
+                  </div>
+                </div>
+                <div className="aspect-video">
+                  <iframe
+                    src={url}
+                    className="w-full h-full"
+                    title={content.title || 'Embedded Content'}
+                    sandbox="allow-scripts allow-same-origin"
+                  />
                 </div>
               </div>
-              <div className="aspect-video">
-                <iframe
-                  src={url}
-                  className="w-full h-full"
-                  title={content.title || 'Embedded Content'}
-                  sandbox="allow-scripts allow-same-origin"
-                />
-              </div>
             </div>
-          </div>
-      )}
-      </CardContent>
+          )}
+        </CardContent>
       </Card>
       {/* Actions */}
       <div className="flex gap-2 pt-4">
