@@ -149,8 +149,8 @@ export function LearnersTable({
                   </TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs transition-all duration-200 ${learner.enabled === 1
-                        ? "bg-green-100 text-green-800 group-hover:bg-green-200"
-                        : "bg-red-100 text-red-800 group-hover:bg-red-200"
+                      ? "bg-green-100 text-green-800 group-hover:bg-green-200"
+                      : "bg-red-100 text-red-800 group-hover:bg-red-200"
                       }`}>
                       {learner.enabled === 1 ? "Active" : "Inactive"}
                     </span>
@@ -176,7 +176,6 @@ export function LearnersTable({
           )}
         </TableBody>
       </Table>
-
       {/* Pagination Controls - Vertical Layout */}
       {learners.length > 0 && handleLearnerPageChange && handleLearnerPrevPage && handleLearnerNextPage && (
         <div className="flex flex-col items-center gap-4 mt-4">
@@ -194,13 +193,11 @@ export function LearnersTable({
             >
               <span className="mr-1">&lt;</span> Previous
             </Button>
-
             {/* Page Numbers */}
             {(() => {
               const totalPages = learnerTotalPages;
               const currentPage = learnerCurrentPage;
               const pages = [];
-
               // Show first page
               if (currentPage > 3) {
                 pages.push(
@@ -218,7 +215,6 @@ export function LearnersTable({
                   pages.push(<span key="ellipsis1" className="px-2">...</span>);
                 }
               }
-
               // Show pages around current page
               const startPage = Math.max(1, currentPage - 2);
               const endPage = Math.min(totalPages, currentPage + 2);
@@ -236,7 +232,6 @@ export function LearnersTable({
                   </Button>
                 );
               }
-
               // Show last page
               if (currentPage < totalPages - 2) {
                 if (currentPage < totalPages - 3) {
@@ -270,7 +265,6 @@ export function LearnersTable({
           </div>
         </div>
       )}
-
     </div>
   );
 }
