@@ -1,0 +1,8 @@
+{
+  "venvPath": "/home/frappe/frappe-bench",
+  "venv": "env",
+  "extraPaths": [
+    "/home/frappe/frappe-bench/apps/frappe",
+    "/home/frappe/frappe-bench/apps/novel_lms"
+  ]
+}
