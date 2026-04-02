@@ -118,7 +118,7 @@ export function NavAiChat() {
                                 isActive={isAiPage && (!currentChatId || currentChatId === 'ai')}
                             >
                                 <Bot className="w-4 h-4" />
-                                <span>AI Chat</span>
+                                <span>Lumi</span>
                                 <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 group-data-[collapsible=icon]:hidden" />
                             </SidebarMenuButton>
                         </CollapsibleTrigger>

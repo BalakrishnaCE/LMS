@@ -110,7 +110,7 @@ const formatMessageText = (text: string | any) => {
     const formattedText = text.replace(/([^\n])\s*(###)/g, '$1\n$2');
 
     const lines = formattedText.split('\n');
-    return lines.map((line:any, index:any) => {
+    return lines.map((line: any, index: any) => {
         const trimmed = line.trim();
         if (trimmed.startsWith('###')) {
             const headingText = line.replace(/^###\s*/, '');
@@ -1260,10 +1260,10 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                     </div>
                     <div className="flex flex-col min-w-0 flex-1 justify-center">
                         <h3 className="text-sm font-bold text-black dark:text-teal-50 leading-none mb-0.5" title="NIA">
-                            NIA
+                            Lumi
                         </h3>
                         <span className="nia-subtitle">
-                            Novel Intelligent Assistant
+                            Your Learning Assistant
                         </span>
                         <TooltipProvider delayDuration={100}>
                             <Tooltip>

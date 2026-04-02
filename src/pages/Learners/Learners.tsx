@@ -9,13 +9,13 @@ import { toast } from "sonner";
 import { UserDetailsDrawer } from "./components/LearnerDetailsDrawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious 
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
 } from "@/components/ui/pagination";
 import { useAPI } from "@/lib/api";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
@@ -64,18 +64,18 @@ interface ApiData {
 // Helper function to convert data to CSV
 function convertToCSV(data: User[]) {
   const headers = [
-    "Name", 
-    "Email", 
-    "Status", 
-    "Department", 
-    "Mobile No", 
-    "Modules Enrolled", 
-    "Modules Completed", 
-    "Completion Rate (%)", 
-    "Avg Progress (%)", 
-    "Avg Score (%)", 
-    "Total Time Spent (min)", 
-    "Achievements Count", 
+    "Name",
+    "Email",
+    "Status",
+    "Department",
+    "Mobile No",
+    "Modules Enrolled",
+    "Modules Completed",
+    "Completion Rate (%)",
+    "Avg Progress (%)",
+    "Avg Score (%)",
+    "Total Time Spent (min)",
+    "Achievements Count",
     "Last Activity"
   ];
   const rows = data.map(user => [
@@ -93,7 +93,7 @@ function convertToCSV(data: User[]) {
     user.achievements_count || 0,
     user.last_activity ? new Date(user.last_activity).toLocaleDateString() : "N/A"
   ]);
-  
+
   return [
     headers.join(","),
     ...rows.map(row => row.join(","))
@@ -105,11 +105,11 @@ function downloadCSV(csv: string, filename: string) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
-  
+
   link.setAttribute("href", url);
   link.setAttribute("download", filename);
   link.style.visibility = "hidden";
-  
+
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -297,14 +297,14 @@ function StatsCards({ stats }: { stats: ApiData["stats"] }) {
 
 
 // Filters Component
-function Filters({ 
-  searchName, 
-  searchEmail, 
-  searchStatus, 
+function Filters({
+  searchName,
+  searchEmail,
+  searchStatus,
   departmentFilter,
   departmentOptions,
-  onSearchNameChange, 
-  onSearchEmailChange, 
+  onSearchNameChange,
+  onSearchEmailChange,
   onSearchStatusChange,
   onDepartmentChange,
   onClearNameSearch,
@@ -388,8 +388,8 @@ function Filters({
           className="w-full md:w-48"
         />
       </div>
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         className="w-full md:w-auto"
         onClick={onExport}
       >
@@ -455,15 +455,15 @@ export default function Learners() {
     setIsValidating(true);
     setError(null);
     try {
-      
-      
+
+
       const response = await api.getLearnersData();
-      
-      
+
+
       if (response.message) {
-        
+
       }
-      
+
       setAnalyticsData(response);
     } catch (err: any) {
       console.error("=== API ERROR ===");
@@ -482,12 +482,12 @@ export default function Learners() {
 
   const mutate = fetchLearnerData;
   const message = analyticsData?.message;
-  
+
   // Get departments from the learners data API response
   const [allDepartmentsData, setAllDepartmentsData] = React.useState<any[]>([]);
   const [userDepartmentMapping, setUserDepartmentMapping] = React.useState<Record<string, any>>({});
   const [departmentDataLoaded, setDepartmentDataLoaded] = React.useState(false);
-  
+
   React.useEffect(() => {
     if (message?.departments) {
       setAllDepartmentsData(message.departments);
@@ -515,30 +515,30 @@ export default function Learners() {
       setUserDepartmentMapping(fallbackMapping);
     }
   }, [message?.users]); // Removed userDepartmentMapping from dependencies to prevent infinite loop
-  
+
   // Transform LearnersData to expected format
   const transformedData = React.useMemo(() => {
-    
-    
+
+
     if (!message) {
-      
+
       return { users: [], stats: null };
     }
-    
+
     // Get users data from the new departments API
     const users = message.users || [];
     const learnerStats = message.learner_analytics || [];
     const stats = message.users_stats || {};
-    
-    
-    
+
+
+
     // Debug: Log if no users found
     if (users.length === 0) {
-      
+
     } else {
-    
+
     }
-    
+
     // Transform users to match frontend expectations
     const mergedUsers = users.map((user: any) => ({
       name: user.name || "",
@@ -568,7 +568,7 @@ export default function Learners() {
       last_activity: user.last_activity || user.last_login || "",
       progress_trackers: user.progress_trackers || []
     }));
-    
+
     // Use stats from the API or calculate from merged users
     const finalStats = stats.total !== undefined ? stats : {
       total: mergedUsers.length,
@@ -576,28 +576,28 @@ export default function Learners() {
       inactive: mergedUsers.filter((user: User) => user.enabled === 0).length,
       percentage_change: 0
     };
-    
+
     // console.log("=== FINAL TRANSFORMED DATA ===");
     // console.log("Merged users:", mergedUsers);
     // console.log("Merged users length:", mergedUsers.length);
     // console.log("Final stats:", finalStats);
-    
+
     const result = {
       users: mergedUsers,
       stats: finalStats
     };
-    
+
     // console.log("=== FINAL RESULT ===");
     // console.log("Result:", result);
-    
+
     return result;
   }, [message?.users, message?.learner_analytics, message?.users_stats, userDepartmentMapping]);
 
   const users = transformedData.users;
   const stats = transformedData.stats;
-  
-  
-  
+
+
+
   const allDepartmentOptions = allDepartmentsData || [];
   const departmentIdToName = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map((dep: any) => [dep.name, dep.department])), [allDepartmentOptions]);
   const departmentNameToId = React.useMemo(() => Object.fromEntries((allDepartmentOptions).map((dep: any) => [dep.department, dep.name])), [allDepartmentOptions]);
@@ -608,36 +608,36 @@ export default function Learners() {
   // Filter users based on search criteria with improved logic
   const filteredUsers = React.useMemo(() => {
     if (!users || users.length === 0) return [];
-    
+
     return users.filter((user: User) => {
       // Handle null/undefined values safely
       const fullName = user.full_name || '';
       const email = user.email || '';
-      const userDepartments = (user.departments && user.departments.length > 0) 
-        ? user.departments 
+      const userDepartments = (user.departments && user.departments.length > 0)
+        ? user.departments
         : (user.department ? [user.department] : []);
-      
+
       // Name filter - case insensitive
-      const nameMatch = searchName === '' || 
+      const nameMatch = searchName === '' ||
         fullName.toLowerCase().includes(searchName.toLowerCase());
-      
+
       // Email filter - case insensitive
-      const emailMatch = searchEmail === '' || 
+      const emailMatch = searchEmail === '' ||
         email.toLowerCase().includes(searchEmail.toLowerCase());
-      
+
       // Status filter
-      const statusMatch = searchStatus === "all" || 
-        (searchStatus === "active" && user.enabled === 1) || 
+      const statusMatch = searchStatus === "all" ||
+        (searchStatus === "active" && user.enabled === 1) ||
         (searchStatus === "inactive" && user.enabled === 0);
-      
+
       // Department filter - check if any selected department matches user's departments
       // Also check against department names (not just IDs)
-      const departmentMatch = departmentFilter.length === 0 || 
+      const departmentMatch = departmentFilter.length === 0 ||
         departmentFilter.some(depId => {
           const depName = departmentIdToName[depId] || depId;
           return userDepartments.includes(depId) || userDepartments.includes(depName);
         });
-      
+
       return nameMatch && emailMatch && statusMatch && departmentMatch;
     });
   }, [users, searchName, searchEmail, searchStatus, departmentFilter, departmentIdToName]);
@@ -765,7 +765,7 @@ export default function Learners() {
       }
 
       const response = await api.updateLearner(updateData);
-      
+
       // Check for backend error structure in response
       const msg = response?.message;
       if (msg && msg.success === false) {
@@ -835,21 +835,21 @@ export default function Learners() {
     const nameParts = learner.full_name?.split(' ') || [];
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
-    
+
     // Convert department names to department IDs for pre-selection
     const getDepartmentIds = (learner: User) => {
       const departments = learner.departments || [];
       const singleDepartment = learner.department ? [learner.department] : [];
       const allDepartmentNames = [...departments, ...singleDepartment].filter(Boolean);
-      
+
       // Convert department names to IDs
       const departmentIds = allDepartmentNames
         .map(deptName => departmentNameToId[deptName] || deptName) // Use ID if mapping exists, otherwise use as-is
         .filter(Boolean);
-      
+
       return departmentIds;
     };
-    
+
     setEditForm({
       first_name: firstName,
       last_name: lastName,
@@ -883,7 +883,7 @@ export default function Learners() {
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4">
+    <div className="w-full p-4 lg:p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Learners</h1>
         <div className="flex gap-2">
@@ -904,7 +904,7 @@ export default function Learners() {
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))}  disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
+                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
             </div>
             <div>
@@ -928,14 +928,14 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
-              <Input 
+              <Input
                 type="tel"
-                value={addForm.mobile_no} 
+                value={addForm.mobile_no}
                 onChange={e => {
                   // Only allow digits and limit to 10 characters
                   const value = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setAddForm(f => ({ ...f, mobile_no: value }));
-                }} 
+                }}
                 disabled={addLoading}
                 placeholder="Enter 10 digit mobile number"
                 maxLength={10}
@@ -948,11 +948,11 @@ export default function Learners() {
             <div>
               <label className="block mb-1 font-medium">Password</label>
               <div className="relative">
-                <Input 
-                  type={showAddPassword ? "text" : "password"} 
-                  value={addForm.password} 
-                  onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))} 
-                  disabled={addLoading} 
+                <Input
+                  type={showAddPassword ? "text" : "password"}
+                  value={addForm.password}
+                  onChange={e => setAddForm(f => ({ ...f, password: e.target.value }))}
+                  disabled={addLoading}
                   placeholder="Leave blank to auto-generate"
                   className="pr-10 border-2 border-border/50 focus:border-primary"
                 />
@@ -1000,7 +1000,7 @@ export default function Learners() {
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))}  disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
+                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
             </div>
             <div>
@@ -1019,14 +1019,14 @@ export default function Learners() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Mobile Number</label>
-              <Input 
+              <Input
                 type="tel"
-                value={editForm.mobile_no} 
+                value={editForm.mobile_no}
                 onChange={e => {
                   // Only allow digits and limit to 10 characters
                   const value = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setEditForm(f => ({ ...f, mobile_no: value }));
-                }} 
+                }}
                 disabled={editLoading}
                 placeholder="Enter 10 digit mobile number"
                 maxLength={10}
@@ -1039,11 +1039,11 @@ export default function Learners() {
             <div>
               <label className="block mb-1 font-medium">Password</label>
               <div className="relative">
-                <Input 
-                  type={showEditPassword ? "text" : "password"} 
-                  value={editForm.password} 
-                  onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} 
-                  disabled={editLoading} 
+                <Input
+                  type={showEditPassword ? "text" : "password"}
+                  value={editForm.password}
+                  onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))}
+                  disabled={editLoading}
                   placeholder="Leave blank to keep existing"
                   className="pr-10 border-2 border-border/50 focus:border-primary"
                 />
@@ -1082,12 +1082,12 @@ export default function Learners() {
           <strong>Warning:</strong> Learner stats total ({stats.total}) does not match number of users ({users.length}). This may indicate an API limit issue. Try refreshing the page.
         </div>
       )}
-      
-      
-      
-      
+
+
+
+
       {stats && <StatsCards stats={stats} />}
-      
+
       <Filters
         searchName={searchName}
         searchEmail={searchEmail}
@@ -1122,17 +1122,17 @@ export default function Learners() {
           <Pagination>
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious 
+                <PaginationPrevious
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />
               </PaginationItem>
-              
+
               {/* Page numbers with ellipsis */}
               {(() => {
                 const pages = [];
                 const maxVisiblePages = 7; // Show max 7 page numbers
-                
+
                 if (totalPages <= maxVisiblePages) {
                   // Show all pages if total is small
                   for (let i = 1; i <= totalPages; i++) {
@@ -1161,7 +1161,7 @@ export default function Learners() {
                       </PaginationLink>
                     </PaginationItem>
                   );
-                  
+
                   // Show ellipsis after first page if needed
                   if (currentPage > 4) {
                     pages.push(
@@ -1170,11 +1170,11 @@ export default function Learners() {
                       </PaginationItem>
                     );
                   }
-                  
+
                   // Show pages around current page
                   const startPage = Math.max(2, currentPage - 1);
                   const endPage = Math.min(totalPages - 1, currentPage + 1);
-                  
+
                   for (let i = startPage; i <= endPage; i++) {
                     if (i !== 1 && i !== totalPages) {
                       pages.push(
@@ -1190,7 +1190,7 @@ export default function Learners() {
                       );
                     }
                   }
-                  
+
                   // Show ellipsis before last page if needed
                   if (currentPage < totalPages - 3) {
                     pages.push(
@@ -1199,7 +1199,7 @@ export default function Learners() {
                       </PaginationItem>
                     );
                   }
-                  
+
                   // Show last page
                   if (totalPages > 1) {
                     pages.push(
@@ -1215,12 +1215,12 @@ export default function Learners() {
                     );
                   }
                 }
-                
+
                 return pages;
               })()}
-              
+
               <PaginationItem>
-                <PaginationNext 
+                <PaginationNext
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />

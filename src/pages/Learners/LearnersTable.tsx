@@ -97,7 +97,7 @@ export function LearnersTable({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full mt-4">
+    <div className="flex flex-col items-center justify-start w-full mt-4">
       <Table>
         <TableHeader>
           <TableRow>
