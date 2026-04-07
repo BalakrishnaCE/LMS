@@ -82,7 +82,7 @@ export default function ModuleEdit() {
             ...chapter,
             id: chapter.name, // Use chapter.name as id (actual document name)
             contents: chapter.contents?.map((block: any) => {
-              let normalizedBlock = {
+              const normalizedBlock = {
                 id: block.content_reference, // Use content_reference as id (actual document name)
                 type: block.content_type, // Use content_type directly
                 docname: block.content_reference, // Use content_reference

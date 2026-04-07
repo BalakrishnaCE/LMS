@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
-import { useFrappeGetCall } from "frappe-react-sdk";
+import { useFrappeGetCall, useFrappePostCall, useFrappeGetDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
 import { LMS_API_BASE_URL } from "@/config/routes";
 import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar";
 import { Button } from "@/components/ui/button";
 import { ContentRenderer } from "@/pages/Modules/Learner/components/ContentRenderer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { BookOpen, ArrowLeft, ArrowRight, Trash2 } from "lucide-react";
+import { BookOpen, ArrowLeft, ArrowRight, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import Lottie from "lottie-react";
 import emptyAnimation from '@/assets/Empty.json';
@@ -56,6 +56,30 @@ export default function AdminModuleDetail() {
     const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showIngestConfirm, setShowIngestConfirm] = useState(false);
+    const [isIngesting, setIsIngesting] = useState(false);
+
+    const { data: moduleDocData, mutate: mutateModuleDoc } = useFrappeGetDoc("LMS Module", moduleName || "");
+    const { call: triggerIngestion } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.start_module_ingestion_v2");
+    const { updateDoc } = useFrappeUpdateDoc();
+
+    const handleIngestToAI = async () => {
+        if (!moduleName) return;
+        setIsIngesting(true);
+        toast.loading("Scheduling Module AI Ingestion...", { id: "ingestion" });
+        try {
+            await triggerIngestion({ module_id: moduleName });
+            toast.success("Successfully added for AI Ingestion", { id: "ingestion" });
+            await updateDoc("LMS Module", moduleName, { is_injest: 1 }).catch(console.error);
+            mutateModuleDoc();
+        } catch (error: any) {
+            console.error("AI Ingestion error:", error);
+            toast.error(error.message || "Failed to trigger AI ingestion.", { id: "ingestion" });
+        } finally {
+            setIsIngesting(false);
+            setShowIngestConfirm(false);
+        }
+    };
 
     // Use get_module_with_details API for admin users instead of LearnerModuleData
     const { data: moduleDataResponse, error: moduleListError, isLoading: moduleDataLoading } = useFrappeGetCall<any>(
@@ -346,6 +370,18 @@ export default function AdminModuleDetail() {
                                         <BookOpen className="h-4 w-4" />
                                         <span>Admin Preview</span>
                                     </div>
+                                    {moduleDocData?.is_injest === 0 && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            className="flex items-center gap-2"
+                                            onClick={() => setShowIngestConfirm(true)}
+                                            disabled={isIngesting}
+                                        >
+                                            <RefreshCw className={`h-4 w-4 ${isIngesting ? "animate-spin" : ""}`} />
+                                            Ingest to AI
+                                        </Button>
+                                    )}
                                     <Button
                                         variant="destructive"
                                         size="sm"
@@ -443,6 +479,33 @@ export default function AdminModuleDetail() {
                             disabled={isDeleting}
                         >
                             {isDeleting ? "Deleting..." : "Delete Module"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* AI Ingestion Confirmation Dialog */}
+            <Dialog open={showIngestConfirm} onOpenChange={setShowIngestConfirm}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Ingest to AI</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to ingest this module's content to the AI? This will update the AI knowledge base with the latest content.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowIngestConfirm(false)}
+                            disabled={isIngesting}
+                        >
+                            No
+                        </Button>
+                        <Button
+                            onClick={handleIngestToAI}
+                            disabled={isIngesting}
+                        >
+                            Yes
                         </Button>
                     </DialogFooter>
                 </DialogContent>

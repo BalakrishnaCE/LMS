@@ -397,3 +397,88 @@
     padding-right: 1rem;
     padding-bottom: 1.5rem;
 }
+
+/* Markdown Styles */
+.chat-bubble-ai table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .chat-bubble-ai table {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.chat-bubble-ai th {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .chat-bubble-ai th {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.chat-bubble-ai td {
+    padding: 0.75rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    vertical-align: top;
+}
+
+.dark .chat-bubble-ai td {
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+.chat-bubble-ai tr:last-child td {
+    border-bottom: none;
+}
+
+.chat-bubble-ai hr {
+    border: 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    margin: 1.5rem 0;
+}
+
+.dark .chat-bubble-ai hr {
+    border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.chat-bubble-ai ul, .chat-bubble-ai ol {
+    margin: 0.75rem 0;
+    padding-left: 1.5rem;
+}
+
+.chat-bubble-ai li {
+    margin-bottom: 0.375rem;
+}
+
+.chat-bubble-ai blockquote {
+    border-left: 4px solid #0d9488;
+    padding-left: 1rem;
+    margin: 1rem 0;
+    color: rgba(0, 0, 0, 0.7);
+    font-style: italic;
+}
+
+.dark .chat-bubble-ai blockquote {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.chat-bubble-ai code {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.85em;
+}
+
+.dark .chat-bubble-ai code {
+    background-color: rgba(255, 255, 255, 0.1);
+}
