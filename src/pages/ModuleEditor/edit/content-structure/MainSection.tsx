@@ -249,7 +249,7 @@ export default function MainSection({
   const [newChapterTitle, setNewChapterTitle] = useState('');
   const { createDoc } = useFrappeCreateDoc();
   const { updateDoc } = useFrappeUpdateDoc();
-  const { call: triggerIngestion } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.start_ingestion");
+  const { call: triggerIngestion } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.start_module_ingestion_v2");
   const { data: moduleDocData, mutate: mutateModuleDoc } = useFrappeGetDoc("LMS Module", moduleId || "");
   const [minLoading, setMinLoading] = useState(true);
   const [editingLessonName, setEditingLessonName] = useState(false);
@@ -273,6 +273,7 @@ export default function MainSection({
   const isAnyEditing = editingLessonName || editingLessonDesc || editingChapterName || isAnyContentEditing;
 
   const [needsIngestion, setNeedsIngestion] = useState(false);
+  const [showIngestConfirm, setShowIngestConfirm] = useState(false);
 
   useEffect(() => {
     if (moduleDocData && moduleDocData.is_injest === 0) {
@@ -334,12 +335,12 @@ export default function MainSection({
       // 4. The response from your python API
       // is automatically wrapped in `message` by Frappe
       if (response && response.message) {
-        toast.success(`Success: ${response.message}`, { id: "ai-ingest" });
+        toast.success("Successfully added for AI Ingestion", { id: "ai-ingest" });
         setNeedsIngestion(false);
         await updateDoc("LMS Module", moduleId, { is_injest: 1 }).catch(console.error);
         mutateModuleDoc();
       } else {
-        toast.success("AI Ingestion started successfully!", { id: "ai-ingest" });
+        toast.success("Successfully added for AI Ingestion", { id: "ai-ingest" });
         setNeedsIngestion(false);
         await updateDoc("LMS Module", moduleId, { is_injest: 1 }).catch(console.error);
         mutateModuleDoc();
@@ -567,6 +568,34 @@ export default function MainSection({
           </div>
         )}
 
+        {/* AI Ingestion Confirmation Dialog */}
+        <Dialog open={showIngestConfirm} onOpenChange={setShowIngestConfirm}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Ingest to AI</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground mt-1">
+              Do you want to ingest this module's content to the AI? This will update the AI knowledge base with the latest content.
+            </p>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setShowIngestConfirm(false)}
+              >
+                No
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowIngestConfirm(false);
+                  handleIngestToAI();
+                }}
+              >
+                Yes
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Lesson Creation Dialog */}
         <Dialog open={adding} onOpenChange={setAdding} >
           <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -675,11 +704,11 @@ export default function MainSection({
                         variant={needsIngestion ? "default" : "outline"}
                         size="sm"
                         disabled={!needsIngestion}
-                        onClick={handleIngestToAI}
+                        onClick={() => setShowIngestConfirm(true)}
                         className="flex items-center justify-center gap-2 transition-all"
                       >
                         <RefreshCw className={`w-4 h-4 ${needsIngestion ? 'animate-pulse' : ''}`} />
-                        Injest to AI
+                        Ingest to AI
                       </Button>
                       {moduleDocData?.last_injetion && (
                         <span className="text-[11px] text-muted-foreground whitespace-nowrap">
@@ -987,7 +1016,7 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew, on
 
   const handleSave = async (data: any) => {
     // For text content, set title as 'chapter name-1st word of content'
-    let saveData = { ...content, ...data };
+    const saveData = { ...content, ...data };
     if (
       (content.type === 'text' || content.type === 'Text Content') &&
       content.chapterTitle
@@ -1460,7 +1489,7 @@ function SortableContentBlock({ id, content, chapter, setModule, onEditChange, s
             chapters: lesson.chapters.map((ch: any) => {
               if (ch.id !== chapter.id) return ch;
               // Filter out any unsaved placeholders and get only saved content
-              let updatedContents = (ch.contents || []).filter((c: any) => c.docname || c.content_reference);
+              const updatedContents = (ch.contents || []).filter((c: any) => c.docname || c.content_reference);
               // Now, add or update the saved content
               const idx = updatedContents.findIndex((c: any) => c.docname === docname || c.content_reference === docname);
               const newContent = {

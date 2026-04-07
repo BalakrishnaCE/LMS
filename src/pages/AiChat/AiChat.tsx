@@ -14,6 +14,8 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // API Base URL for Frappe backend
 const API_BASE_URL = "/api/method/novel_lms.lms_ai_bot.main.chat";
@@ -73,8 +75,8 @@ interface ChatContext {
     chapter?: Chapter;
 }
 
-const formatMessageText = (text: string | any) => {
-    if (!text) return [""];
+const formatMessageText = (text: string | any, isAi: boolean) => {
+    if (!text) return "";
     if (typeof text !== 'string') {
         try {
             text = JSON.stringify(text);
@@ -83,54 +85,25 @@ const formatMessageText = (text: string | any) => {
         }
     }
 
-    const formatInline = (str: string, lineIndex: number) => {
-        const parts: React.ReactNode[] = [];
-        let currentIndex = 0;
-        const regex = /(\*\*.*?\*\*|\[Source:.*?\])/g;
-        let match;
+    // Handle <br> tags often sent by LLMs
+    const sanitizedText = text.replace(/<br\s*\/?>/gi, '\n');
 
-        while ((match = regex.exec(str)) !== null) {
-            if (match.index > currentIndex) {
-                parts.push(str.substring(currentIndex, match.index));
-            }
-            const matchedText = match[0];
-            if (matchedText.startsWith('**') && matchedText.endsWith('**')) {
-                parts.push(<strong key={`${lineIndex}-${match.index}`}>{matchedText.slice(2, -2)}</strong>);
-            } else if (matchedText.startsWith('[Source:')) {
-                parts.push(<em key={`${lineIndex}-${match.index}`} className="text-xs opacity-80">{matchedText}</em>);
-            }
-            currentIndex = match.index + matchedText.length;
-        }
-        if (currentIndex < str.length) {
-            parts.push(str.substring(currentIndex));
-        }
-        return parts.length > 0 ? parts : str;
-    };
+    if (!isAi) {
+        return <div className="whitespace-pre-wrap">{sanitizedText}</div>;
+    }
 
-    const formattedText = text.replace(/([^\n])\s*(###)/g, '$1\n$2');
-
-    const lines = formattedText.split('\n');
-    return lines.map((line: any, index: any) => {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('###')) {
-            const headingText = line.replace(/^###\s*/, '');
-            return (
-                <h3 key={index} className="messageHeading">
-                    {formatInline(headingText, index)}
-                </h3>
-            );
-        }
-
-        if (trimmed === '') {
-            return <div key={index} className="messageSpacer" />;
-        }
-
-        return (
-            <div key={index} className="messageParagraph">
-                {formatInline(line, index)}
-            </div>
-        );
-    });
+    return (
+        <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            components={{
+                h3: ({node, ...props}) => <h3 className="messageHeading" {...props} />,
+                p: ({node, ...props}) => <p className="messageParagraph" {...props} />,
+                a: ({node, ...props}) => <a className="text-teal-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
+            }}
+        >
+            {sanitizedText}
+        </ReactMarkdown>
+    );
 };
 
 const MessageBubble = memo(({ message, onCopy, copiedId }: { message: Message, onCopy: (text: string, id: string) => void, copiedId: string | null }) => {
@@ -149,8 +122,8 @@ const MessageBubble = memo(({ message, onCopy, copiedId }: { message: Message, o
                 )}
                 <div className="relative mb-2">
                     <div className={`chat-bubble ${message.sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'}`}>
-                        <div className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-                            {formatMessageText(message.text)}
+                        <div className="text-sm leading-relaxed break-words">
+                            {formatMessageText(message.text, message.sender === 'ai')}
                         </div>
                     </div>
                 </div>
@@ -715,36 +688,6 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         }]);
     };
 
-    const sendQueryToAPI = async (query: string): Promise<{ response: string; suggested_title?: string }> => {
-        const response = await fetch(API_BASE_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                department: context.department?.name || '',
-                module: context.module?.name || '',
-                lesson: context.lesson?.name || '',
-                chapter: context.chapter?.name || '',
-                query: query,
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Frappe wraps the response in a 'message' object
-        const result = data.message || data;
-
-        return {
-            response: result.response,
-            // Only present on the very first turn (backend omits it on follow-ups)
-            suggested_title: result.suggested_title ?? undefined,
-        };
-    };
 
     const createChatSession = async (): Promise<string | null> => {
         try {
@@ -788,9 +731,6 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         if (!inputValue.trim() || isLoading) return;
 
         const userQuery = inputValue.trim();
-        // Snapshot whether this is the very first user message (no AI replies yet)
-        // If chatId is null, this is the first real API call on a fresh session.
-        // (The greeting AI bubble in state doesn't count — it's local, not from the bot.)
         const isFirstMessage = !chatId;
 
         const newMessage: Message = {
@@ -808,10 +748,110 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         }
 
         setIsLoading(true);
-        try {
-            const { response: aiResponseText, suggested_title } = await sendQueryToAPI(userQuery);
+        let accumulatedResponse = "";
+        const streamingMessageId = (Date.now() + 1).toString();
+        let suggestedTitle = "";
 
-            // Handle persistence
+        try {
+            const response = await fetch(API_BASE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Frappe-CSRF-Token': (window as any).frappe?.csrf_token
+                },
+                body: JSON.stringify({
+                    department: context.department?.name || '',
+                    module: context.module?.name || '',
+                    lesson: context.lesson?.name || '',
+                    chapter: context.chapter?.name || '',
+                    query: userQuery,
+                    stream: true
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error("No reader available");
+
+            const decoder = new TextDecoder();
+            
+            // Add initial empty AI message for streaming
+            setMessages(prev => [...prev, {
+                id: streamingMessageId,
+                text: "",
+                sender: 'ai',
+                timestamp: new Date()
+            }]);
+
+            // We can set isLoading to false now that we have the first chunk coming,
+            // or keep it true until the end. If we keep it true, the input remains disabled.
+            // Usually we want it disabled during streaming.
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.replace('data: ', '').trim();
+                        if (dataStr === '[DONE]') break;
+
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            
+                            // Check if it's the title chunk
+                            if (parsed.suggested_title) {
+                                suggestedTitle = parsed.suggested_title;
+                                console.log("New Title Received:", suggestedTitle);
+                            } 
+                            // Check if it's a message chunk (Ollama/OpenAI delta format)
+                            else if (parsed.choices && parsed.choices[0].delta?.content) {
+                                const content = parsed.choices[0].delta.content;
+                                accumulatedResponse += content;
+                                
+                                setMessages(prev => {
+                                    const last = prev[prev.length - 1];
+                                    if (last && last.id === streamingMessageId) {
+                                        return [...prev.slice(0, -1), { ...last, text: accumulatedResponse }];
+                                    }
+                                    return prev;
+                                });
+                            }
+                            // Fallback for direct content structure if any
+                            else if (parsed.content) {
+                                accumulatedResponse += parsed.content;
+                                setMessages(prev => {
+                                    const last = prev[prev.length - 1];
+                                    if (last && last.id === streamingMessageId) {
+                                        return [...prev.slice(0, -1), { ...last, text: accumulatedResponse }];
+                                    }
+                                    return prev;
+                                });
+                            }
+                        } catch (e) {
+                            // If not JSON, it might be raw text content
+                            if (dataStr && !dataStr.startsWith('{')) {
+                                accumulatedResponse += dataStr;
+                                setMessages(prev => {
+                                    const last = prev[prev.length - 1];
+                                    if (last && last.id === streamingMessageId) {
+                                        return [...prev.slice(0, -1), { ...last, text: accumulatedResponse }];
+                                    }
+                                    return prev;
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Handle persistence and metadata once streaming is complete
             let currentChatId = chatId;
             if (!currentChatId) {
                 currentChatId = await createChatSession();
@@ -819,32 +859,18 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             }
 
             if (currentChatId) {
-                // Don't await this to keep UI snappy
-                saveQueryResponse(currentChatId, userQuery, aiResponseText);
+                saveQueryResponse(currentChatId, userQuery, accumulatedResponse);
 
-                if (isFirstMessage && suggested_title) {
-                    // 1. Write to localStorage immediately so the sidebar updates
-                    //    without waiting for the next fetch cycle.
-                    localStorage.setItem(
-                        `novel_lms_chat_title_${currentChatId}`,
-                        suggested_title
-                    );
-                    // 2. Persist permanently to the Chats DocType (fire-and-forget)
+                if (isFirstMessage && suggestedTitle) {
+                    localStorage.setItem(`novel_lms_chat_title_${currentChatId}`, suggestedTitle);
                     fetch('/api/method/novel_lms.novel_lms.api.Chat.update_chat_title', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ chat_id: currentChatId, title: suggested_title })
+                        body: JSON.stringify({ chat_id: currentChatId, title: suggestedTitle })
                     }).catch(err => console.error('[NIA] Failed to save title to backend:', err));
                 }
             }
 
-            const aiResponse: Message = {
-                id: (Date.now() + 1).toString(),
-                text: aiResponseText,
-                sender: 'ai',
-                timestamp: new Date()
-            };
-            setMessages(prev => [...prev, aiResponse]);
         } catch (error) {
             console.error('API Error:', error);
             const errorMessage: Message = {
@@ -853,7 +879,11 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 sender: 'ai',
                 timestamp: new Date()
             };
-            setMessages(prev => [...prev, errorMessage]);
+            // If we already added a streaming message, replace it or update it with error
+            setMessages(prev => {
+                const filtered = prev.filter(m => m.id !== streamingMessageId);
+                return [...filtered, errorMessage];
+            });
         } finally {
             setIsLoading(false);
         }

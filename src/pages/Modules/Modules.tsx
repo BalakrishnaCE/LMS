@@ -99,7 +99,10 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
 
     // Add authentication check to prevent race condition
     const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
-    const { call: triggerModuleIngestion } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.start_module_ingestion");
+    const { call: triggerModuleIngestion } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.start_module_ingestion_v2");
+    // Bot ingestion state
+    const [showIngestConfirm, setShowIngestConfirm] = useState(false);
+    const [moduleToIngest, setModuleToIngest] = useState<{ name: string; name1: string } | null>(null);
 
     // Debounced save function for search query
     const saveSearchToStorage = useCallback(
@@ -338,16 +341,22 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
         }
     };
 
-    const handleModuleIngest = async (moduleName: string) => {
+    const handleModuleIngest = (moduleName: string, moduleDisplayName: string) => {
+        setModuleToIngest({ name: moduleName, name1: moduleDisplayName });
+        setShowIngestConfirm(true);
+    };
+
+    const confirmModuleIngest = async () => {
+        if (!moduleToIngest) return;
+
+        setShowIngestConfirm(false);
+        const moduleName = moduleToIngest.name;
+
         try {
             toast.loading("Scheduling Module AI Ingestion...", { id: "ingestion" });
-            const response = await triggerModuleIngestion({ module_id: moduleName });
+            await triggerModuleIngestion({ module_id: moduleName });
 
-            if (response && response.message) {
-                toast.success(`Success: ${response.message}`, { id: "ingestion" });
-            } else {
-                toast.success("AI Ingestion triggered successfully!", { id: "ingestion" });
-            }
+            toast.success("Successfully added for AI Ingestion", { id: "ingestion" });
 
             // Reload the page to remove the icon naturally via API state
             setTimeout(() => {
@@ -357,6 +366,8 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
         } catch (err: any) {
             console.error("Ingestion error:", err);
             toast.error(err.message || "Failed to trigger ingestion", { id: "ingestion" });
+        } finally {
+            setModuleToIngest(null);
         }
     };
 
@@ -532,7 +543,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     e.stopPropagation();
-                                                    handleModuleIngest(module.name);
+                                                    handleModuleIngest(module.name, module.name1);
                                                 }}
                                                 className="absolute top-10 right-12 z-20 p-2 rounded-full bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/80 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
                                                 title="Ingest to AI"
@@ -719,6 +730,42 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                         >
                             <CopyPlus className="mr-2 h-4 w-4" />
                             Confirm Duplicate
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* AI Ingestion Confirmation Dialog */}
+            <Dialog open={showIngestConfirm} onOpenChange={setShowIngestConfirm}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Ingest to AI</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Do you want to ingest this module's content to the AI? This will update the AI knowledge base with the latest content.
+                        </p>
+                        {moduleToIngest && (
+                            <div className="mt-4 rounded-lg bg-muted p-3">
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Module:</p>
+                                <p className="text-sm font-semibold">{moduleToIngest.name1}</p>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter className="flex justify-end gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowIngestConfirm(false);
+                                setModuleToIngest(null);
+                            }}
+                        >
+                            No
+                        </Button>
+                        <Button
+                            onClick={confirmModuleIngest}
+                        >
+                            Yes
                         </Button>
                     </DialogFooter>
                 </DialogContent>
