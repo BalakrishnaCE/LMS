@@ -19,11 +19,11 @@ const FloatingChatButton = () => {
     const [size, setSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
     const { theme } = useTheme();
     const { user, isLMSAdmin } = useUser();
-     
-     // Check if AI is allowed for this user
-     const isAiAllowed = user?.email && AI_ALLOWED_USERS.includes(user.email.toLowerCase());
-     
-     const [location, setLocation] = useLocation();
+
+    // Check if AI is allowed for this user
+    const isAiAllowed = user?.email && AI_ALLOWED_USERS.includes(user.email.toLowerCase());
+
+    const [location, setLocation] = useLocation();
     const isDragging = useRef(false);
     const startPos = useRef({ x: 0, y: 0 });
     const startSize = useRef({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
@@ -86,7 +86,7 @@ const FloatingChatButton = () => {
                 // Reset size to default so it doesn't open huge next time
                 setSize({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
                 startSize.current = { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
-                setLocation(`${BASE_PATH}/ai`);
+                setLocation('/ai');
             }
         }
         isDragging.current = false;
@@ -114,7 +114,7 @@ const FloatingChatButton = () => {
         localStorage.setItem('novel_lms_return_path', location);
         setIsOpen(false);
         setShouldRestoreSession(false);
-        setLocation(`${BASE_PATH}/ai`);
+        setLocation('/ai');
     }, [setLocation, location]);
 
     // Lock body scroll when chat is open
