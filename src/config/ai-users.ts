@@ -6,5 +6,8 @@ export const AI_ALLOWED_USERS = [
   "bb@noveloffice.com",
   "subin.s@noveloffice.in",
   "yamini.c@noveloffice.in",
-  "prathyusha.p@noveloffice.in"
+  "prathyusha.p@noveloffice.in",
+  "sakshi.k@noveloffice.in",
+  "abhishek.v@noveloffice.in",
+  "sreelakshmi.a@noveloffice.in"
 ];
