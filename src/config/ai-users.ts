@@ -9,5 +9,7 @@ export const AI_ALLOWED_USERS = [
   "prathyusha.p@noveloffice.in",
   "sakshi.k@noveloffice.in",
   "abhishek.v@noveloffice.in",
-  "sreelakshmi.a@noveloffice.in"
+  "sreelakshmi.a@noveloffice.in",
+  "parameshwari.s@noveloffice.in",
+  "keerthana.k@noveloffice.in"
 ];
