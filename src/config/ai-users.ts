@@ -11,5 +11,24 @@ export const AI_ALLOWED_USERS = [
   "abhishek.v@noveloffice.in",
   "sreelakshmi.a@noveloffice.in",
   "parameshwari.s@noveloffice.in",
-  "keerthana.k@noveloffice.in"
+  "keerthana.k@noveloffice.in",
+  "priya.r@noveloffice.in",
+  "harshitha.p@noveloffice.in",
+  "sweta.s@noveloffice.in",
+  "raniya.n@noveloffice.in",
+  "nikita.b@noveloffice.in",
+  "saniya.s@noveloffice.in",
+  "preethi.p@noveloffice.in",
+  "elmi.s@noveloffice.in",
+  "barbita@novelteam.com",
+  "gauthami.k@noveloffice.in",
+  "vishal.r@noveloffice.in",
+  "paul.a@noveloffice.in"
 ];
+
+
+
+
+
+
+
