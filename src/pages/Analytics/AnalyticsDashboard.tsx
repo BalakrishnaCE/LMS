@@ -1975,7 +1975,7 @@ export default function AnalyticsDashboard() {
         // Question block: strict 3-row layout
         const normalizeLine = (text: string) =>
           (text || 'N/A')
-            .replace(/<[^>]*>/g, '')                  // strip HTML
+            .replace(/<[^>]*>/g, '')                // strip HTML
             .replace(/[\u00A0\u200B-\u200D\uFEFF]/g, ' ') // remove NBSP & zero-width chars
             // Replace curly/smart quotes with ASCII equivalents
             .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'") // smart single quotes → '
@@ -3896,8 +3896,8 @@ export default function AnalyticsDashboard() {
                             <button
                               onClick={() => setLearnerModuleFilter('all')}
                               className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${learnerModuleFilter === 'all'
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-primary/10 text-primary hover:bg-primary/20'
                                 }`}
                             >
                               Total: {learnerSidebarData?.learner_info?.total_modules || 0}
@@ -3905,8 +3905,8 @@ export default function AnalyticsDashboard() {
                             <button
                               onClick={() => setLearnerModuleFilter('completed')}
                               className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${learnerModuleFilter === 'completed'
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-primary/10 text-primary hover:bg-primary/20'
                                 }`}
                             >
                               Completed: {learnerSidebarData?.learner_info?.completed_modules || 0}
@@ -3914,8 +3914,8 @@ export default function AnalyticsDashboard() {
                             <button
                               onClick={() => setLearnerModuleFilter('in_progress')}
                               className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${learnerModuleFilter === 'in_progress'
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-primary/10 text-primary hover:bg-primary/20'
                                 }`}
                             >
                               In Progress: {learnerSidebarData?.learner_info?.in_progress_modules || 0}
@@ -3923,8 +3923,8 @@ export default function AnalyticsDashboard() {
                             <button
                               onClick={() => setLearnerModuleFilter('not_started')}
                               className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${learnerModuleFilter === 'not_started'
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-primary/10 text-primary hover:bg-primary/20'
                                 }`}
                             >
                               Not Started: {learnerSidebarData?.learner_info?.not_started_modules || 0}
@@ -3979,10 +3979,10 @@ export default function AnalyticsDashboard() {
                                         </td>
                                         <td className="p-3">
                                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${module.status === 'Completed'
+                                            ? 'bg-primary/10 text-primary'
+                                            : module.status === 'In Progress'
                                               ? 'bg-primary/10 text-primary'
-                                              : module.status === 'In Progress'
-                                                ? 'bg-primary/10 text-primary'
-                                                : 'bg-muted text-muted-foreground'
+                                              : 'bg-muted text-muted-foreground'
                                             }`}>
                                             {module.status}
                                           </span>
@@ -3993,10 +3993,10 @@ export default function AnalyticsDashboard() {
                                             <div className="w-16 bg-muted rounded-full h-1">
                                               <div
                                                 className={`h-1 rounded-full ${module.status === 'Completed'
+                                                  ? 'bg-primary'
+                                                  : module.status === 'In Progress'
                                                     ? 'bg-primary'
-                                                    : module.status === 'In Progress'
-                                                      ? 'bg-primary'
-                                                      : 'bg-muted'
+                                                    : 'bg-muted'
                                                   }`}
                                                 style={{ width: `${Math.round(module.progress)}%` }}
                                               ></div>
@@ -4051,8 +4051,8 @@ export default function AnalyticsDashboard() {
                                     <td className="p-2 text-xs font-medium">{quiz.module_name}</td>
                                     <td className="p-2 text-xs">
                                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${quiz.status === 'Attempted'
-                                          ? 'bg-primary/10 text-primary'
-                                          : 'bg-muted text-muted-foreground'
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'bg-muted text-muted-foreground'
                                         }`}>
                                         {quiz.status}
                                       </span>
@@ -4097,10 +4097,10 @@ export default function AnalyticsDashboard() {
                                     <td className="p-2 text-xs font-medium">{qa.module_name}</td>
                                     <td className="p-2 text-xs">
                                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${qa.status === 'Scored'
+                                        ? 'bg-primary/10 text-primary'
+                                        : qa.status === 'Pending Score'
                                           ? 'bg-primary/10 text-primary'
-                                          : qa.status === 'Pending Score'
-                                            ? 'bg-primary/10 text-primary'
-                                            : 'bg-muted text-muted-foreground'
+                                          : 'bg-muted text-muted-foreground'
                                         }`}>
                                         {qa.status}
                                       </span>
@@ -4214,8 +4214,8 @@ export default function AnalyticsDashboard() {
                         <button
                           onClick={() => fetchLearnerDetails('total')}
                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'total'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-primary/10 text-primary hover:bg-primary/20'
                             }`}
                         >
                           Total: {allLearnerDetails.length}
@@ -4223,8 +4223,8 @@ export default function AnalyticsDashboard() {
                         <button
                           onClick={() => fetchLearnerDetails('completed')}
                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'completed'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-primary/10 text-primary hover:bg-primary/20'
                             }`}
                         >
                           Completed: {allLearnerDetails.filter(l => l.status === 'completed').length}
@@ -4232,8 +4232,8 @@ export default function AnalyticsDashboard() {
                         <button
                           onClick={() => fetchLearnerDetails('in_progress')}
                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'in_progress'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-primary/10 text-primary hover:bg-primary/20'
                             }`}
                         >
                           In Progress: {allLearnerDetails.filter(l => l.status === 'in_progress').length}
@@ -4241,8 +4241,8 @@ export default function AnalyticsDashboard() {
                         <button
                           onClick={() => fetchLearnerDetails('not_started')}
                           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'not_started'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-primary/10 text-primary hover:bg-primary/20'
                             }`}
                         >
                           Not Started: {allLearnerDetails.filter(l => l.status === 'not_started').length}
@@ -4299,9 +4299,9 @@ export default function AnalyticsDashboard() {
                                         <td className="p-3 text-sm bg-muted/50">{learner.department || 'N/A'}</td>
                                         <td className="p-3 text-sm bg-muted/50">
                                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${learner.status === 'completed' ? 'bg-primary/10 text-primary' :
-                                              learner.status === 'in_progress' ? 'bg-primary/10 text-primary' :
-                                                learner.status === 'not_started' ? 'bg-muted text-muted-foreground' :
-                                                  'bg-muted text-muted-foreground'
+                                            learner.status === 'in_progress' ? 'bg-primary/10 text-primary' :
+                                              learner.status === 'not_started' ? 'bg-muted text-muted-foreground' :
+                                                'bg-muted text-muted-foreground'
                                             }`}>
                                             {learner.status === 'completed' ? 'Completed' :
                                               learner.status === 'in_progress' ? 'In Progress' :
