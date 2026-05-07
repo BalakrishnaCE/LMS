@@ -5,10 +5,12 @@ import { useUser } from "@/hooks/use-user";
 const AiChatPage = () => {
     const [location, setLocation] = useLocation();
     const search = useSearch();
-    const { user, isLMSAdmin } = useUser();
+    const { isLMSAdmin } = useUser();
     // chatId is optional in the route
     const [, params] = useRoute("/ai/:chatId?");
     const chatId = params?.chatId;
+
+    const resetKey = search.includes('new=') ? search : '';
 
     return (
         <div className="h-full overflow-hidden bg-background flex flex-col">
@@ -16,6 +18,7 @@ const AiChatPage = () => {
                 <AiChat
                     key={location + search}
                     initialChatId={chatId}
+                    resetKey={resetKey}
                     onMinimize={() => {
                         localStorage.setItem('novel_lms_open_chat', 'true');
 

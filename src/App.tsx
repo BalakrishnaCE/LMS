@@ -35,8 +35,8 @@ import { MediaManagerProvider } from "@/contexts/MediaManagerContext";
 import { useUser } from "@/hooks/use-user";
 
 function AppContent() {
-  const { user } = useUser();
-  const isAiAllowed = true;
+  const { isLMSAdmin } = useUser();
+  const isAiAllowed = !isLMSAdmin;
 
   return (
     <Router base={BASE_PATH}>
@@ -52,14 +52,14 @@ function AppContent() {
             <Layout>
               <AiChatPage />
             </Layout>
-          )} allowedRoles={["LMS Admin", "LMS Student", "LMS Content Editor"]} />
+          )} allowedRoles={["LMS Student", "LMS Content Editor"]} />
         )}
         {isAiAllowed && (
           <ProtectedRoute path="/ai/:chatId" component={() => (
             <Layout>
               <AiChatPage />
             </Layout>
-          )} allowedRoles={["LMS Admin", "LMS Student", "LMS Content Editor"]} />
+          )} allowedRoles={["LMS Student", "LMS Content Editor"]} />
         )}
         <ProtectedRoute path="/" component={() => (
           <Layout>

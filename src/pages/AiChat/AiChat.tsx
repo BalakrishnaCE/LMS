@@ -148,7 +148,7 @@ const MessageBubble = memo(({ message, onCopy, copiedId }: { message: Message, o
 });
 MessageBubble.displayName = "MessageBubble";
 
-const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating = false, onMinimize, extraHeaderButtons, shouldRestoreSession = false }: { initialModuleName?: string; initialChatId?: string; sidebarControl?: React.ReactNode; isFloating?: boolean; onMinimize?: () => void; extraHeaderButtons?: React.ReactNode; shouldRestoreSession?: boolean }) => {
+const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating = false, onMinimize, extraHeaderButtons, shouldRestoreSession = false, resetKey }: { initialModuleName?: string; initialChatId?: string; sidebarControl?: React.ReactNode; isFloating?: boolean; onMinimize?: () => void; extraHeaderButtons?: React.ReactNode; shouldRestoreSession?: boolean; resetKey?: string }) => {
     const { user, isLoading: isUserLoading } = useUser();
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -518,6 +518,13 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             return () => clearTimeout(timer);
         }
     }, [currentStep, isLoading]);
+
+    // Reset chat state when sidebar "New Chat" triggers a resetKey change
+    useEffect(() => {
+        if (resetKey) {
+            handleReset();
+        }
+    }, [resetKey]);
 
     const fetchUserDepartments = async () => {
         try {
