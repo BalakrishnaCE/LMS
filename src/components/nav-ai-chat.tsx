@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/collapsible"
 import { getFullPath, ROUTES } from "@/config/routes"
 import { useUser } from "@/hooks/use-user"
-import { AI_ALLOWED_USERS } from "@/config/ai-users"
 
 interface ChatSession {
     id: string;
@@ -45,7 +44,7 @@ export function NavAiChat() {
                     // (3) human-readable dept/module/lesson names, (4) generic label
                     const localTitle = localStorage.getItem(`novel_lms_chat_title_${c.name}`);
                     const fallbackTitle =
-                        [c.department_name || c.department, c.module_name || c.module, c.lesson_name || c.lesson]
+                        [c.department_name || c.department, c.module_name || c.module, c.lesson_name || c.lesson, c.chapter_name || c.chapter]
                             .filter(Boolean).join(' - ') ||
                         'New Conversation';
                     return {
@@ -92,7 +91,7 @@ export function NavAiChat() {
     const currentChatId = location.split('/').pop();
     const isAiPage = location.includes(ROUTES.AI_CHAT);
 
-    const isAiAllowed = user?.email && AI_ALLOWED_USERS.includes(user.email.toLowerCase());
+    const isAiAllowed = true;
 
     if (!isAiAllowed) return null;
 

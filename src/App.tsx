@@ -33,11 +33,10 @@ import { PermissionProvider } from "@/contexts/PermissionContext";
 import { NavigationProvider } from "@/contexts/NavigationContext";
 import { MediaManagerProvider } from "@/contexts/MediaManagerContext";
 import { useUser } from "@/hooks/use-user";
-import { AI_ALLOWED_USERS } from "@/config/ai-users";
 
 function AppContent() {
   const { user } = useUser();
-  const isAiAllowed = user?.email && AI_ALLOWED_USERS.includes(user.email.toLowerCase());
+  const isAiAllowed = true;
 
   return (
     <Router base={BASE_PATH}>

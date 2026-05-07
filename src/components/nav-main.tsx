@@ -12,7 +12,6 @@ import {
 import { navigate } from "wouter/use-browser-location"
 import { useUser } from "@/hooks/use-user"
 import { getRelativePath, getFullPath, BASE_PATH, ROUTES } from "@/config/routes"
-import { AI_ALLOWED_USERS } from "@/config/ai-users"
 
 export type NavItemIcon = Icon | React.ComponentType<{ className?: string }>
 
@@ -30,7 +29,7 @@ export function NavMain({
 }) {
   const [location] = useLocation();
   const { isLMSAdmin, user } = useUser();
-  const isAiAllowed = user?.email && AI_ALLOWED_USERS.includes(user.email.toLowerCase());
+  const isAiAllowed = true;
 
   // Get the current path without the base path
   const currentPath = getRelativePath(location);
