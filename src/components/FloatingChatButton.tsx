@@ -2,11 +2,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { X, ExternalLink } from "lucide-react";
 import AiChat from "@/pages/AiChat/AiChat";
 import { useTheme } from "@/components/theme-provider";
-import { useUser } from "@/hooks/use-user";
 import { useLocation } from "wouter";
 import { BASE_PATH } from "@/config/routes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AI_ALLOWED_USERS } from "@/config/ai-users";
 
 const DEFAULT_WIDTH = 360;
 const DEFAULT_HEIGHT = 550;
@@ -18,10 +16,9 @@ const FloatingChatButton = () => {
     const [isMaximized, setIsMaximized] = useState(false);
     const [size, setSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
     const { theme } = useTheme();
-    const { user, isLMSAdmin } = useUser();
 
-    // Check if AI is allowed for this user
-    const isAiAllowed = user?.email && AI_ALLOWED_USERS.includes(user.email.toLowerCase());
+    // AI is now available for all users
+    const isAiAllowed = true;
 
     const [location, setLocation] = useLocation();
     const isDragging = useRef(false);
@@ -112,6 +109,7 @@ const FloatingChatButton = () => {
 
     const toggleMaximize = useCallback(() => {
         localStorage.setItem('novel_lms_return_path', location);
+        // The stream singleton survives navigation — no snapshot needed
         setIsOpen(false);
         setShouldRestoreSession(false);
         setLocation('/ai');

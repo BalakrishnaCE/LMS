@@ -16,6 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { chatStreamStore } from "@/stores/chatStreamStore";
 
 // API Base URL for Frappe backend
 const API_BASE_URL = "/api/method/novel_lms.lms_ai_bot.main.chat";
@@ -151,6 +152,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
     const { user, isLoading: isUserLoading } = useUser();
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const hasInitialized = useRef(false);
+    // Ref to track latest state for reliable unmount saving (avoids stale closures)
+    const latestStateRef = useRef<{ context: ChatContext; currentStep: ConversationStep; messages: Message[]; chatId: string | null; inputValue: string; isLoading: boolean }>({ context: {}, currentStep: 'department', messages: [], chatId: null, inputValue: '', isLoading: false });
 
     // Conversation state
     const [currentStep, setCurrentStep] = useState<ConversationStep>('department');
@@ -325,8 +329,8 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         if (!isUserLoading) {
             let restored = false;
 
-            // Priority 0: Forced restore
-            if (shouldRestoreSession) {
+            // Priority 0: Forced restore (from minimize back to floating)
+            if (!restored && shouldRestoreSession) {
                 const restoredState = loadState();
                 if (restoredState) {
                     if (restoredState.context) setContext(restoredState.context);
@@ -339,12 +343,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         setMessages(restoredMessages);
                     }
                     if (restoredState.chatId) setChatId(restoredState.chatId);
-
-                    if (restoredState.chatId) setChatId(restoredState.chatId);
                     if (restoredState.inputValue) setInputValue(restoredState.inputValue);
 
                     // Restore hierarchies so 'Back' navigation works
-                    // We fetch all levels that we have context for
                     if (restoredState.context?.department) {
                         fetchDepartmentModules(restoredState.context.department.id);
                     }
@@ -381,8 +382,6 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                             setMessages(restoredMessages);
                         }
                         if (restoredState.chatId) setChatId(restoredState.chatId);
-
-                        if (restoredState.chatId) setChatId(restoredState.chatId);
                         if (restoredState.inputValue) setInputValue(restoredState.inputValue);
 
                         // Restore hierarchies so 'Back' navigation works
@@ -401,8 +400,49 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                     }
                 }
             }
+
+            // Mark initialization complete after a short delay to allow state to settle
+            setTimeout(() => { hasInitialized.current = true; }, 600);
         }
     }, [initialModuleName, initialChatId, isUserLoading, shouldRestoreSession]);
+
+    // Rehydrate from singleton if we remount during an active stream
+    useEffect(() => {
+        const sync = () => {
+            const s = chatStreamStore.getState();
+            if (!s.isStreaming || !s.streamingMessageId) return;
+
+            setIsLoading(true);
+            setMessages(prev => {
+                // If the streaming bubble already exists, update it
+                const exists = prev.some(m => m.id === s.streamingMessageId);
+                if (exists) {
+                    return prev.map(m =>
+                        m.id === s.streamingMessageId ? { ...m, text: s.accumulatedText } : m
+                    );
+                }
+                // If we remounted and it's missing, re-add it
+                return [...prev, {
+                    id: s.streamingMessageId!,
+                    text: s.accumulatedText,
+                    sender: 'ai',
+                    timestamp: new Date()
+                }];
+            });
+        };
+
+        // Run once on mount to catch any in-flight stream
+        sync();
+
+        // Subscribe for subsequent updates
+        const unsub = chatStreamStore.subscribe(() => {
+            const s = chatStreamStore.getState();
+            if (!s.isStreaming) setIsLoading(false);
+            sync();
+        });
+
+        return unsub;
+    }, []); // empty deps — run once on mount/remount
 
     // Save state whenever it changes
     // Save state whenever it changes (Debounced)
@@ -426,8 +466,32 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     };
 
-    // Save state whenever it changes (Debounced)
+    // Keep latestStateRef in sync for unmount save
     useEffect(() => {
+        latestStateRef.current = { context, currentStep, messages, chatId, inputValue, isLoading };
+    }, [context, currentStep, messages, chatId, inputValue, isLoading]);
+
+    // Save state on unmount (ensures state is persisted during maximize/minimize transitions)
+    useEffect(() => {
+        return () => {
+            const s = latestStateRef.current;
+            // Don't save empty states
+            if (s.currentStep === 'department' && s.messages.length === 0 && !s.context.department && !s.inputValue) {
+                return;
+            }
+            const payload = JSON.stringify({
+                timestamp: Date.now(),
+                ...s
+            });
+            localStorage.setItem('novel_lms_ai_chat_state', payload);
+        };
+    }, []);
+
+    // Save state whenever it changes (Debounced)
+    // Guard: don't save until initialization is complete to prevent overwriting restored state
+    useEffect(() => {
+        if (!hasInitialized.current) return;
+
         const saveHandler = setTimeout(() => {
             saveState();
         }, 500); // 500ms debounce
@@ -733,6 +797,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
         const userQuery = inputValue.trim();
         const isFirstMessage = !chatId;
+        const streamingMessageId = (Date.now() + 1).toString();
 
         const newMessage: Message = {
             id: Date.now().toString(),
@@ -742,16 +807,26 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         };
 
         setMessages(prev => [...prev, newMessage]);
-        setInputValue("");
+        setInputValue('');
 
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
 
         setIsLoading(true);
-        let accumulatedResponse = "";
-        const streamingMessageId = (Date.now() + 1).toString();
-        let suggestedTitle = "";
+        
+        // Add the empty streaming bubble immediately
+        setMessages(prev => [...prev, {
+            id: streamingMessageId,
+            text: '',
+            sender: 'ai',
+            timestamp: new Date()
+        }]);
+
+        // Register in the singleton BEFORE any await
+        chatStreamStore.startStream(streamingMessageId);
+
+        let suggestedTitle = '';
 
         try {
             const response = await fetch(API_BASE_URL, {
@@ -770,26 +845,12 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 }),
             });
 
-            if (!response.ok) {
-                throw new Error(`API error: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`API error: ${response.status}`);
 
             const reader = response.body?.getReader();
-            if (!reader) throw new Error("No reader available");
+            if (!reader) throw new Error('No reader available');
 
             const decoder = new TextDecoder();
-            
-            // Add initial empty AI message for streaming
-            setMessages(prev => [...prev, {
-                id: streamingMessageId,
-                text: "",
-                sender: 'ai',
-                timestamp: new Date()
-            }]);
-
-            // We can set isLoading to false now that we have the first chunk coming,
-            // or keep it true until the end. If we keep it true, the input remains disabled.
-            // Usually we want it disabled during streaming.
 
             while (true) {
                 const { value, done } = await reader.read();
@@ -805,54 +866,31 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
                         try {
                             const parsed = JSON.parse(dataStr);
-                            
-                            // Check if it's the title chunk
                             if (parsed.suggested_title) {
                                 suggestedTitle = parsed.suggested_title;
-                                console.log("New Title Received:", suggestedTitle);
-                            } 
-                            // Check if it's a message chunk (Ollama/OpenAI delta format)
-                            else if (parsed.choices && parsed.choices[0].delta?.content) {
-                                const content = parsed.choices[0].delta.content;
-                                accumulatedResponse += content;
-                                
-                                setMessages(prev => {
-                                    const last = prev[prev.length - 1];
-                                    if (last && last.id === streamingMessageId) {
-                                        return [...prev.slice(0, -1), { ...last, text: accumulatedResponse }];
-                                    }
-                                    return prev;
-                                });
+                            } else if (parsed.choices?.[0]?.delta?.content) {
+                                chatStreamStore.appendChunk(parsed.choices[0].delta.content);
+                            } else if (parsed.content) {
+                                chatStreamStore.appendChunk(parsed.content);
                             }
-                            // Fallback for direct content structure if any
-                            else if (parsed.content) {
-                                accumulatedResponse += parsed.content;
-                                setMessages(prev => {
-                                    const last = prev[prev.length - 1];
-                                    if (last && last.id === streamingMessageId) {
-                                        return [...prev.slice(0, -1), { ...last, text: accumulatedResponse }];
-                                    }
-                                    return prev;
-                                });
-                            }
-                        } catch (e) {
-                            // If not JSON, it might be raw text content
+                        } catch {
                             if (dataStr && !dataStr.startsWith('{')) {
-                                accumulatedResponse += dataStr;
-                                setMessages(prev => {
-                                    const last = prev[prev.length - 1];
-                                    if (last && last.id === streamingMessageId) {
-                                        return [...prev.slice(0, -1), { ...last, text: accumulatedResponse }];
-                                    }
-                                    return prev;
-                                });
+                                chatStreamStore.appendChunk(dataStr);
                             }
                         }
+
+                        // Keep local messages in sync with the singleton
+                        setMessages(prev => {
+                            const s = chatStreamStore.getState();
+                            return prev.map(m =>
+                                m.id === streamingMessageId ? { ...m, text: s.accumulatedText } : m
+                            );
+                        });
                     }
                 }
             }
 
-            // Handle persistence and metadata once streaming is complete
+            // Persist
             let currentChatId = chatId;
             if (!currentChatId) {
                 currentChatId = await createChatSession();
@@ -860,7 +898,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             }
 
             if (currentChatId) {
-                saveQueryResponse(currentChatId, userQuery, accumulatedResponse);
+                saveQueryResponse(currentChatId, userQuery, chatStreamStore.getState().accumulatedText);
 
                 if (isFirstMessage && suggestedTitle) {
                     localStorage.setItem(`novel_lms_chat_title_${currentChatId}`, suggestedTitle);
@@ -868,24 +906,23 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ chat_id: currentChatId, title: suggestedTitle })
-                    }).catch(err => console.error('[NIA] Failed to save title to backend:', err));
+                    }).catch(err => console.error('[NIA] Failed to save title:', err));
                 }
             }
 
         } catch (error) {
             console.error('API Error:', error);
-            const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                text: "Sorry, I encountered an error while processing your request. Please try again.",
-                sender: 'ai',
-                timestamp: new Date()
-            };
-            // If we already added a streaming message, replace it or update it with error
             setMessages(prev => {
                 const filtered = prev.filter(m => m.id !== streamingMessageId);
-                return [...filtered, errorMessage];
+                return [...filtered, {
+                    id: (Date.now() + 2).toString(),
+                    text: 'Sorry, I encountered an error. Please try again.',
+                    sender: 'ai',
+                    timestamp: new Date()
+                }];
             });
         } finally {
+            chatStreamStore.endStream();
             setIsLoading(false);
         }
     };
@@ -931,6 +968,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
         // Clear localStorage
         localStorage.removeItem('novel_lms_ai_chat_state');
+        chatStreamStore.reset();
 
         // Refetch departments if needed (though they should be loaded)
         if (departments.length === 0) {
