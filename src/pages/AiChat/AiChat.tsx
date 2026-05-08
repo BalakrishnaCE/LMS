@@ -957,7 +957,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         }
     }, []);
 
-    const handleReset = () => {
+    const handleReset = useCallback(() => {
         // Clear state
         setContext({});
         setCurrentStep('department');
@@ -974,8 +974,22 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         if (departments.length === 0) {
             fetchUserDepartments();
         }
-    };
+    }, [departments.length]);
 
+    // Listen for 'new_chat' broadcast from the nav sidebar (same channel as minimize/restore)
+    useEffect(() => {
+        const channel = new BroadcastChannel('ai_chat_control');
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data === 'new_chat') {
+                handleReset();
+            }
+        };
+        channel.addEventListener('message', handleMessage);
+        return () => {
+            channel.removeEventListener('message', handleMessage);
+            channel.close();
+        };
+    }, [handleReset]);
 
     const handleBack = () => {
         if (currentStep === 'faq_topic') {

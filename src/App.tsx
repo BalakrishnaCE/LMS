@@ -32,12 +32,9 @@ import FAQPage from "./pages/FAQ/FAQPage";
 import { PermissionProvider } from "@/contexts/PermissionContext";
 import { NavigationProvider } from "@/contexts/NavigationContext";
 import { MediaManagerProvider } from "@/contexts/MediaManagerContext";
-import { useUser } from "@/hooks/use-user";
+
 
 function AppContent() {
-  const { user } = useUser();
-  const isAiAllowed = true;
-
   return (
     <Router base={BASE_PATH}>
       <Switch>
@@ -47,20 +44,16 @@ function AppContent() {
           </div>
         </Route>
 
-        {isAiAllowed && (
-          <ProtectedRoute path="/ai" component={() => (
-            <Layout>
-              <AiChatPage />
-            </Layout>
-          )} allowedRoles={["LMS Admin", "LMS Student", "LMS Content Editor"]} />
-        )}
-        {isAiAllowed && (
-          <ProtectedRoute path="/ai/:chatId" component={() => (
-            <Layout>
-              <AiChatPage />
-            </Layout>
-          )} allowedRoles={["LMS Admin", "LMS Student", "LMS Content Editor"]} />
-        )}
+        <ProtectedRoute path="/ai" component={() => (
+          <Layout>
+            <AiChatPage />
+          </Layout>
+        )} allowedRoles={["LMS Student", "LMS Content Editor", "LMS Admin"]} />
+        <ProtectedRoute path="/ai/:chatId" component={() => (
+          <Layout>
+            <AiChatPage />
+          </Layout>
+        )} allowedRoles={["LMS Student", "LMS Content Editor", "LMS Admin"]} />
         <ProtectedRoute path="/" component={() => (
           <Layout>
             <Admindashboard />
@@ -130,7 +123,7 @@ function AppContent() {
         <Route path="/:path*" component={NotFound} />
 
       </Switch>
-      {isAiAllowed && <FloatingChatButton />}
+      <FloatingChatButton />
       <Toaster />
     </Router>
   );

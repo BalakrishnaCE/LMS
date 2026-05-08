@@ -1,7 +1,6 @@
 import * as React from "react"
 import { MessageSquarePlus, History, Search, Bot, ChevronRight } from "lucide-react"
 import { useLocation } from "wouter"
-import { navigate } from "wouter/use-browser-location"
 import {
     SidebarGroup,
     SidebarMenu,
@@ -25,7 +24,7 @@ interface ChatSession {
 }
 
 export function NavAiChat() {
-    const [location] = useLocation();
+    const [location, setLocation] = useLocation();
     const { user } = useUser();
     const { state } = useSidebar();
     const [chatSessions, setChatSessions] = React.useState<ChatSession[]>([]);
@@ -76,12 +75,20 @@ export function NavAiChat() {
     const handleNewChat = () => {
         localStorage.setItem('novel_lms_return_path', location);
         localStorage.removeItem('novel_lms_ai_chat_state');
-        navigate(`${getFullPath(ROUTES.AI_CHAT)}?new=${Date.now()}`);
+
+        if (location.includes(ROUTES.AI_CHAT)) {
+            // Already on the AI page — broadcast a reset to the mounted AiChat
+            const channel = new BroadcastChannel('ai_chat_control');
+            channel.postMessage('new_chat');
+            channel.close();
+        } else {
+            setLocation(getFullPath(`${ROUTES.AI_CHAT}?new=${Date.now()}`));
+        }
     };
 
     const handleSelectChat = (id: string) => {
         localStorage.setItem('novel_lms_return_path', location);
-        navigate(getFullPath(`${ROUTES.AI_CHAT}/${id}`));
+        setLocation(getFullPath(`${ROUTES.AI_CHAT}/${id}`));
     };
 
     const filteredSessions = chatSessions.filter(session =>
@@ -91,9 +98,7 @@ export function NavAiChat() {
     const currentChatId = location.split('/').pop();
     const isAiPage = location.includes(ROUTES.AI_CHAT);
 
-    const isAiAllowed = true;
 
-    if (!isAiAllowed) return null;
 
     return (
         <SidebarGroup>
