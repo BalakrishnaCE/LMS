@@ -82,13 +82,13 @@ export function NavAiChat() {
             channel.postMessage('new_chat');
             channel.close();
         } else {
-            setLocation(getFullPath(`${ROUTES.AI_CHAT}?new=${Date.now()}`));
+            setLocation(`${ROUTES.AI_CHAT}?new=${Date.now()}`);
         }
     };
 
     const handleSelectChat = (id: string) => {
         localStorage.setItem('novel_lms_return_path', location);
-        setLocation(getFullPath(`${ROUTES.AI_CHAT}/${id}`));
+        setLocation(`${ROUTES.AI_CHAT}/${id}`);
     };
 
     const filteredSessions = chatSessions.filter(session =>
