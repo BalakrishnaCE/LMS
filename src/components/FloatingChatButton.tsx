@@ -5,6 +5,7 @@ import { useTheme } from "@/components/theme-provider";
 import { useLocation } from "wouter";
 import { BASE_PATH } from "@/config/routes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useUser } from "@/hooks/use-user";
 
 const DEFAULT_WIDTH = 360;
 const DEFAULT_HEIGHT = 550;
@@ -16,9 +17,7 @@ const FloatingChatButton = () => {
     const [isMaximized, setIsMaximized] = useState(false);
     const [size, setSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
     const { theme } = useTheme();
-
-    // AI is now available for all users
-    const isAiAllowed = true;
+    // AI is available to all users (admins included)
 
     const [location, setLocation] = useLocation();
     const isDragging = useRef(false);
@@ -164,9 +163,8 @@ const FloatingChatButton = () => {
         }
     }, [location]);
 
-    // Only show for logged-in users who are in the allowed list
-    // Also hide when on the /ai page (new window)
-    if (!isAiAllowed || location.startsWith('/ai')) {
+    // Hide on the /ai page and on the /login page
+    if (location.startsWith('/ai') || location.startsWith('/login')) {
         return null;
     }
 
