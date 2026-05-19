@@ -39,6 +39,8 @@ interface ModulesProps {
     itemsPerPage: number;
     showArchived?: boolean;
     onShowArchivedChange?: (value: boolean) => void;
+    showNotIngestedOnly?: boolean;
+    onShowNotIngestedOnlyChange?: (value: boolean) => void;
 }
 
 
@@ -75,7 +77,13 @@ function downloadCSV(csv: string, filename: string) {
     document.body.removeChild(link);
 }
 
-function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: ModulesProps) {
+function Modules({ 
+    itemsPerPage, 
+    showArchived = false, 
+    onShowArchivedChange,
+    showNotIngestedOnly = false,
+    onShowNotIngestedOnlyChange
+}: ModulesProps) {
     const [page, setPage] = useState(1)
     // Initialize search query from localStorage
     const [searchQuery, setSearchQuery] = useState(() => {
@@ -178,6 +186,9 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
     if (searchQuery) {
         filters.push(["name1", "like", `%${searchQuery}%`])
     }
+    if (showNotIngestedOnly) {
+        filters.push(["is_injest", "=", 0])
+    }
 
     const { data: module_data } = useFrappeGetDocList("LMS Module",
         {
@@ -216,7 +227,7 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
     // Reset page when filters change
     useEffect(() => {
         setPage(1)
-    }, [searchQuery, selectedDepartment, selectedStatus, showArchived])
+    }, [searchQuery, selectedDepartment, selectedStatus, showArchived, showNotIngestedOnly])
 
     // Reset status filter when showArchived changes
     useEffect(() => {
@@ -444,6 +455,30 @@ function Modules({ itemsPerPage, showArchived = false, onShowArchivedChange }: M
                             className={`
                                 inline-block h-4 w-4 transform rounded-full bg-white transition-transform
                                 ${showArchived ? 'translate-x-6' : 'translate-x-1'}
+                            `}
+                        />
+                    </button>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <Label htmlFor="not-ingested-toggle" className="text-sm font-medium whitespace-nowrap">
+                        Not Ingested
+                    </Label>
+                    <button
+                        id="not-ingested-toggle"
+                        type="button"
+                        role="switch"
+                        aria-checked={showNotIngestedOnly}
+                        onClick={() => onShowNotIngestedOnlyChange?.(!showNotIngestedOnly)}
+                        className={`
+                            relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                            border-0 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+                            ${showNotIngestedOnly ? 'bg-[#018790]' : 'bg-gray-300 dark:bg-gray-600'}
+                        `}
+                    >
+                        <span
+                            className={`
+                                inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                                ${showNotIngestedOnly ? 'translate-x-6' : 'translate-x-1'}
                             `}
                         />
                     </button>

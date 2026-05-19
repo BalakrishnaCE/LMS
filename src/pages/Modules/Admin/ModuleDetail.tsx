@@ -6,7 +6,8 @@ import { ModuleSidebar } from "@/pages/Modules/Learner/components/ModuleSidebar"
 import { Button } from "@/components/ui/button";
 import { ContentRenderer } from "@/pages/Modules/Learner/components/ContentRenderer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { BookOpen, ArrowLeft, ArrowRight, Trash2, RefreshCw } from "lucide-react";
+
+import { BookOpen, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Trash2, Bot } from "lucide-react";
 import { toast } from "sonner";
 import Lottie from "lottie-react";
 import emptyAnimation from '@/assets/Empty.json';
@@ -58,9 +59,12 @@ export default function AdminModuleDetail() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [showIngestConfirm, setShowIngestConfirm] = useState(false);
     const [isIngesting, setIsIngesting] = useState(false);
+    const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+    const [isRemoving, setIsRemoving] = useState(false);
 
     const { data: moduleDocData, mutate: mutateModuleDoc } = useFrappeGetDoc("LMS Module", moduleName || "");
     const { call: triggerIngestion } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.start_module_ingestion_v2");
+    const { call: triggerRemoval } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.remove_module_from_ai");
     const { updateDoc } = useFrappeUpdateDoc();
 
     const handleIngestToAI = async () => {
@@ -78,6 +82,24 @@ export default function AdminModuleDetail() {
         } finally {
             setIsIngesting(false);
             setShowIngestConfirm(false);
+        }
+    };
+
+    const handleRemoveFromAI = async () => {
+        if (!moduleName) return;
+        setIsRemoving(true);
+        toast.loading("Scheduling Module AI Removal...", { id: "removal" });
+        try {
+            await triggerRemoval({ module_id: moduleName });
+            toast.success("Successfully scheduled for AI Removal", { id: "removal" });
+            await updateDoc("LMS Module", moduleName, { is_injest: 0 }).catch(console.error);
+            mutateModuleDoc();
+        } catch (error: any) {
+            console.error("AI Removal error:", error);
+            toast.error(error.message || "Failed to trigger AI removal.", { id: "removal" });
+        } finally {
+            setIsRemoving(false);
+            setShowRemoveConfirm(false);
         }
     };
 
@@ -101,7 +123,7 @@ export default function AdminModuleDetail() {
         if (moduleDataResponse && !moduleDataLoading) {
             const response = moduleDataResponse as any;
             let moduleData = null;
-            
+
             // Handle get_module_with_details response format
             // The API returns data in frappe.response["data"], which frappe-react-sdk wraps
             // Try multiple response paths
@@ -113,7 +135,7 @@ export default function AdminModuleDetail() {
             } else if (response?.lessons) {
                 data = response;
             }
-            
+
             // Process data if it exists - the API should return the correct module based on module_id parameter
             // But verify it matches the requested moduleName for safety
             if (data) {
@@ -141,7 +163,7 @@ export default function AdminModuleDetail() {
                     };
                 }
             }
-            
+
             if (moduleData) {
                 console.log('AdminModuleDetail - Successfully parsed module data:', moduleData);
                 setModule(moduleData);
@@ -172,16 +194,16 @@ export default function AdminModuleDetail() {
     // Handle module deletion
     const handleDeleteModule = async () => {
         if (!moduleName) return;
-        
+
         setIsDeleting(true);
         try {
             // Use direct fetch with correct base URL to ensure it uses lms.noveloffice.org
             const apiBaseUrl = LMS_API_BASE_URL || '';
             const cleanBaseUrl = apiBaseUrl.replace(/\/$/, '');
-            const apiUrl = cleanBaseUrl 
+            const apiUrl = cleanBaseUrl
                 ? `${cleanBaseUrl}/api/method/novel_lms.novel_lms.api.module_management.delete_module_with_cascade`
                 : `/api/method/novel_lms.novel_lms.api.module_management.delete_module_with_cascade`;
-            
+
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -199,16 +221,16 @@ export default function AdminModuleDetail() {
             }
 
             await response.json();
-            
+
             toast.success("Module deleted successfully", {
                 description: "All related data (lessons, chapters, contents, and progress) has been removed."
             });
-            
+
             // Navigate back to modules list
             setLocation(ROUTES.MODULES);
         } catch (error: any) {
             console.error("Error deleting module:", error);
-            
+
             // Extract error message from various possible error formats
             let errorMessage = "An error occurred while deleting the module.";
             if (error?.message) {
@@ -222,7 +244,7 @@ export default function AdminModuleDetail() {
             } else if (error?.exception) {
                 errorMessage = error.exception;
             }
-            
+
             toast.error("Failed to delete module", {
                 description: errorMessage,
                 duration: 5000
@@ -266,8 +288,8 @@ export default function AdminModuleDetail() {
     const currentLesson = module.lessons?.[currentLessonIdx];
     const currentChapter = currentLesson?.chapters?.[currentChapterIdx];
     const isFirst = currentLessonIdx === 0 && currentChapterIdx === 0;
-    const isLast = currentLessonIdx === (module.lessons?.length ?? 0) - 1 && 
-                  currentChapterIdx === (currentLesson?.chapters?.length ?? 0) - 1;
+    const isLast = currentLessonIdx === (module.lessons?.length ?? 0) - 1 &&
+        currentChapterIdx === (currentLesson?.chapters?.length ?? 0) - 1;
 
     // Sidebar click handlers for admin
     const handleLessonClick = (lessonName: string) => {
@@ -321,7 +343,7 @@ export default function AdminModuleDetail() {
         setCurrentLessonIdx(lessonIdx);
         setCurrentChapterIdx(chapterIdx);
     };
-    
+
     // Main render
     return (
         <>
@@ -358,8 +380,8 @@ export default function AdminModuleDetail() {
                                         <div>
                                             <h2 className="text-2xl font-bold mb-2">{module.name1}</h2>
                                             <h3 className="text-xl font-semibold text-muted-foreground">
-                                                {module.lessons?.length === 0 
-                                                    ? "No lessons or chapters yet" 
+                                                {module.lessons?.length === 0
+                                                    ? "No lessons or chapters yet"
                                                     : "Select a lesson and chapter to view content"}
                                             </h3>
                                         </div>
@@ -370,18 +392,35 @@ export default function AdminModuleDetail() {
                                         <BookOpen className="h-4 w-4" />
                                         <span>Admin Preview</span>
                                     </div>
-                                    {moduleDocData?.is_injest === 0 && (
+                                    {moduleDocData?.is_injest === 1 && (
                                         <Button
                                             type="button"
                                             size="sm"
-                                            className="flex items-center gap-2"
-                                            onClick={() => setShowIngestConfirm(true)}
-                                            disabled={isIngesting}
+                                            variant="outline"
+                                            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 flex items-center gap-2"
+                                            onClick={() => setShowRemoveConfirm(true)}
+                                            disabled={isRemoving}
                                         >
-                                            <RefreshCw className={`h-4 w-4 ${isIngesting ? "animate-spin" : ""}`} />
-                                            Ingest to AI
+                                            <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
+                                                <Bot className={`${isRemoving ? "animate-spin" : ""}`} style={{ height: '10px', width: '10px' }} />
+                                                <ArrowDown className="stroke-[3]" style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
+                                            </div>
+                                            Remove from AI
                                         </Button>
                                     )}
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        className="flex items-center gap-2"
+                                        onClick={() => setShowIngestConfirm(true)}
+                                        disabled={isIngesting}
+                                    >
+                                        <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
+                                            <Bot className={`${isIngesting ? "animate-pulse" : ""}`} style={{ height: '10px', width: '10px' }} />
+                                            <ArrowUp className={`stroke-[3] ${isIngesting ? "animate-bounce" : ""}`} style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
+                                        </div>
+                                        {moduleDocData?.is_injest === 1 ? "Re-ingest to AI" : "Ingest to AI"}
+                                    </Button>
                                     <Button
                                         variant="destructive"
                                         size="sm"
@@ -393,7 +432,7 @@ export default function AdminModuleDetail() {
                                     </Button>
                                 </div>
                             </div>
-                            
+
                             {/* Chapter Contents - Only show if lesson and chapter exist */}
                             {currentLesson && currentChapter && (
                                 <>
@@ -410,11 +449,11 @@ export default function AdminModuleDetail() {
                                             ))}
                                         </div>
                                     )}
-                                    
+
                                     {/* Navigation */}
                                     <div className="flex justify-between items-center mt-8 pt-6 border-t">
-                                        <Button 
-                                            onClick={handlePrevious} 
+                                        <Button
+                                            onClick={handlePrevious}
                                             disabled={isFirst}
                                             variant="outline"
                                             className="gap-2"
@@ -423,11 +462,11 @@ export default function AdminModuleDetail() {
                                             Previous
                                         </Button>
                                         <div className="text-sm text-muted-foreground">
-                                            Lesson {currentLessonIdx + 1} of {module.lessons.length} • 
+                                            Lesson {currentLessonIdx + 1} of {module.lessons.length} •
                                             Chapter {currentChapterIdx + 1} of {currentLesson.chapters.length}
                                         </div>
-                                        <Button 
-                                            onClick={handleNext} 
+                                        <Button
+                                            onClick={handleNext}
                                             disabled={isLast}
                                             className="gap-2"
                                         >
@@ -441,7 +480,7 @@ export default function AdminModuleDetail() {
                     </div>
                 </div>
             </div>
-            
+
             {/* Delete Confirmation Dialog */}
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                 <DialogContent>
@@ -504,6 +543,34 @@ export default function AdminModuleDetail() {
                         <Button
                             onClick={handleIngestToAI}
                             disabled={isIngesting}
+                        >
+                            Yes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* AI Removal Confirmation Dialog */}
+            <Dialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Remove from AI</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to remove this module's content from the AI? This will delete the module's data from the AI knowledge base.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowRemoveConfirm(false)}
+                            disabled={isRemoving}
+                        >
+                            No
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleRemoveFromAI}
+                            disabled={isRemoving}
                         >
                             Yes
                         </Button>

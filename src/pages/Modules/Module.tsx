@@ -157,6 +157,9 @@ function Module() {
 
     // Toggle state for showing archived modules
     const [showArchived, setShowArchived] = useState(false);
+    
+    // Toggle state for showing only not ingested modules
+    const [showNotIngestedOnly, setShowNotIngestedOnly] = useState(false);
 
     // Colors - using CSS variable for primary (used for both Total and Published), accent for archived
     const [colors, setColors] = useState({
@@ -292,7 +295,13 @@ function Module() {
                 </Card>
             </div>
 
-            <Modules itemsPerPage={8} showArchived={showArchived} onShowArchivedChange={setShowArchived} />
+            <Modules 
+                itemsPerPage={8} 
+                showArchived={showArchived} 
+                onShowArchivedChange={setShowArchived} 
+                showNotIngestedOnly={showNotIngestedOnly}
+                onShowNotIngestedOnlyChange={setShowNotIngestedOnly}
+            />
         </div>
     )
 }
