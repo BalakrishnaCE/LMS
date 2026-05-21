@@ -759,8 +759,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    department: (context.department?.id !== 'all' && context.department?.id !== 'faq') ? context.department?.id : undefined,
+                    department: context.department?.id === 'faq' ? context.department?.id : (context.department?.id !== 'all' ? context.department?.id : undefined),
                     module: (context.module?.id !== 'all' && context.department?.id !== 'faq') ? context.module?.id : undefined,
+                    faq_topic: context.department?.id === 'faq' ? context.module?.name : undefined,
                     modules: (context.module?.id === 'all' || !context.lesson || !context.chapter) ? 'All Modules' : undefined,
                     lesson: context.lesson?.id !== 'all' ? context.lesson?.id : undefined,
                     chapter: context.chapter?.id !== 'all' ? context.chapter?.id : undefined
