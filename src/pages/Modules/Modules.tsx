@@ -295,7 +295,7 @@ function Modules({
         } catch (error) {
             toast.dismiss();
             toast.error("Failed to export modules");
-            console.error("Export error:", error);
+            // console.error("Export error:", error);
         } finally {
             setIsExporting(false);
         }
@@ -346,7 +346,7 @@ function Modules({
         } catch (error: any) {
             toast.dismiss();
             toast.error(error.message || "Failed to duplicate module");
-            console.error("Duplicate error:", error);
+            // console.error("Duplicate error:", error);
         } finally {
             setModuleToDuplicate(null);
         }
@@ -375,7 +375,7 @@ function Modules({
             }, 1000);
 
         } catch (err: any) {
-            console.error("Ingestion error:", err);
+            // console.error("Ingestion error:", err);
             toast.error(err.message || "Failed to trigger ingestion", { id: "ingestion" });
         } finally {
             setModuleToIngest(null);
@@ -595,7 +595,7 @@ function Modules({
                                                 className="w-full h-48 object-cover pb-4"
                                                 style={{ marginTop: '2rem' }}
                                                 onError={() => {
-                                                    console.log(`Image failed to load: ${imageUrl}`);
+                                                    // console.log(`Image failed to load: ${imageUrl}`);
                                                     setImageErrors(prev => ({ ...prev, [module.name]: true }));
                                                 }}
                                             />

@@ -31,17 +31,17 @@ export function useUser(): UseUserReturn {
   const [error] = useState<unknown>(null);
 
   // Get LMS permissions - only call once when user changes
-  const { 
-    isLMSAdmin, 
-    isLMSStudent, 
-    isLMSContentEditor, 
-    isLoading: permissionsLoading 
+  const {
+    isLMSAdmin,
+    isLMSStudent,
+    isLMSContentEditor,
+    isLoading: permissionsLoading
   } = useLMSUserPermissions();
 
 
   useEffect(() => {
-    console.log("useUser hook:", { currentUser, isAuthLoading, permissionsLoading });
-    
+    // console.log("useUser hook:", { currentUser, isAuthLoading, permissionsLoading });
+
     // If auth is still loading, keep loading state
     if (isAuthLoading) {
       setIsLoading(true);
@@ -50,7 +50,7 @@ export function useUser(): UseUserReturn {
 
     // If no current user, clear user data
     if (!currentUser) {
-      console.log("No current user, clearing user data");
+      // console.log("No current user, clearing user data");
       setUser(null);
       setIsLoading(false);
       return;
@@ -67,8 +67,8 @@ export function useUser(): UseUserReturn {
       roles: [] // We'll get roles from useLMSUserPermissions instead
     };
 
-    console.log("Setting user data:", basicUser);
-    console.log("User email for API calls:", basicUser.email);
+    // console.log("Setting user data:", basicUser);
+    // console.log("User email for API calls:", basicUser.email);
     setUser(basicUser);
     setIsLoading(false);
   }, [currentUser, isAuthLoading]);

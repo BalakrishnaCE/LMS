@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useUser } from "@/hooks/use-user";
 import { useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
@@ -175,14 +175,14 @@ async function checkQuizQACompletion(module: CourseModule, user: UserInfo) {
         quizProgressList = (await quizRes.json())?.data || [];
 
     } catch (err) {
-        console.error('Error fetching quiz progress:', err);
+        // console.error('Error fetching quiz progress:', err);
     }
     try {
         const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[["user","=","${user?.name}"]]&fields=["score","max_score","name","question_answer"]`, { credentials: 'include' });
         qaProgressList = (await qaRes.json())?.data || [];
 
     } catch (err) {
-        console.error('Error fetching QA progress:', err);
+        // console.error('Error fetching QA progress:', err);
     }
     const scores: Array<{ title: string, score: number, maxScore: number, type: string }> = [];
     let allCompleted = true;
@@ -200,7 +200,7 @@ async function checkQuizQACompletion(module: CourseModule, user: UserInfo) {
         );
 
         if (!hasMatchingQuiz) {
-            console.log('Quiz content exists but no matching progress found. Adding available quiz scores.');
+            // console.log('Quiz content exists but no matching progress found. Adding available quiz scores.');
             quizProgressList.forEach(progress => {
                 if (progress.score > 0 || progress.max_score > 0) {
                     scores.push({
@@ -222,7 +222,7 @@ async function checkQuizQACompletion(module: CourseModule, user: UserInfo) {
         );
 
         if (!hasMatchingQA) {
-            console.log('QA content exists but no matching progress found. Adding available QA scores.');
+            // console.log('QA content exists but no matching progress found. Adding available QA scores.');
             qaProgressList.forEach(progress => {
                 if (progress.score_added === 1 && (progress.score > 0 || progress.max_score > 0)) {
                     scores.push({
@@ -236,7 +236,7 @@ async function checkQuizQACompletion(module: CourseModule, user: UserInfo) {
         }
     }
     for (const { content } of quizQAContents) {
-        console.log('Processing content:', content);
+        // console.log('Processing content:', content);
         let displayTitle = content.name;
         if (content.title) {
             displayTitle = content.title;
@@ -280,7 +280,7 @@ async function checkQuizQACompletion(module: CourseModule, user: UserInfo) {
                 progress = qaProgressList.length > 0 ? qaProgressList[0] : undefined;
 
             }
-            console.log('QA progress for', content.name, 'content_reference:', content.content_reference, 'found:', progress);
+            // console.log('QA progress for', content.name, 'content_reference:', content.content_reference, 'found:', progress);
             if (!progress) {
                 allCompleted = false;
             } else {
@@ -375,6 +375,7 @@ export default function ModuleDetail() {
     const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
     const [reviewing, setReviewing] = useState(false);
     const [quizQAScores, setQuizQAScores] = useState<Array<{ title: string, score: number, maxScore: number, type: string }>>([]);
+    const contentScrollRef = useRef<HTMLDivElement>(null);
 
 
     // Console logging: Component mount
@@ -401,14 +402,14 @@ export default function ModuleDetail() {
 
     // Console logging: User state changes
     useEffect(() => {
-        console.log('👤 User state changed:', {
-            userLoading,
-            userIdentifier,
-            userEmail: user?.email,
-            userName: user?.name,
-            fullUser: user,
-            componentMountCount: 'tracking'
-        });
+        // console.log('👤 User state changed:', {
+        //     userLoading,
+        //     userIdentifier,
+        //     userEmail: user?.email,
+        //     userName: user?.name,
+        //     fullUser: user,
+        //     componentMountCount: 'tracking'
+        // });
     }, [userLoading, userIdentifier, user]);
 
     useEffect(() => {
@@ -454,7 +455,7 @@ export default function ModuleDetail() {
     // Simplified retry mechanism - only retry on actual errors, not empty results
     useEffect(() => {
         if (moduleListError && userIdentifier && moduleName) {
-            console.log('🔄 API call failed, retrying in 1 second...', moduleListError);
+            // console.log('🔄 API call failed, retrying in 1 second...', moduleListError);
             const retryTimeout = setTimeout(() => {
                 refetchModuleData();
             }, 1000);
@@ -472,18 +473,18 @@ export default function ModuleDetail() {
 
     // Debug API call state
     useEffect(() => {
-        console.log('🔍 API CALL STATE:', {
-            moduleName,
-            userEmail: user?.email,
-            userName: user?.name,
-            userIdentifier: userIdentifier,
-            fullUserObject: user,
-            userKeys: user ? Object.keys(user) : [],
-            isLoading: moduleDataLoading,
-            hasData: !!moduleListData,
-            hasError: !!moduleListError,
-            timestamp: new Date().toISOString()
-        });
+        // console.log('🔍 API CALL STATE:', {
+        //     moduleName,
+        //     userEmail: user?.email,
+        //     userName: user?.name,
+        //     userIdentifier: userIdentifier,
+        //     fullUserObject: user,
+        //     userKeys: user ? Object.keys(user) : [],
+        //     isLoading: moduleDataLoading,
+        //     hasData: !!moduleListData,
+        //     hasError: !!moduleListError,
+        //     timestamp: new Date().toISOString()
+        // });
     }, [moduleName, userIdentifier, moduleDataLoading, moduleListData, moduleListError, user]);
 
 
@@ -514,7 +515,7 @@ export default function ModuleDetail() {
         }
         else {
             // No matching response format found
-            console.log('No matching response format for module data');
+            // console.log('No matching response format for module data');
         }
 
         // Log extracted data for debugging
@@ -531,7 +532,7 @@ export default function ModuleDetail() {
     // Administrator-specific: Force immediate data display
     useEffect(() => {
         if (isLMSAdmin && moduleData && !module) {
-            console.log('🔧 Admin mode: Force setting module data immediately');
+            // console.log('🔧 Admin mode: Force setting module data immediately');
             setModule(moduleData);
             setStarted(true);
         }
@@ -601,16 +602,16 @@ export default function ModuleDetail() {
         }
     }, [moduleName, userIdentifier, isLMSAdmin, refetchCompletionData]);
 
-    console.log('🎬 ModuleDetail State:', {
-        started,
-        reviewing,
-        isLMSAdmin,
-        hasModule: !!module,
-        progressStatus: progress?.status,
-        moduleDataLoading,
-        userLoading,
-        moduleName
-    });
+    // console.log('🎬 ModuleDetail State:', {
+    //     started,
+    //     reviewing,
+    //     isLMSAdmin,
+    //     hasModule: !!module,
+    //     progressStatus: progress?.status,
+    //     moduleDataLoading,
+    //     userLoading,
+    //     moduleName
+    // });
 
     // Fix resume bug: Set current position based on user's actual progress
     useEffect(() => {
@@ -716,7 +717,7 @@ export default function ModuleDetail() {
     // Phase 2: Handle completion data error
     useEffect(() => {
         if (completionDataError) {
-            console.warn('⚠️ Completion data fetch error:', completionDataError);
+            // console.warn('⚠️ Completion data fetch error:', completionDataError);
             // Keep default completion data state - don't break the page
         }
     }, [completionDataError]);
@@ -743,7 +744,7 @@ export default function ModuleDetail() {
 
         // Check if module is completed - if so, allow access to everything
         if (moduleData.progress?.status === "Completed") {
-            console.log('🎯 CourseModule is completed - allowing access to all content');
+            // console.log('🎯 CourseModule is completed - allowing access to all content');
             return () => true; // Allow access to all lessons and chapters
         }
 
@@ -751,11 +752,11 @@ export default function ModuleDetail() {
         const completedLessons = new Set(completionData?.completed_lessons ?? []);
         const completedChapters = new Set(completionData?.completed_chapters ?? []);
 
-        console.log('🔍 buildIsAccessible using calculated data:', {
-            completedLessons: Array.from(completedLessons),
-            completedChapters: Array.from(completedChapters),
-            inProgressChapters: completionData?.in_progress_chapters
-        });
+        // console.log('🔍 buildIsAccessible using calculated data:', {
+        //     completedLessons: Array.from(completedLessons),
+        //     completedChapters: Array.from(completedChapters),
+        //     inProgressChapters: completionData?.in_progress_chapters
+        // });
 
         // Get current position from completionData OR from in_progress_chapters OR from UI state as fallback
         const currentChapter = completionData?.current_position?.type === 'Chapter'
@@ -846,7 +847,7 @@ export default function ModuleDetail() {
                 (item.module?.name === moduleName) || ((item.module as { name1?: string })?.name1 === moduleName)
             );
             if (dashboardModule?.module?.image) {
-                console.log('🖼️ Syncing module image from dashboard data:', dashboardModule.module.image);
+                // console.log('🖼️ Syncing module image from dashboard data:', dashboardModule.module.image);
                 setModule(prev => prev ? { ...prev, image: dashboardModule.module.image } : null);
             }
         }
@@ -945,7 +946,7 @@ export default function ModuleDetail() {
                     : 0;
                 if (chapterIdx < 0) chapterIdx = 0;
 
-                console.log('🔄 Syncing UI indices with progress:', { lessonIdx, chapterIdx, current_lesson: progress.current_lesson, current_chapter: progress.current_chapter });
+                // console.log('🔄 Syncing UI indices with progress:', { lessonIdx, chapterIdx, current_lesson: progress.current_lesson, current_chapter: progress.current_chapter });
                 setCurrentLessonIdx(lessonIdx);
                 setCurrentChapterIdx(chapterIdx);
             }
@@ -955,7 +956,7 @@ export default function ModuleDetail() {
     // Force progress recalculation when completion data changes
     useEffect(() => {
         // This will trigger a re-render and recalculate overallProgress
-        console.log('🔄 Progress recalculation triggered - completionData changed');
+        // console.log('🔄 Progress recalculation triggered - completionData changed');
     }, [completionData, currentLessonIdx, currentChapterIdx, module]);
 
     // Unified Progress Calculation - Single Source of Truth
@@ -1009,7 +1010,7 @@ export default function ModuleDetail() {
             );
             // Dashboard API returns progress in item.progress.progress
             if (moduleProgress?.progress?.progress !== undefined && moduleProgress.progress.progress !== null) {
-                console.log('📊 Using dashboard API progress for sidebar:', moduleProgress.progress.progress);
+                // console.log('📊 Using dashboard API progress for sidebar:', moduleProgress.progress.progress);
                 return moduleProgress.progress.progress;
             }
         }
@@ -1030,7 +1031,7 @@ export default function ModuleDetail() {
         if (totalChapters === 0) return 0;
 
         const progressPercentage = Math.round((completedChapters / totalChapters) * 100 * 100) / 100;
-        console.log('📊 Using sidebar completion data progress (fallback):', progressPercentage, `(${completedChapters}/${totalChapters})`);
+        // console.log('📊 Using sidebar completion data progress (fallback):', progressPercentage, `(${completedChapters}/${totalChapters})`);
 
         return progressPercentage;
     };
@@ -1044,7 +1045,7 @@ export default function ModuleDetail() {
 
         // Use real completion data if available, but calculate completed items if arrays are empty
         if (completionData) {
-            console.log('🔍 Using real completion data for sidebar:', completionData);
+            // console.log('🔍 Using real completion data for sidebar:', completionData);
 
             // If completion data has empty arrays, calculate completed items from in_progress_chapters
             const completedChapters = completionData.completed_chapters || [];
@@ -1090,11 +1091,11 @@ export default function ModuleDetail() {
                         }
                     });
 
-                    console.log('🔍 Calculated completed items:', {
-                        completedChapters,
-                        completedLessons,
-                        currentChapterName
-                    });
+                    // console.log('🔍 Calculated completed items:', {
+                    //     completedChapters,
+                    //     completedLessons,
+                    //     currentChapterName
+                    // });
                 }
             }
 
@@ -1202,7 +1203,7 @@ export default function ModuleDetail() {
     // Synchronize completion data with module progress for real-time updates
     useEffect(() => {
         if (completionData && progress) {
-            console.log('🔄 Syncing completion data with progress state');
+            // console.log('🔄 Syncing completion data with progress state');
             // Update progress state to match completion data
             setProgress(prev => {
                 if (!prev) return prev;
@@ -1218,7 +1219,7 @@ export default function ModuleDetail() {
     // Update sidebar completion data when completion data changes for real-time sidebar updates
     useEffect(() => {
         if (completionData) {
-            console.log('🔄 Updating sidebar completion data for real-time updates');
+            // console.log('🔄 Updating sidebar completion data for real-time updates');
             // This will trigger sidebar re-render with correct data
             // The getSidebarCompletionData function will be called again with updated completionData
         }
@@ -1278,6 +1279,10 @@ export default function ModuleDetail() {
             }));
         }
     };
+    const scrollContentToTop = () => {
+        contentScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     const handlePrevious = async () => {
         if (!module?.lessons?.length) return;
         let lessonIdx = currentLessonIdx;
@@ -1290,6 +1295,8 @@ export default function ModuleDetail() {
         }
         setCurrentLessonIdx(lessonIdx);
         setCurrentChapterIdx(chapterIdx);
+        // Scroll to top when navigating chapters
+        scrollContentToTop();
         if (!reviewing && !completed && user) {
             await updateProgress({
                 user: userIdentifier,
@@ -1345,33 +1352,37 @@ export default function ModuleDetail() {
 
             // Safety check: ensure currentLesson exists
             if (!currentLesson || !currentLesson.chapters || currentLesson.chapters.length === 0) {
-                console.warn('Review mode: Invalid lesson or chapter data', { lessonIdx, chapterIdx, currentLesson });
+                // console.warn('Review mode: Invalid lesson or chapter data', { lessonIdx, chapterIdx, currentLesson });
                 return;
             }
 
-            console.log('Review mode: handleNext called', {
-                lessonIdx,
-                chapterIdx,
-                totalChapters: currentLesson.chapters.length,
-                totalLessons: module.lessons.length
-            });
+            // console.log('Review mode: handleNext called', {
+            //     lessonIdx,
+            //     chapterIdx,
+            //     totalChapters: currentLesson.chapters.length,
+            //     totalLessons: module.lessons.length
+            // });
 
             if (chapterIdx < currentLesson.chapters.length - 1) {
                 // Move to next chapter in the same lesson
                 chapterIdx += 1;
-                console.log('Review mode: Moving to next chapter', { lessonIdx, chapterIdx });
+                // console.log('Review mode: Moving to next chapter', { lessonIdx, chapterIdx });
                 setCurrentLessonIdx(lessonIdx);
                 setCurrentChapterIdx(chapterIdx);
+                // Scroll to top when navigating chapters
+                scrollContentToTop();
             } else if (lessonIdx < module.lessons.length - 1) {
                 // Move to next lesson's first chapter
                 lessonIdx += 1;
                 chapterIdx = 0;
-                console.log('Review mode: Moving to next lesson', { lessonIdx, chapterIdx });
+                // console.log('Review mode: Moving to next lesson', { lessonIdx, chapterIdx });
                 setCurrentLessonIdx(lessonIdx);
                 setCurrentChapterIdx(chapterIdx);
+                // Scroll to top when navigating chapters
+                scrollContentToTop();
             } else {
                 // End of review: show completion screen again
-                console.log('Review mode: End of review, returning to completion screen');
+                // console.log('Review mode: End of review, returning to completion screen');
                 setReviewing(false);
             }
             return;
@@ -1552,6 +1563,8 @@ export default function ModuleDetail() {
             chapterIdx += 1;
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
+            // Scroll to top when navigating chapters
+            scrollContentToTop();
 
             const nextChapter = currentLesson.chapters[chapterIdx];
 
@@ -1620,6 +1633,8 @@ export default function ModuleDetail() {
             chapterIdx = 0;
             setCurrentLessonIdx(lessonIdx);
             setCurrentChapterIdx(chapterIdx);
+            // Scroll to top when navigating chapters
+            scrollContentToTop();
 
             const nextChapter = module.lessons[lessonIdx].chapters[chapterIdx];
 
@@ -1741,7 +1756,7 @@ export default function ModuleDetail() {
             }
 
             // All quizzes and QAs are completed - proceed with module completion
-            console.log('Completing module - showing completion screen');
+            // console.log('Completing module - showing completion screen');
 
             // ALWAYS set completed state to true FIRST - this ensures completion screen shows immediately
             // This works even if module is already completed (second click, third click, etc.)
@@ -1783,7 +1798,7 @@ export default function ModuleDetail() {
 
 
         } catch (error) {
-            console.error("Failed to mark module as completed:", error);
+            // console.error("Failed to mark module as completed:", error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
             // Even on error, keep completion screen showing
@@ -1825,7 +1840,7 @@ export default function ModuleDetail() {
                 }
             }, 500);
         } catch (e) {
-            console.error("Failed to start module:", e);
+            // console.error("Failed to start module:", e);
             setIsTransitioning(false);
         }
     };
@@ -2052,7 +2067,7 @@ export default function ModuleDetail() {
                         />
                     </div>
                     {/* Main Content - Scrollable */}
-                    <div className="flex-1 flex justify-center items-start p-8 overflow-y-auto h-full">
+                    <div ref={contentScrollRef} className="flex-1 flex justify-center items-start p-8 overflow-y-auto h-full">
                         <div className="w-full rounded-xl shadow p-8">
                             {/* Show loading state when module data is loading or when module is loaded but lesson/chapter data is not ready */}
                             {(() => {

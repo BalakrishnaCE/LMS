@@ -186,7 +186,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
     // Initial Context Resolution
     const resolveModuleContext = async (moduleName: string) => {
-        console.log("AiChat: Resolving context for module:", moduleName);
+        // console.log("AiChat: Resolving context for module:", moduleName);
         try {
             setIsLoading(true);
             const response = await fetch(`/api/method/novel_lms.novel_lms.api.ai_chat_helper.get_module_context?module_id=${moduleName}`, {
@@ -196,15 +196,15 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 },
             });
 
-            console.log("AiChat: API Response status:", response.status);
+            // console.log("AiChat: API Response status:", response.status);
 
             if (!response.ok) {
-                console.error("Failed to fetch module context");
+                // console.error("Failed to fetch module context");
                 return;
             }
 
             const data = await response.json();
-            console.log("AiChat: API Data:", data);
+            // console.log("AiChat: API Data:", data);
             const result = data.message;
 
             if (result && result.department && result.module) {
@@ -235,7 +235,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 }
             }
         } catch (error) {
-            console.error('Error resolving module context:', error);
+            // console.error('Error resolving module context:', error);
         } finally {
             setIsLoading(false);
         }
@@ -259,7 +259,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                     }
                 }
             } catch (e) {
-                console.error("Failed to load chat state", e);
+                // console.error("Failed to load chat state", e);
             }
             return null;
         };
@@ -271,11 +271,11 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 const data = await response.json();
                 const chat = data.message;
                 // ── DEBUG ──
-                console.log('[NIA] get_chat raw response:', {
-                    module: chat?.module, module_name: chat?.module_name,
-                    lesson: chat?.lesson, lesson_name: chat?.lesson_name,
-                    chapter: chat?.chapter, chapter_name: chat?.chapter_name,
-                });
+                // console.log('[NIA] get_chat raw response:', {
+                //     module: chat?.module, module_name: chat?.module_name,
+                //     lesson: chat?.lesson, lesson_name: chat?.lesson_name,
+                //     chapter: chat?.chapter, chapter_name: chat?.chapter_name,
+                // });
                 // ──────────
 
                 if (chat) {
@@ -318,7 +318,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                     setCurrentStep('qa');
                 }
             } catch (e) {
-                console.error("Failed to load chat history", e);
+                // console.error("Failed to load chat history", e);
             } finally {
                 setIsLoading(false);
             }
@@ -537,7 +537,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             const faqOption: Department = { id: 'faq', name: 'FAQ', label: 'FAQ', value: 'faq' };
             setDepartments([faqOption, ...(data.message || [])]);
         } catch (error) {
-            console.error('Error fetching departments:', error);
+            // console.error('Error fetching departments:', error);
             const faqOption: Department = { id: 'faq', name: 'FAQ', label: 'FAQ', value: 'faq' };
             setDepartments([faqOption]);
         } finally {
@@ -566,7 +566,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             );
             setModules([allOption, ...filteredModules]);
         } catch (error) {
-            console.error('Error fetching modules:', error);
+            // console.error('Error fetching modules:', error);
             setModules([]);
         } finally {
             setIsLoading(false);
@@ -594,7 +594,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             );
             setLessons([allOption, ...filteredLessons]);
         } catch (error) {
-            console.error('Error fetching lessons:', error);
+            // console.error('Error fetching lessons:', error);
             setLessons([]);
         } finally {
             setIsLoading(false);
@@ -623,7 +623,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             setChapters(finalChapters);
             return finalChapters;
         } catch (error) {
-            console.error('Error fetching chapters:', error);
+            // console.error('Error fetching chapters:', error);
             setChapters([]);
             return [];
         } finally {
@@ -644,7 +644,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             const data = await response.json();
             setFaqTopics(data.message || []);
         } catch (error) {
-            console.error('Error fetching FAQ topics:', error);
+            // console.error('Error fetching FAQ topics:', error);
             setFaqTopics([]);
         } finally {
             setIsLoading(false);
@@ -772,7 +772,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 return data.message.chat_id;
             }
         } catch (error) {
-            console.error("Failed to create chat session:", error);
+            // console.error("Failed to create chat session:", error);
         }
         return null;
     };
@@ -789,7 +789,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 })
             });
         } catch (error) {
-            console.error("Failed to save query response:", error);
+            // console.error("Failed to save query response:", error);
         }
     };
 
@@ -907,12 +907,12 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ chat_id: currentChatId, title: suggestedTitle })
-                    }).catch(err => console.error('[NIA] Failed to save title:', err));
+                    }).catch(_err => { /* console.error('[NIA] Failed to save title:', _err); */ });
                 }
             }
 
         } catch (error) {
-            console.error('API Error:', error);
+            // console.error('API Error:', error);
             setMessages(prev => {
                 const filtered = prev.filter(m => m.id !== streamingMessageId);
                 return [...filtered, {
@@ -941,7 +941,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             setCopiedId(id);
             setTimeout(() => setCopiedId(null), 2000);
         } catch (err) {
-            console.error("Copy failed:", err);
+            // console.error("Copy failed:", err);
             // Fallback for older browsers or if api is denied
             try {
                 const textArea = document.createElement("textarea");
@@ -953,7 +953,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 setCopiedId(id);
                 setTimeout(() => setCopiedId(null), 2000);
             } catch (fallbackErr) {
-                console.error("Fallback copy failed:", fallbackErr);
+                // console.error("Fallback copy failed:", fallbackErr);
             }
         }
     }, []);

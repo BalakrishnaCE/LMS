@@ -110,34 +110,34 @@ export function ModuleSidebar({
       completed.add(itemId);
       localStorage.setItem(`lms_completed_${moduleName}`, JSON.stringify([...completed]));
     } catch (error) {
-      console.error('Failed to save completed item:', error);
+      // console.error('Failed to save completed item:', error);
     }
   };
 
   // Helper function to check if a lesson is completed
   const isLessonCompleted = (lesson: any) => {
-    console.log('🔍 isLessonCompleted called:', {
-      lessonName: lesson.name,
-      progressStatus: progress?.status,
-      progressObject: progress,
-      mode,
-      completionData: completionData
-    });
+    // console.log('🔍 isLessonCompleted called:', {
+    //   lessonName: lesson.name,
+    //   progressStatus: progress?.status,
+    //   progressObject: progress,
+    //   mode,
+    //   completionData: completionData
+    // });
     // Check if module is completed - if so, all lessons are completed
     // This works in both learner and review modes (progress is now passed in review mode too)
     if (progress?.status === "Completed") {
-      console.log('🎯 Module is completed - all lessons are completed', lesson.name);
+      // console.log('🎯 Module is completed - all lessons are completed', lesson.name);
       return true;
     }
     
     // Use completion data if available (more reliable)
     if (completionData && completionData.completed_lessons) {
       const isCompleted = completionData.completed_lessons.includes(lesson.name);
-      console.log('🔍 Lesson completion check:', {
-        lessonName: lesson.name,
-        completedLessons: completionData.completed_lessons,
-        isCompleted: isCompleted
-      });
+      // console.log('🔍 Lesson completion check:', {
+      //   lessonName: lesson.name,
+      //   completedLessons: completionData.completed_lessons,
+      //   isCompleted: isCompleted
+      // });
       return isCompleted;
     }
     
@@ -157,30 +157,30 @@ export function ModuleSidebar({
 
   // Phase 2: Helper function to check if a chapter is completed using completion data
   const isChapterCompleted = (chapter: any, lesson: any) => {
-    console.log('🔍 isChapterCompleted called:', {
-      chapterName: chapter.name,
-      lessonName: lesson.name,
-      progressStatus: progress?.status,
-      progressObject: progress,
-      mode,
-      completionData: completionData
-    });
+    // console.log('🔍 isChapterCompleted called:', {
+    //   chapterName: chapter.name,
+    //   lessonName: lesson.name,
+    //   progressStatus: progress?.status,
+    //   progressObject: progress,
+    //   mode,
+    //   completionData: completionData
+    // });
     // Check if module is completed - if so, all chapters are completed
     // This works in both learner and review modes (progress is now passed in review mode too)
     if (progress?.status === "Completed") {
-      console.log('🎯 Module is completed - all chapters are completed', chapter.name);
+      // console.log('🎯 Module is completed - all chapters are completed', chapter.name);
       return true;
     }
     
     // Use completion data if available (more reliable)
     if (completionData && completionData.completed_chapters) {
       const isCompleted = completionData.completed_chapters.includes(chapter.name);
-      console.log('🔍 Chapter completion check:', {
-        chapterName: chapter.name,
-        lessonName: lesson.name,
-        completedChapters: completionData.completed_chapters,
-        isCompleted: isCompleted
-      });
+      // console.log('🔍 Chapter completion check:', {
+      //   chapterName: chapter.name,
+      //   lessonName: lesson.name,
+      //   completedChapters: completionData.completed_chapters,
+      //   isCompleted: isCompleted
+      // });
       return isCompleted;
     }
     
@@ -426,13 +426,13 @@ export function ModuleSidebar({
                         
                         // Debug logging
                         if (chapter.name === currentChapterName || chapter.name === progress?.current_chapter) {
-                          console.log("Chapter highlighting debug:", {
-                            chapterName: chapter.name,
-                            currentChapterName,
-                            progressCurrentChapter: progress?.current_chapter,
-                            mode,
-                            isCurrentChapter
-                          });
+                          // console.log("Chapter highlighting debug:", {
+                          //   chapterName: chapter.name,
+                          //   currentChapterName,
+                          //   progressCurrentChapter: progress?.current_chapter,
+                          //   mode,
+                          //   isCurrentChapter
+                          // });
                         }
                         return (
                           <div

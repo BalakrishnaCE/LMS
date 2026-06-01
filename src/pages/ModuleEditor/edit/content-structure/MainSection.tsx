@@ -917,7 +917,7 @@ export default function MainSection({
         </Dialog>
         {/*  Drawer for Content Types using shadcn/ui Drawer */}
         <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} direction="right">
-          <DrawerContent className="overflow-scroll">
+          <DrawerContent className="overflow-y-auto overflow-x-hidden">
             <DrawerHeader>
               <DrawerTitle>Select Content Type</DrawerTitle>
             </DrawerHeader>
@@ -1289,7 +1289,7 @@ function SortableContentBlock({ id, content, chapter, setModule, onEditChange, s
   const handleSaveContent = async (data: any) => {
     try {
       // Debug logs
-      console.log('[MainSection] handleSaveContent data:', data);
+      // console.log('[MainSection] handleSaveContent data:', data);
 
       // Map type to doctype and fields
       let doctype = null;

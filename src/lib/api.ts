@@ -7,8 +7,8 @@ export { ErrorBoundary } from "@/lib/error-boundary";
 import { LMS_API_BASE_URL } from "../config/routes";
 
 // API Base URL
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? "https://lms.noveloffice.org" 
+const API_BASE = process.env.NODE_ENV === 'production'
+  ? "https://lms.noveloffice.org"
   : LMS_API_BASE_URL;
 
 // Types
@@ -237,7 +237,7 @@ export class APIService {
       async () => {
         const queryString = new URLSearchParams(params).toString();
         const url = this.buildUrl(`/api/method/${method}${queryString ? `?${queryString}` : ''}`);
-        
+
         const response = await fetch(url, {
           method: 'GET',
           credentials: 'include',
@@ -245,11 +245,11 @@ export class APIService {
             'Accept': 'application/json',
           }
         });
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         return response.json();
       },
       ttl
@@ -428,7 +428,7 @@ export class APIService {
       credentials: 'include'
     });
     const result = await response.json();
-    
+
     // Cache the result for 5 minutes
     searchCache.set(cacheKey, result, 5 * 60 * 1000);
     return result;
@@ -438,16 +438,16 @@ export class APIService {
     try {
       // Use deduplication with shorter TTL for module data (30 seconds)
       // This prevents duplicate calls while ensuring relatively fresh data
-        const result = await this.getDeduplicated(
-          'novel_lms.novel_lms.api.module_management.get_learner_module_data',
-          data,
-          30000 // 30 seconds TTL
-        );
-        
-        // Unwrap the message field if it exists (Frappe API format)
-        const unwrappedResult = result.message || result;
-        
-        return unwrappedResult;
+      const result = await this.getDeduplicated(
+        'novel_lms.novel_lms.api.module_management.get_learner_module_data',
+        data,
+        30000 // 30 seconds TTL
+      );
+
+      // Unwrap the message field if it exists (Frappe API format)
+      const unwrappedResult = result.message || result;
+
+      return unwrappedResult;
     } catch (error) {
       errorHandler.handleAPIError(error, 'getLearnerModuleData');
       throw error;
@@ -491,13 +491,13 @@ export class APIService {
     const response = await fetch(this.buildUrl(`/api/method/novel_lms.novel_lms.api.analytics.get_lms_analytics?${params}`), {
       credentials: 'include'
     });
-    
+
     if (!response.ok) {
       throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
     }
-    
+
     const result = await response.json();
-    
+
     // Cache the result for 2 minutes (analytics data changes more frequently)
     searchCache.set(cacheKey, result, 2 * 60 * 1000);
     return result;
@@ -525,7 +525,7 @@ export class APIService {
     const url = this.buildUrl('/api/method/novel_lms.novel_lms.api.departments.get_user_departments_mapping');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
+
     try {
       const response = await fetch(url, {
         method: 'GET',
@@ -533,11 +533,11 @@ export class APIService {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
       }
-      
+
       return response.json();
     } catch (error: any) {
       clearTimeout(timeoutId);
@@ -558,12 +558,12 @@ export class APIService {
   }
 
   // Batch API methods
-  async getModuleBatchData(data: { 
-    user: string; 
-    module_id?: string; 
-    include_progress?: boolean; 
-    include_permissions?: boolean; 
-    include_content_access?: boolean; 
+  async getModuleBatchData(data: {
+    user: string;
+    module_id?: string;
+    include_progress?: boolean;
+    include_permissions?: boolean;
+    include_content_access?: boolean;
   }) {
     try {
       const result = await this.getDeduplicated(
@@ -637,16 +637,16 @@ export const useLearnersData = () => {
 };
 
 export const useTLDashboard = (tl_user: string, options?: { enabled?: boolean }) => {
-  console.log("useTLDashboard called with:", { tl_user, options });
-  
+  // console.log("useTLDashboard called with:", { tl_user, options });
+
   const result = useFrappeGetCall<TLDashboardData>(
     "novel_lms.novel_lms.api.tl_dashboard.get_tl_dashboard_data",
     { tl_user },
     options
   );
-  
-  console.log("useTLDashboard result:", result);
-  
+
+  // console.log("useTLDashboard result:", result);
+
   return result;
 };
 
@@ -658,30 +658,30 @@ export const useLearnerModuleData = (user: string, filters?: {
   const [data, setData] = React.useState<any>(null);
   const [error, setError] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(false);
-  
+
   // More robust enabled condition - only call if user is provided and not empty
   const isEnabled = options?.enabled !== false && user && user.trim() !== "";
-  
+
   const params = { user, ...filters };
-  
-  console.log('🔍 useLearnerModuleData called with:', {
-    user,
-    filters,
-    options,
-    isEnabled,
-    userProvided: !!user,
-    userLength: user?.length || 0
-  });
-  
+
+  // console.log('🔍 useLearnerModuleData called with:', {
+  //   user,
+  //   filters,
+  //   options,
+  //   isEnabled,
+  //   userProvided: !!user,
+  //   userLength: user?.length || 0
+  // });
+
   React.useEffect(() => {
     if (!isEnabled) {
       return;
     }
-    
+
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const apiService = APIService.getInstance();
         const result = await apiService.getLearnerModuleData(params);
@@ -693,10 +693,10 @@ export const useLearnerModuleData = (user: string, filters?: {
         setIsLoading(false);
       }
     };
-    
+
     fetchData();
   }, [isEnabled, user, JSON.stringify(filters)]);
-  
+
   return { data, error, isLoading };
 };
 
@@ -705,8 +705,8 @@ export const useAdminModules = (filters?: {
   module?: string;
   department?: string;
 }, options?: { enabled?: boolean }) => {
-  console.log("useAdminModules called with filters:", filters);
-  
+  // console.log("useAdminModules called with filters:", filters);
+
   // Memoize the filters to prevent unnecessary re-calls
   const memoizedFilters = React.useMemo(() => {
     if (!filters) return {};
@@ -716,15 +716,15 @@ export const useAdminModules = (filters?: {
       department: filters.department
     };
   }, [filters?.user, filters?.module, filters?.department]);
-  
+
   const result = useFrappeGetCall(
     "novel_lms.novel_lms.api.module_management.get_admin_modules",
     memoizedFilters,
     options
   );
-  
-  console.log("useAdminModules result:", result);
-  
+
+  // console.log("useAdminModules result:", result);
+
   return result;
 };
 
@@ -774,16 +774,16 @@ export const useModuleBatchData = (user: string, moduleId?: string, options?: { 
   const [data, setData] = React.useState<any>(null);
   const [error, setError] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(false);
-  
+
   const isEnabled = options?.enabled !== false && !!user;
-  
+
   React.useEffect(() => {
     if (!isEnabled) return;
-    
+
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const apiService = APIService.getInstance();
         const result = await apiService.getModuleBatchData({
@@ -800,10 +800,10 @@ export const useModuleBatchData = (user: string, moduleId?: string, options?: { 
         setIsLoading(false);
       }
     };
-    
+
     fetchData();
   }, [isEnabled, user, moduleId]);
-  
+
   return { data, error, isLoading };
 };
 
@@ -811,16 +811,16 @@ export const useDashboardBatchData = (user: string, options?: { enabled?: boolea
   const [data, setData] = React.useState<any>(null);
   const [error, setError] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(false);
-  
+
   const isEnabled = options?.enabled !== false && !!user;
-  
+
   React.useEffect(() => {
     if (!isEnabled) return;
-    
+
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const apiService = APIService.getInstance();
         const result = await apiService.getDashboardBatchData({ user });
@@ -831,10 +831,10 @@ export const useDashboardBatchData = (user: string, options?: { enabled?: boolea
         setIsLoading(false);
       }
     };
-    
+
     fetchData();
   }, [isEnabled, user]);
-  
+
   return { data, error, isLoading };
 };
 

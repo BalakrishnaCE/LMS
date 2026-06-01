@@ -1249,7 +1249,8 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   };
 
   return (
-    <AnimatePresence>
+    <>
+      <AnimatePresence>
       {isOpen && (
         <motion.aside
           key="sidebar"
@@ -1410,6 +1411,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
           </div>
         </motion.aside>
       )}
+      </AnimatePresence>
 
       {/* Settings Dialog */}
       <SettingsDialog
@@ -1440,6 +1442,6 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         onOpenChange={setShowDeleteChapterDialog}
         onConfirm={handleDeleteChapter}
       />
-    </AnimatePresence>
+    </>
   );
 }

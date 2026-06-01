@@ -74,7 +74,7 @@ function getLockState(module: any, allModules: any[]) {
     }
   } else {
     // is_locked is undefined or null - use fallback calculation
-    console.warn(`⚠️ [DASHBOARD] Module ${module.name} (${module.name1}) - is_locked is ${module.is_locked} (undefined/null), using fallback calculation`);
+    // console.warn(`⚠️ [DASHBOARD] Module ${module.name} (${module.name1}) - is_locked is ${module.is_locked} (undefined/null), using fallback calculation`);
     // Fallback to frontend calculation (for backward compatibility only)
     // IMPORTANT: Filter by department to ensure independent locking per department
     if (module.assignment_based === "Department" && module.order && module.order > 0) {
@@ -113,13 +113,13 @@ export default function LearnerDashboard() {
 
   const { data: DeadlineData, error: deadlineError, isLoading: deadlinesLoading } = useLearnerDashboard(user?.email || "", { enabled: !!user?.email && user?.email.trim() !== "" });
 
-  if (error) {
-    console.error('API Error details:', error);
-  }
+  // if (error) {
+  //   console.error('API Error details:', error);
+  // }
 
-  if (deadlineError) {
-    console.error('Deadline API Error details:', deadlineError);
-  }
+  // if (deadlineError) {
+  //   console.error('Deadline API Error details:', deadlineError);
+  // }
 
   // Helper function to safely extract the data array from DeadlineData
   const getDeadlineDataArray = () => {
@@ -171,7 +171,7 @@ export default function LearnerDashboard() {
 
       }
     } catch (error) {
-      console.error('Error fetching achievements:', error);
+      // console.error('Error fetching achievements:', error);
       setDashboardAchievements([]);
     } finally {
       setAchievementsLoading(false);
@@ -236,9 +236,10 @@ export default function LearnerDashboard() {
       // Debug logging for is_locked
       if (item.module?.is_locked !== undefined) {
 
-      } else {
-        console.warn(`⚠️ [DASHBOARD] Module ${item.module?.name} (${item.module?.name1}) - is_locked is MISSING from dashboard API, will use fallback logic`);
       }
+      // else {
+      //   console.warn(`⚠️ [DASHBOARD] Module ${item.module?.name} (${item.module?.name1}) - is_locked is MISSING from dashboard API, will use fallback logic`);
+      // }
       return moduleData;
     });
 
@@ -286,15 +287,15 @@ export default function LearnerDashboard() {
   // Final check: Log all modules and their is_locked status for debugging
   React.useEffect(() => {
     if (modules.length > 0) {
-      console.log('🔍 [DASHBOARD] Final modules array:', modules.map((m: any) => ({
-        name: m.name,
-        name1: m.name1,
-        is_locked: m.is_locked,
-        hasIsLocked: 'is_locked' in m,
-        assignment_based: m.assignment_based,
-        department: m.department,
-        order: m.order
-      })));
+      // console.log('🔍 [DASHBOARD] Final modules array:', modules.map((m: any) => ({
+      //   name: m.name,
+      //   name1: m.name1,
+      //   is_locked: m.is_locked,
+      //   hasIsLocked: 'is_locked' in m,
+      //   assignment_based: m.assignment_based,
+      //   department: m.department,
+      //   order: m.order
+      // })));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(modules.map((m: any) => ({ name: m.name, is_locked: m.is_locked })))]);
@@ -315,12 +316,12 @@ export default function LearnerDashboard() {
           is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : undefined
         };
         if (moduleData.is_locked === undefined) {
-          console.warn(`⚠️ [DASHBOARD] Module ${moduleData.name} (${moduleData.name1}) - is_locked is MISSING from final fallback`);
+          // console.warn(`⚠️ [DASHBOARD] Module ${moduleData.name} (${moduleData.name1}) - is_locked is MISSING from final fallback`);
         }
         return moduleData;
       });
     } else {
-      console.warn('DeadlineData.message is not an array:', deadlineModules);
+      // console.warn('DeadlineData.message is not an array:', deadlineModules);
       // If it's not an array, try to extract array from nested structure
       const extractedArray = getDeadlineDataArray();
       if (Array.isArray(extractedArray) && extractedArray.length > 0) {
@@ -883,7 +884,7 @@ export default function LearnerDashboard() {
                                         className="object-cover w-full h-full rounded-r-xl"
                                         loading="lazy"
                                         onError={() => {
-                                          console.error('Failed to load module image:', module.image);
+                                          // console.error('Failed to load module image:', module.image);
                                         }}
                                       />
                                     </div>
@@ -1036,7 +1037,7 @@ export default function LearnerDashboard() {
                             // CRITICAL: Use backend is_locked field if available (same as other sections)
                             if (module.is_locked !== undefined && module.is_locked !== null) {
                               isLocked = Boolean(module.is_locked);
-                              console.log(`🔒 [DASHBOARD] Ready to Start - Module ${module.name} (${module.name1}) - Using backend is_locked: ${module.is_locked} -> isLocked: ${isLocked}`);
+                              // console.log(`🔒 [DASHBOARD] Ready to Start - Module ${module.name} (${module.name1}) - Using backend is_locked: ${module.is_locked} -> isLocked: ${isLocked}`);
                               if (isLocked) {
                                 lockReason = "Complete previous modules to unlock this module.";
                               }
@@ -1053,7 +1054,7 @@ export default function LearnerDashboard() {
                               if (previous.some((m: any) => m.progress?.status !== "Completed")) {
                                 isLocked = true;
                                 lockReason = "Complete previous modules to unlock this module.";
-                                console.warn(`⚠️ [DASHBOARD] Ready to Start - Module ${module.name} (${module.name1}) - Using fallback calculation, is_locked was missing`);
+                                // console.warn(`⚠️ [DASHBOARD] Ready to Start - Module ${module.name} (${module.name1}) - Using fallback calculation, is_locked was missing`);
                               }
                             }
 
@@ -1095,7 +1096,7 @@ export default function LearnerDashboard() {
                                           className="object-cover w-full h-full rounded-r-xl"
                                           loading="lazy"
                                           onError={() => {
-                                            console.error('Failed to load module image:', module.image);
+                                            // console.error('Failed to load module image:', module.image);
                                           }}
                                         />
                                       </div>
@@ -1261,7 +1262,7 @@ export default function LearnerDashboard() {
                                           className="object-cover w-full h-full rounded-r-xl"
                                           loading="lazy"
                                           onError={() => {
-                                            console.error('Failed to load module image:', module.image);
+                                            // console.error('Failed to load module image:', module.image);
                                           }}
                                         />
                                       </div>

@@ -123,7 +123,7 @@ export default function ModuleDetail() {
                 setIsValidating(false);
             })
             .catch((err: any) => {
-                console.error("Error loading module:", err);
+                // console.error("Error loading module:", err);
                 setError(err.message || "Failed to load module");
                 setIsValidating(false);
             });

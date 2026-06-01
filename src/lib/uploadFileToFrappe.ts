@@ -25,9 +25,9 @@ export async function uploadFileToFrappe(file: File): Promise<string> {
       : '/api/method/upload_file';
   }
   
-  console.log('📤 Upload URL:', uploadUrl);
-  console.log('📤 File type:', file.type, 'Is audio:', isAudioFile);
-  console.log('📤 Target server:', LMS_API_BASE_URL || 'https://lms.noveloffice.org (via Vite proxy)');
+  // console.log('📤 Upload URL:', uploadUrl);
+  // console.log('📤 File type:', file.type, 'Is audio:', isAudioFile);
+  // console.log('📤 Target server:', LMS_API_BASE_URL || 'https://lms.noveloffice.org (via Vite proxy)');
 
   try {
     const response = await fetch(uploadUrl, {
@@ -79,7 +79,7 @@ export async function uploadFileToFrappe(file: File): Promise<string> {
     }
 
     const data = await response.json();
-    console.log('📁 Upload response:', data);
+    // console.log('📁 Upload response:', data);
     
     // Handle nested response structure (message.message.file_url for custom endpoints)
     // or flat structure (message.file_url for standard upload_file)
@@ -97,7 +97,7 @@ export async function uploadFileToFrappe(file: File): Promise<string> {
     
     if (fileUrl) {
       
-      console.log('📁 Raw file URL from server:', fileUrl);
+      // console.log('📁 Raw file URL from server:', fileUrl);
       
       // Extract relative path from full URL if needed
       if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
@@ -119,7 +119,7 @@ export async function uploadFileToFrappe(file: File): Promise<string> {
         fileUrl = `/${fileUrl}`;
       }
       
-      console.log('🔗 Final file URL (relative path):', fileUrl);
+      // console.log('🔗 Final file URL (relative path):', fileUrl);
       return fileUrl;
     }
     throw new Error('Invalid upload response: file_url not found in response');
