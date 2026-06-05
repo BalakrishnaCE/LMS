@@ -20,6 +20,20 @@ const FloatingChatButton = () => {
     // AI is available to all users (admins included)
 
     const [location, setLocation] = useLocation();
+    const [isTakingQuiz, setIsTakingQuiz] = useState(() => {
+        return typeof document !== "undefined" && document.body?.dataset?.takingQuiz === "true";
+    });
+
+    useEffect(() => {
+        const handleQuizState = (e: Event) => {
+            const customEvent = e as CustomEvent<{ isTakingQuiz: boolean }>;
+            setIsTakingQuiz(!!customEvent.detail?.isTakingQuiz);
+        };
+        window.addEventListener("lms-quiz-state-change", handleQuizState as EventListener);
+        return () => {
+            window.removeEventListener("lms-quiz-state-change", handleQuizState as EventListener);
+        };
+    }, []);
     const isDragging = useRef(false);
     const startPos = useRef({ x: 0, y: 0 });
     const startSize = useRef({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
@@ -163,8 +177,8 @@ const FloatingChatButton = () => {
         }
     }, [location]);
 
-    // Hide on the /ai page and on the /login page
-    if (location.startsWith('/ai') || location.startsWith('/login')) {
+    // Hide on the /ai page, on the /login page, and when taking a quiz
+    if (location.startsWith('/ai') || location.startsWith('/login') || isTakingQuiz) {
         return null;
     }
 
