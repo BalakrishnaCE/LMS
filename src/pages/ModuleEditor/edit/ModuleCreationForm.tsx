@@ -39,6 +39,11 @@ export default function ModuleCreationForm() {
     limit: 100,
   });
 
+  const { data: existingModules } = useFrappeGetDocList("LMS Module", {
+    fields: ["name1"],
+    limit: 1000,
+  });
+
   const departmentOptions = (departments || []).map((dept) => ({
     value: dept.name,
     label: dept.department,
@@ -47,6 +52,11 @@ export default function ModuleCreationForm() {
   const handleCreateModule = async () => {
     if (!moduleName.trim()) {
       toast.error("Module name is required");
+      return;
+    }
+
+    if (existingModules && existingModules.some((mod: any) => mod.name1?.toLowerCase() === moduleName.trim().toLowerCase())) {
+      toast.error("A module with this name already exists. Please choose a different name.");
       return;
     }
     if (assignmentBased === "Department" && !departmentSelected) {

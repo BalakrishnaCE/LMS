@@ -44,6 +44,19 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
   const { call: addQAProgress, loading: adding } = useFrappePostCall("novel_lms.novel_lms.api.quiz_qa_progress.add_qa_progress");
   const { call: updateQAProgress, loading: updating } = useFrappePutCall("novel_lms.novel_lms.api.quiz_qa_progress.update_qa_progress");
   
+  useEffect(() => {
+    if (open && !isLMSAdmin) {
+      document.body.dataset.takingQuiz = "true";
+      const event = new CustomEvent("lms-quiz-state-change", { detail: { isTakingQuiz: true } });
+      window.dispatchEvent(event);
+      return () => {
+        delete document.body.dataset.takingQuiz;
+        const event = new CustomEvent("lms-quiz-state-change", { detail: { isTakingQuiz: false } });
+        window.dispatchEvent(event);
+      };
+    }
+  }, [open, isLMSAdmin]);
+
   // Check for existing progress
   const { data: existingProgress, isValidating: checkingProgress } = useFrappeGetDocList(
     'Question Answer Progress',

@@ -672,8 +672,8 @@ export default function Learners() {
   async function handleAddLearner(e: React.FormEvent) {
     e.preventDefault();
     setAddError(null);
-    if (!addForm.first_name || !addForm.email || !addForm.departments || addForm.departments.length === 0) {
-      setAddError("Please fill all required fields and select at least one department.");
+    if (!addForm.first_name?.trim() || !addForm.last_name?.trim() || !addForm.email?.trim() || !addForm.departments || addForm.departments.length === 0) {
+      setAddError("Please fill all required fields (First Name, Last Name, Email) and select at least one department.");
       return;
     }
     setAddLoading(true);
@@ -742,8 +742,8 @@ export default function Learners() {
   async function handleEditLearner(e: React.FormEvent) {
     e.preventDefault();
     setEditError(null);
-    if (!editForm.first_name || !editForm.email || !editForm.departments || editForm.departments.length === 0 || !learnerToEdit?.name) {
-      setEditError("Please select at least one department.");
+    if (!editForm.first_name?.trim() || !editForm.last_name?.trim() || !editForm.email?.trim() || !editForm.departments || editForm.departments.length === 0 || !learnerToEdit?.name) {
+      setEditError("Please fill all required fields (First Name, Last Name, Email) and select at least one department.");
       return;
     }
     setEditLoading(true);
@@ -900,11 +900,11 @@ export default function Learners() {
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="block mb-1 font-medium">First Name<span className="text-red-500">*</span></label>
-                <Input value={addForm.first_name} onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} required disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
+                <Input value={addForm.first_name} onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value.replace(/[^a-zA-Z\s]/g, '') }))} required disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
+                <Input value={addForm.last_name} onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value.replace(/[^a-zA-Z\s]/g, '') }))} required disabled={addLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
             </div>
             <div>
@@ -996,11 +996,11 @@ export default function Learners() {
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="block mb-1 font-medium">First Name<span className="text-red-500">*</span></label>
-                <Input value={editForm.first_name} onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} required disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
+                <Input value={editForm.first_name} onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value.replace(/[^a-zA-Z\s]/g, '') }))} required disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
               <div className="flex-1">
                 <label className="block mb-1 font-medium">Last Name<span className="text-red-500">*</span></label>
-                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
+                <Input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value.replace(/[^a-zA-Z\s]/g, '') }))} required disabled={editLoading} className="border-2 border-border/50 focus:border-primary" />
               </div>
             </div>
             <div>

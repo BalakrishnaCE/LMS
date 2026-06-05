@@ -233,6 +233,21 @@ function QuizDialog({
 
   // Use the proper quiz progress API
   const { call: updateQuizProgress } = useFrappePostCall('novel_lms.novel_lms.api.quiz_qa_progress.update_quiz_progress');
+  const { call: addQuizProgress } = useFrappePostCall('novel_lms.novel_lms.api.quiz_qa_progress.add_quiz_progress');
+
+  // Track whether we've initiated progress for this quiz (to avoid duplicate starts)
+  const [progressStarted, setProgressStarted] = useState(false);
+
+  useEffect(() => {
+    document.body.dataset.takingQuiz = "true";
+    const event = new CustomEvent("lms-quiz-state-change", { detail: { isTakingQuiz: true } });
+    window.dispatchEvent(event);
+    return () => {
+      delete document.body.dataset.takingQuiz;
+      const event = new CustomEvent("lms-quiz-state-change", { detail: { isTakingQuiz: false } });
+      window.dispatchEvent(event);
+    };
+  }, []);
 
   const handleAnswerChange = (questionId: string, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
@@ -255,7 +270,7 @@ function QuizDialog({
       let correctCount = 0;
       let totalCount = 0;
 
-      quiz.questions.forEach(question => {
+      quiz.questions.forEach((question, idx) => {
         totalCount += 1;
         const userAnswer = answers[question.name] || '';
         let correctAnswer = '';
@@ -283,6 +298,17 @@ function QuizDialog({
           marked_ans: userAnswer,
           correct_ans: correctAnswer
         };
+
+        // Detailed logging for first question and any questions without correct answer
+        if (idx === 0 || !correctAnswer) {
+          console.log(`[Quiz Q${idx + 1}] Question: ${question.name}`, {
+            userAnswer,
+            correctAnswer,
+            options: question.options?.map(o => ({ text: o.option_text, correct: o.correct, is_correct: (o as any).is_correct })),
+            hasOptions: !!question.options,
+            optionCount: question.options?.length
+          });
+        }
 
         // Debug log to verify correct answer is found
         if (!correctAnswer) {
@@ -325,23 +351,47 @@ function QuizDialog({
       // Refetch progress status to get detailed quiz_data
       let actualCorrectCount = correctCount;
       let actualTotalCount = totalCount;
+      let hasValidQuizData = false;
 
       if (refetchProgress) {
-        const refetchedData = await refetchProgress();
-        const progressData = refetchedData?.message;
+        try {
+          const refetchedData = await refetchProgress();
+          const progressData = refetchedData?.message;
 
-        // Calculate correct answers from quiz_data if available
-        if (progressData?.quiz_data && progressData.quiz_data.length > 0) {
-          actualCorrectCount = progressData.quiz_data.filter(q => q.is_correct).length;
-          actualTotalCount = progressData.quiz_data.length;
+          // Calculate correct answers from quiz_data if available and properly populated
+          if (progressData?.quiz_data && progressData.quiz_data.length > 0) {
+            actualCorrectCount = progressData.quiz_data.filter(q => q.is_correct).length;
+            actualTotalCount = progressData.quiz_data.length;
+            hasValidQuizData = true;
+            console.log('Quiz data refetched successfully:', { actualCorrectCount, actualTotalCount });
+          } else {
+            console.warn('Refetch returned but quiz_data is empty or not available');
+          }
+        } catch (refetchError) {
+          console.warn('Failed to refetch quiz progress:', refetchError);
         }
       }
 
       // Update UI state
-      // Use actual correct count for score if available, otherwise use API score
-      // The API score might be weighted by question scores, so we use correct count for display
-      const displayScore = actualCorrectCount > 0 ? actualCorrectCount : savedScore;
-      const displayMaxScore = actualTotalCount > 0 ? actualTotalCount : savedMaxScore;
+      // If we have valid quiz_data from refetch, use the correct count from it
+      // Otherwise, use the API's calculated score directly (which handles weighted scores)
+      let displayScore, displayMaxScore;
+      
+      if (hasValidQuizData) {
+        // Use quiz_data if we successfully retrieved it
+        displayScore = actualCorrectCount;
+        displayMaxScore = actualTotalCount;
+        console.log('Using refetched quiz_data for display:', { displayScore, displayMaxScore });
+      } else {
+        // Use API score directly - this is always calculated correctly on the backend
+        // In this case, score/max_score might be weighted, so we use them directly
+        displayScore = savedScore;
+        displayMaxScore = savedMaxScore;
+        // When showing weighted scores, we still show as "X out of Y" but it may be points not question count
+        actualCorrectCount = savedScore;
+        actualTotalCount = savedMaxScore;
+        console.log('Using API score for display (may be weighted):', { displayScore, displayMaxScore });
+      }
 
       setScore(displayScore);
       setMaxScore(displayMaxScore);
@@ -417,6 +467,28 @@ function QuizDialog({
       setHasAttempted(true);
     }
   }, [quizProgressStatus, progressLoading, hasAttempted, quiz?.name, quiz?.questions?.length]);
+
+  // If no progress exists, start progress when the quiz dialog is opened so started_on is recorded
+  useEffect(() => {
+    if (!quiz?.name || progressLoading || progressStarted) return;
+
+    const progressMsg = quizProgressStatus?.message;
+    // get_quiz_progress_status returns { completed: False, message: 'Quiz not started' } when not started
+    const notStarted = !progressMsg || (progressMsg && progressMsg.message && progressMsg.message.toLowerCase().includes('not started'));
+
+    if (notStarted) {
+      (async () => {
+        try {
+          await addQuizProgress({ quiz_id: quiz.name, module: moduleId || undefined });
+          setProgressStarted(true);
+          // refresh progress status to reflect the new started_on
+          refetchProgress?.();
+        } catch (err) {
+          console.warn('Failed to start quiz progress:', err);
+        }
+      })();
+    }
+  }, [quiz?.name, progressLoading, progressStarted, addQuizProgress, moduleId, refetchProgress, quizProgressStatus]);
 
   // Safety checks
   if (!quiz || !quiz.questions || quiz.questions.length === 0) {
