@@ -17,6 +17,7 @@ import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
 import { toast } from "sonner";
 import { calculateModuleProgress } from "../../../utils/progressUtils";
+import { useCodeBlockFormatter } from "@/hooks/useCodeBlockFormatter";
 
 // TypeScript interfaces
 interface Content {
@@ -359,6 +360,7 @@ function getOverallProgress(module: CourseModule, currentLessonIdx: number, curr
 }
 
 export default function ModuleDetail() {
+    useCodeBlockFormatter();
     const params = useParams<{ moduleName: string }>();
     const moduleName = params.moduleName;
     const [, setLocation] = useLocation();
@@ -907,8 +909,20 @@ export default function ModuleDetail() {
             setCompleted(true);
             // Reset reviewing to false so completion screen can show
             setReviewing(false);
+
+            // Fetch quiz/QA scores on initial load so CompletionScreen shows the correct score
+            // Without this, quizQAScores remains [] and the score displays as 0%
+            if (module && user && quizQAScores.length === 0) {
+                checkQuizQACompletion(module, user).then(({ scores }) => {
+                    if (scores.length > 0) {
+                        setQuizQAScores(scores);
+                    }
+                }).catch(() => {
+                    // Non-critical: scores will show 0% if fetch fails
+                });
+            }
         }
-    }, [progress, savedProgress]);
+    }, [progress, savedProgress, module, user]);
 
     // Progress restoration on mount - Production approach
     useEffect(() => {
@@ -1280,7 +1294,9 @@ export default function ModuleDetail() {
         }
     };
     const scrollContentToTop = () => {
-        contentScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => {
+            contentScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
     };
 
     const handlePrevious = async () => {

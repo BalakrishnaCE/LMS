@@ -1,0 +1,477 @@
+/* Rich Editor Base Styles */
+.rich-editor .ProseMirror {
+  white-space: pre-wrap !important;
+}
+
+.rich-editor .ProseMirror p,
+.rich-editor .ProseMirror div,
+.rich-editor .ProseMirror span,
+.rich-editor .ProseMirror li,
+.rich-editor .ProseMirror * {
+  white-space: pre-wrap !important;
+}
+
+.rich-editor [contenteditable="true"] {
+  white-space: pre-wrap !important;
+}
+
+/* ============================================
+   Code Block (pre) — Premium Dark Theme
+   Applies in editor + preview + saved content
+   ============================================ */
+
+.rich-editor .ProseMirror pre,
+.text-content-prose pre,
+.prose pre {
+  background: #f7f7f7;
+  border: 1px solid rgba(100, 130, 180, 0.2);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin: 18px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: #000000;
+  /* box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6); */
+  position: relative;
+  white-space: pre;
+  word-break: normal;
+  -webkit-font-smoothing: antialiased;
+}
+
+
+
+/* Code inside pre */
+.rich-editor .ProseMirror pre code,
+.text-content-prose pre code,
+.prose pre code {
+  display: block;
+  font-family: inherit;
+  color: inherit;
+  background: transparent !important;
+  padding: 0;
+  margin: 0;
+  font-size: inherit;
+  white-space: inherit;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Ensure tabs render as 4 spaces visually inside code blocks and editor textarea */
+.rich-editor .ProseMirror pre,
+.rich-editor .ProseMirror pre code,
+.rich-editor .richtext-node-code-block .prism-code-editor,
+.rich-editor .richtext-node-code-block textarea {
+  tab-size: 4;
+  -moz-tab-size: 4;
+}
+
+/* Prevent inline code styles leaking into pre */
+.rich-editor .ProseMirror pre code span,
+.text-content-prose pre code span,
+.prose pre code span {
+  color: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* Dark Mode — Code Block */
+.dark .rich-editor .ProseMirror pre,
+.dark .text-content-prose pre,
+.dark .prose pre {
+  background: #242525;
+  border-color: rgba(60, 70, 90, 0.25);
+  color: #fbfbfc;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Scrollbar for code blocks */
+.rich-editor .ProseMirror pre::-webkit-scrollbar,
+.text-content-prose pre::-webkit-scrollbar,
+.prose pre::-webkit-scrollbar {
+  height: 6px;
+}
+
+.rich-editor .ProseMirror pre::-webkit-scrollbar-track,
+.text-content-prose pre::-webkit-scrollbar-track,
+.prose pre::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+}
+
+.rich-editor .ProseMirror pre::-webkit-scrollbar-thumb,
+.text-content-prose pre::-webkit-scrollbar-thumb,
+.prose pre::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+
+.rich-editor .ProseMirror pre::-webkit-scrollbar-thumb:hover,
+.text-content-prose pre::-webkit-scrollbar-thumb:hover,
+.prose pre::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ============================================
+   Inline Code (backtick `code` in text)
+   ============================================ */
+
+.rich-editor .ProseMirror code:not(pre code),
+.text-content-prose code:not(pre code),
+.prose code:not(pre code) {
+  background: #C0E1D2;
+  color: #1e293b;
+  border: 1px solid rgba(100, 130, 180, 0.25);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 0.88em;
+  line-height: 1.5;
+  font-weight: 400;
+  display: inline;
+  margin: 0 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  word-break: break-word;
+  -webkit-font-smoothing: antialiased;
+}
+
+.rich-editor .ProseMirror code:not(pre code):hover,
+.text-content-prose code:not(pre code):hover,
+.prose code:not(pre code):hover {
+  background: #c0e1d2;
+  border-color: rgba(100, 130, 180, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+/* Dark Mode — Inline Code */
+.dark .rich-editor .ProseMirror code:not(pre code),
+.dark .text-content-prose code:not(pre code),
+.dark .prose code:not(pre code) {
+  background: #3d4145;
+  color: #e2e8f0;
+  border-color: rgba(60, 70, 90, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.dark .rich-editor .ProseMirror code:not(pre code):hover,
+.dark .text-content-prose code:not(pre code):hover,
+.dark .prose code:not(pre code):hover {
+  background: #484d52;
+  border-color: rgba(60, 70, 90, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Vertical alignment for inline code in headings/paragraphs */
+.rich-editor .ProseMirror p code,
+.rich-editor .ProseMirror li code,
+.rich-editor .ProseMirror h1 code,
+.rich-editor .ProseMirror h2 code,
+.rich-editor .ProseMirror h3 code {
+  vertical-align: baseline;
+}
+
+/* ============================================
+   Code Block Node-View Editor Widget
+   Targets the interactive editor UI rendered
+   by reactjs-tiptap-editor's CodeBlock extension
+   ============================================ */
+
+/* Outer container */
+.rich-editor .richtext-node-code-block {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(100, 130, 180, 0.22) !important;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.6) inset !important;
+  margin: 18px 0 !important;
+  background: #ffffff !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rich-editor .richtext-node-code-block:hover {
+  border-color: rgba(100, 130, 180, 0.40) !important;
+  box-shadow:
+    0 6px 32px rgba(0, 0, 0, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.7) inset !important;
+}
+
+/* ── Toolbar ── */
+.rich-editor .richtext-code-block-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  padding: 6px 10px !important;
+  background: #e5e7eb !important;
+  border-bottom: 1px solid rgba(100, 130, 180, 0.2) !important;
+  min-height: 40px !important;
+}
+
+/* ── Language selector dropdown ──
+   The library renders a custom React Select (not a native <select>).
+   It is the first <div> child of the toolbar.
+   The toolbar-divider immediately after it is also hidden. */
+.rich-editor .richtext-code-block-toolbar > div:first-child {
+  display: none !important;
+}
+
+/* Hide the first divider that follows the language selector */
+.rich-editor .richtext-code-block-toolbar > .toolbar-divider:first-of-type {
+  display: none !important;
+}
+
+/* Static "Code" label — plain text, no badge styling */
+.rich-editor .richtext-code-block-toolbar::before {
+  content: 'CODE' !important;
+  font-size: 11px !important;
+  font-family: inherit !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.6px !important;
+  color: #6b7280 !important;
+  background: none !important;
+  border: none !important;
+  padding: 0 6px 0 2px !important;
+  user-select: none !important;
+  flex-shrink: 0 !important;
+}
+
+/* Dark mode plain label */
+.dark .rich-editor .richtext-code-block-toolbar::before {
+  color: #9ca3af !important;
+}
+
+/* Toolbar dividers */
+.rich-editor .richtext-code-block-toolbar .toolbar-divider {
+  width: 1px !important;
+  height: 18px !important;
+  background: rgba(99, 120, 160, 0.2) !important;
+  margin: 0 4px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Toolbar icon buttons */
+.rich-editor .richtext-code-block-toolbar button,
+.rich-editor .richtext-code-block-toolbar [role="button"],
+.rich-editor .richtext-code-block-toolbar [class*="richtext-cursor-pointer"] {
+  color: #000000 !important;
+  border-radius: 6px !important;
+  transition: color 0.15s ease, background 0.15s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.rich-editor .richtext-code-block-toolbar button:hover,
+.rich-editor .richtext-code-block-toolbar [role="button"]:hover,
+.rich-editor .richtext-code-block-toolbar [class*="richtext-cursor-pointer"]:hover {
+  background: rgba(100, 130, 180, 0.15) !important;
+  color: #1e293b !important;
+}
+
+/* SVG icons inside buttons */
+.rich-editor .richtext-code-block-toolbar svg {
+  width: 15px !important;
+  height: 15px !important;
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+.rich-editor .richtext-code-block-toolbar button:hover svg,
+.rich-editor .richtext-code-block-toolbar [class*="richtext-cursor-pointer"]:hover svg {
+  opacity: 1;
+}
+
+/* ============================================
+   SIDE-BY-SIDE Code Block Layout
+   Left  = raw editor  (textarea + overlays)
+   Right = highlighted preview (pce-line)
+   ============================================ */
+
+/* ── prism-code-editor base ── */
+.rich-editor .richtext-node-code-block .prism-code-editor,
+.rich-editor .richtext-node-code-block [class*="prism-code"] {
+  background: #ffffff !important;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Monaco', 'Consolas', monospace !important;
+  font-size: 13.5px !important;
+  line-height: 1.75 !important;
+  color: #000000 !important;
+  min-height: 120px !important;
+  max-height: 60vh !important;
+  padding: 0 !important;
+  -webkit-font-smoothing: antialiased !important;
+  overflow: auto !important;
+  /* Only one vertical scrollbar here on the main container */
+}
+
+/* ── pce-wrapper (Container Split) ── */
+.rich-editor .richtext-node-code-block .pce-wrapper {
+  display: block !important;
+  position: relative !important;
+  min-height: 120px !important;
+  background: linear-gradient(to right, #f3f4f6 0%, #f3f4f6 50%, transparent 50%, transparent 100%) !important;
+}
+
+/* Vertical divider between panels */
+.rich-editor .richtext-node-code-block .pce-wrapper::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  width: 1px !important;
+  background: rgba(99, 120, 160, 0.25) !important;
+  z-index: 5 !important;
+  pointer-events: none !important;
+}
+
+/* ── Left panel: Editor (pce-overlays + textarea) ── */
+.rich-editor .richtext-node-code-block .pce-overlays {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 50% !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.rich-editor .richtext-node-code-block textarea {
+  min-height: 120px !important;
+  width: 100% !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  caret-color: #121213 !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Monaco', 'Consolas', monospace !important;
+  font-size: 13.5px !important;
+  line-height: 1.75 !important;
+  padding: 16px 20px !important;
+  background: transparent !important;
+  resize: none !important;
+  outline: none !important;
+  border: none !important;
+  white-space: pre !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  /* Hide individual vertical scrollbar */
+}
+
+/* ── Right panel: Syntax-highlighted preview (pce-line) ── */
+.rich-editor .richtext-node-code-block .pce-wrapper .pce-line {
+  margin-left: 50% !important;
+  width: 50% !important;
+  box-sizing: border-box !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+  text-align: left !important;
+}
+
+/* Pack lines properly with correct top/bottom padding */
+.rich-editor .richtext-node-code-block .pce-wrapper .pce-line:first-of-type {
+  padding-top: 16px !important;
+}
+
+.rich-editor .richtext-node-code-block .pce-wrapper .pce-line:last-of-type {
+  padding-bottom: 16px !important;
+}
+
+/* Active line highlight (left panel) */
+.rich-editor .richtext-node-code-block .active-line {
+  background: rgba(132, 146, 177, 0.164) !important;
+  border-radius: 3px !important;
+}
+
+/* Line numbers (if enabled) */
+.rich-editor .richtext-node-code-block .line-numbers-rows {
+  border-right: 1px solid rgba(99, 120, 160, 0.15) !important;
+  padding-right: 12px !important;
+  color: #8a7c8500 !important;
+  font-size: 12px !important;
+  user-select: none !important;
+}
+
+/* ── Scrollbars ── */
+.rich-editor .richtext-node-code-block ::-webkit-scrollbar {
+  height: 5px !important;
+  width: 5px !important;
+}
+
+.rich-editor .richtext-node-code-block ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-radius: 3px !important;
+}
+
+.rich-editor .richtext-node-code-block ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12) !important;
+  border-radius: 3px !important;
+}
+
+.rich-editor .richtext-node-code-block ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* ── Selected / focused state ── */
+.rich-editor .richtext-node-code-block.ProseMirror-selectednode,
+.rich-editor .richtext-node-code-block:focus-within {
+  border-color: rgba(239, 241, 247, 0.35) !important;
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.1),
+    0 6px 28px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ── Dark mode overrides ── */
+.dark .rich-editor .richtext-node-code-block {
+  border-color: rgba(60, 70, 90, 0.25) !important;
+  background: #32363a !important;
+}
+
+.dark .rich-editor .richtext-code-block-toolbar {
+  background: #2a2e31 !important;
+  border-bottom-color: rgba(60, 70, 90, 0.2) !important;
+}
+
+.dark .rich-editor .richtext-node-code-block .prism-code-editor,
+.dark .rich-editor .richtext-node-code-block [class*="prism-code"] {
+  background: #32363a !important;
+  color: #f8fafc !important;
+}
+
+.dark .rich-editor .richtext-node-code-block .pce-overlays {
+  background: #32363a !important;
+}
+
+.dark .rich-editor .richtext-node-code-block .pce-wrapper::after {
+  background: rgba(99, 120, 160, 0.18) !important;
+}
+
+/* Dark mode text inputs and carets */
+.dark .rich-editor .richtext-node-code-block textarea {
+  color: #e2e8f0 !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
+  caret-color: #ffffff !important;
+}
+
+/* Dark mode — language selector and its divider (already hidden globally above) */
+.dark .rich-editor .richtext-code-block-toolbar > div:first-child {
+  display: none !important;
+}
+
+/* Dark mode toolbar action buttons & icons */
+.dark .rich-editor .richtext-code-block-toolbar button,
+.dark .rich-editor .richtext-code-block-toolbar [role="button"],
+.dark .rich-editor .richtext-code-block-toolbar [class*="richtext-cursor-pointer"] {
+  color: #f8fafc !important;
+}
+
+.dark .rich-editor .richtext-code-block-toolbar button:hover,
+.dark .rich-editor .richtext-code-block-toolbar [role="button"]:hover,
+.dark .rich-editor .richtext-code-block-toolbar [class*="richtext-cursor-pointer"]:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
