@@ -1,9 +1,11 @@
 import RichTextEditor from 'reactjs-tiptap-editor';
 import { BaseKit } from 'reactjs-tiptap-editor';
 import React, { useEffect, useState, useRef, useMemo } from "react";
+import './RichEditor.css';
 import { Bold } from 'reactjs-tiptap-editor/bold';
 import { BulletList } from 'reactjs-tiptap-editor/bulletlist';
-import { Code } from 'reactjs-tiptap-editor/code';
+// import { Code } from 'reactjs-tiptap-editor/code';
+import { CodeBlock } from 'reactjs-tiptap-editor/codeblock';
 import { Heading } from 'reactjs-tiptap-editor/heading';
 import { Image } from 'reactjs-tiptap-editor/image';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -68,7 +70,38 @@ const RichEditor: React.FC<RichEditorProps> = React.memo(({ content, onChange, d
             Bold.configure(),
             Italic.configure(),
             TextUnderline.configure(),
-            Code.configure(),
+            // Code.configure(),
+            // The reactjs-tiptap-editor CodeBlock is a custom atom node — its .configure()
+            // only accepts GeneralOptions (divider, spacer, button, toolbar).
+            // Options like defaultLanguage, exitOnTripleEnter, tabSize are NOT supported.
+            // To change defaults (language, tabSize), we override addAttributes via .extend().
+            CodeBlock.extend({
+                addAttributes() {
+                    return {
+                        code: {
+                            default: '',
+                            parseHTML: (element: HTMLElement) => element.textContent || '',
+                        },
+                        language: {
+                            default: 'python', // changed from 'plaintext' to 'python'
+                        },
+                        lineNumbers: {
+                            default: true,
+                        },
+                        wordWrap: {
+                            default: false,
+                        },
+                        tabSize: {
+                            default: 4, // changed from 2 to 4
+                        },
+                        shouldFocus: {
+                            default: true,
+                            parseHTML: () => false,
+                            renderHTML: () => null,
+                        },
+                    };
+                },
+            }).configure(),
             Heading.configure({
                 levels: [1, 2, 3],
             }),
@@ -214,122 +247,7 @@ const RichEditor: React.FC<RichEditorProps> = React.memo(({ content, onChange, d
         };
     }, [theme, isMounted]);
 
-    // Direct fix to ensure space key always works
-    useEffect(() => {
-        if (!isMounted) return;
 
-        const insertSpaceDirectly = (editorElement: HTMLElement) => {
-            // ... (Same space key fix logic)
-            try {
-                const selection = window.getSelection();
-                if (!selection || selection.rangeCount === 0) {
-                    const range = document.createRange();
-                    range.selectNodeContents(editorElement);
-                    range.collapse(false);
-                    selection?.removeAllRanges();
-                    selection?.addRange(range);
-                }
-
-                const range = selection?.getRangeAt(0);
-                if (!range) return;
-
-                const textNode = document.createTextNode(' ');
-                range.insertNode(textNode);
-
-                range.setStartAfter(textNode);
-                range.collapse(true);
-                selection?.removeAllRanges();
-                selection?.addRange(range);
-
-                const inputEvent = new Event('input', { bubbles: true, cancelable: true });
-                editorElement.dispatchEvent(inputEvent);
-            } catch (error) {
-                console.error('Error inserting space:', error);
-            }
-        };
-
-        const fixSpaceKey = () => {
-            // ... (Same space key fix logic)
-            const editorElements = document.querySelectorAll('.rich-editor .ProseMirror, .rich-editor [contenteditable="true"]');
-
-            editorElements.forEach((element) => {
-                const el = element as HTMLElement;
-                el.style.whiteSpace = 'pre-wrap';
-
-                const handleKeyDown = (e: KeyboardEvent) => {
-                    if (e.key === ' ' || e.keyCode === 32) {
-                        e.preventDefault();
-                        e.stopImmediatePropagation();
-                        e.stopPropagation();
-                        insertSpaceDirectly(el);
-                    }
-                };
-
-                el.removeEventListener('keydown', handleKeyDown as EventListener, true);
-                el.addEventListener('keydown', handleKeyDown as EventListener, true);
-
-                const handleKeyPress = (e: KeyboardEvent) => {
-                    if (e.key === ' ' || e.keyCode === 32 || e.charCode === 32) {
-                        e.preventDefault();
-                        e.stopImmediatePropagation();
-                        e.stopPropagation();
-                        insertSpaceDirectly(el);
-                    }
-                };
-
-                el.removeEventListener('keypress', handleKeyPress as EventListener, true);
-                el.addEventListener('keypress', handleKeyPress as EventListener, true);
-            });
-        };
-
-        fixSpaceKey();
-        const timeout1 = setTimeout(fixSpaceKey, 50);
-        const timeout2 = setTimeout(fixSpaceKey, 200);
-        const timeout3 = setTimeout(fixSpaceKey, 500);
-        const timeout4 = setTimeout(fixSpaceKey, 1000); // reduced timeouts as memo might make mounting faster
-
-        const observer = new MutationObserver(() => {
-            fixSpaceKey();
-        });
-
-        const richEditorContainer = editorContainerRef.current || document.querySelector('.rich-editor');
-        if (richEditorContainer) {
-            observer.observe(richEditorContainer, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                characterData: true,
-            });
-        }
-
-        const globalHandler = (e: KeyboardEvent) => {
-            // ... (Same space key fix logic)
-            const target = e.target as HTMLElement;
-            const isInEditor = target?.closest?.('.rich-editor .ProseMirror, .rich-editor [contenteditable="true"]');
-
-            if (isInEditor && (e.key === ' ' || e.keyCode === 32)) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                e.stopPropagation();
-
-                const editorEl = target.closest('.ProseMirror, [contenteditable="true"]') as HTMLElement;
-                if (editorEl) {
-                    insertSpaceDirectly(editorEl);
-                }
-            }
-        };
-
-        document.addEventListener('keydown', globalHandler, { capture: true, passive: false });
-
-        return () => {
-            clearTimeout(timeout1);
-            clearTimeout(timeout2);
-            clearTimeout(timeout3);
-            clearTimeout(timeout4);
-            observer.disconnect();
-            document.removeEventListener('keydown', globalHandler, { capture: true } as EventListenerOptions);
-        };
-    }, [isMounted]);
 
     if (!isMounted) {
         return null;
@@ -339,33 +257,6 @@ const RichEditor: React.FC<RichEditorProps> = React.memo(({ content, onChange, d
         <div
             ref={editorContainerRef}
             className={`rich-editor ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-            // ... (Same container handler)
-            onKeyDown={(e) => {
-                if (e.key === ' ' || e.keyCode === 32) {
-                    const target = e.target as HTMLElement;
-                    const editorEl = target.closest('.ProseMirror, [contenteditable="true"]') as HTMLElement;
-                    if (editorEl) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        try {
-                            const selection = window.getSelection();
-                            if (selection && selection.rangeCount > 0) {
-                                const range = selection.getRangeAt(0);
-                                const textNode = document.createTextNode(' ');
-                                range.insertNode(textNode);
-                                range.setStartAfter(textNode);
-                                range.collapse(true);
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                                const inputEvent = new Event('input', { bubbles: true });
-                                editorEl.dispatchEvent(inputEvent);
-                            }
-                        } catch (err) {
-                            console.error('Error inserting space:', err);
-                        }
-                    }
-                }
-            }}
         >
             <RichTextEditor
                 output='html'
@@ -392,22 +283,6 @@ const RichEditor: React.FC<RichEditorProps> = React.memo(({ content, onChange, d
                     }
                 }}
             />
-            <style dangerouslySetInnerHTML={{
-                __html: `
-             .rich-editor .ProseMirror {
-               white-space: pre-wrap !important;
-             }
-             .rich-editor .ProseMirror p,
-             .rich-editor .ProseMirror div,
-             .rich-editor .ProseMirror span,
-             .rich-editor .ProseMirror li,
-             .rich-editor .ProseMirror * {
-               white-space: pre-wrap !important;
-             }
-             .rich-editor [contenteditable="true"] {
-               white-space: pre-wrap !important;
-             }
-           `}} />
         </div>
     );
 });
