@@ -114,19 +114,7 @@ const FloatingChatButton = () => {
         setLocation('/ai');
     }, [setLocation, location]);
 
-    // Lock body scroll when chat is open
-    useEffect(() => {
-        if (isOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
 
-        // Cleanup on unmount
-        return () => {
-            document.body.style.overflow = '';
-        };
-    }, [isOpen]);
 
     // Cleanup drag listeners on unmount
     useEffect(() => {

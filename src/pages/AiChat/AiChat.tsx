@@ -153,6 +153,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const hasInitialized = useRef(false);
+    const isUserScrollingRef = useRef(false);
     // Ref to track latest state for reliable unmount saving (avoids stale closures)
     const latestStateRef = useRef<{ context: ChatContext; currentStep: ConversationStep; messages: Message[]; chatId: string | null; inputValue: string; isLoading: boolean }>({ context: {}, currentStep: 'department', messages: [], chatId: null, inputValue: '', isLoading: false });
 
@@ -501,12 +502,68 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
 
 
-    // Auto-scroll to bottom when messages change
     useEffect(() => {
         if (scrollRef.current) {
-            scrollRef.current.scrollIntoView({ behavior: "smooth" });
+            const viewport = scrollRef.current.closest('[data-radix-scroll-area-viewport], [data-slot="scroll-area-viewport"]') as HTMLDivElement;
+            if (viewport) {
+                const handleWheel = (e: WheelEvent) => {
+                    if (e.deltaY < 0) {
+                        // Scrolling up explicitly
+                        isUserScrollingRef.current = true;
+                    }
+                };
+
+                const handleTouchStart = () => {
+                    isUserScrollingRef.current = true;
+                };
+
+                const handlePointerDown = () => {
+                    // Any click inside the chat area (scrollbar drag, text selection, etc.) pauses auto-scroll
+                    isUserScrollingRef.current = true;
+                };
+
+                const handleScroll = () => {
+                    const { scrollTop, scrollHeight, clientHeight } = viewport;
+                    // Very tight tolerance to detect if user has snapped back to bottom
+                    const isAtBottom = scrollHeight - scrollTop - clientHeight <= 20; 
+                    if (isAtBottom) {
+                        isUserScrollingRef.current = false;
+                    } else if (isLoading && !isUserScrollingRef.current) {
+                        // If we're loading, and they aren't marked as scrolling, but they are not at bottom,
+                        // this might be because a chunk just came in and pushed the scroll height down, 
+                        // before scrollIntoView caught up. So we don't automatically set isUserScrollingRef to true here.
+                    } else {
+                        // If they aren't at the bottom, they might be scrolling
+                        // But rely primarily on wheel/touch/pointer for setting to true during generation to avoid false positives
+                        if (!isLoading) {
+                            isUserScrollingRef.current = true;
+                        }
+                    }
+                };
+                
+                viewport.addEventListener('wheel', handleWheel, { passive: true });
+                viewport.addEventListener('touchstart', handleTouchStart, { passive: true });
+                viewport.addEventListener('pointerdown', handlePointerDown, { passive: true });
+                viewport.addEventListener('scroll', handleScroll, { passive: true });
+                handleScroll();
+                
+                return () => {
+                    viewport.removeEventListener('wheel', handleWheel);
+                    viewport.removeEventListener('touchstart', handleTouchStart);
+                    viewport.removeEventListener('pointerdown', handlePointerDown);
+                    viewport.removeEventListener('scroll', handleScroll);
+                };
+            }
         }
-    }, [messages, currentStep]);
+    }, [currentStep, isFloating, isLoading]);
+
+    // Auto-scroll to bottom when messages change
+    useEffect(() => {
+        if (scrollRef.current && !isUserScrollingRef.current) {
+            const behavior = isLoading ? "auto" : "smooth";
+            scrollRef.current.scrollIntoView({ behavior });
+        }
+    }, [messages, currentStep, isLoading]);
 
     // Auto-focus input when in QA mode and not loading
     useEffect(() => {
@@ -807,6 +864,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             timestamp: new Date()
         };
 
+        isUserScrollingRef.current = false;
         setMessages(prev => [...prev, newMessage]);
         setInputValue('');
 
