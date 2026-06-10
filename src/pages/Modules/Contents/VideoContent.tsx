@@ -41,7 +41,7 @@ export default function VideoContent({
   };
 
   // Debug logging
-  console.log('VideoContent - Content data:', content);
+  // console.log('VideoContent - Content data:', content);
 
   // Normalize URL to handle both relative and full URLs
   // Uses lms.noveloffice.org as base URL in both development and production

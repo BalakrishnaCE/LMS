@@ -104,13 +104,13 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
 
     // Debug logging
     useEffect(() => {
-        console.log('🔍 LearnerModules - User state:', {
-            user,
-            userEmail: user?.email,
-            userName: user?.name,
-            userIdentifier,
-            shouldCallAPI
-        });
+        // console.log('🔍 LearnerModules - User state:', {
+        //     user,
+        //     userEmail: user?.email,
+        //     userName: user?.name,
+        //     userIdentifier,
+        //     shouldCallAPI
+        // });
     }, [user, userIdentifier, shouldCallAPI]);
 
     const { data, error, isLoading: apiLoading } = useLearnerModuleData(userIdentifier, {
@@ -130,31 +130,31 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
     useEffect(() => {
         if (data) {
             const modulesFromData = data?.modules || data?.message?.modules || [];
-            console.log('🔍 LearnerModules - API Response:', {
-                hasData: !!data,
-                dataKeys: Object.keys(data || {}),
-                hasMessage: !!data?.message,
-                hasMessageModules: !!data?.message?.modules,
-                hasDirectModules: !!data?.modules,
-                modulesCount: modulesFromData.length,
-                modules: modulesFromData,
-                meta: data?.meta || data?.message?.meta,
-                error: data?.error
-            });
+            // console.log('🔍 LearnerModules - API Response:', {
+            //     hasData: !!data,
+            //     dataKeys: Object.keys(data || {}),
+            //     hasMessage: !!data?.message,
+            //     hasMessageModules: !!data?.message?.modules,
+            //     hasDirectModules: !!data?.modules,
+            //     modulesCount: modulesFromData.length,
+            //     modules: modulesFromData,
+            //     meta: data?.meta || data?.message?.meta,
+            //     error: data?.error
+            // });
 
             // Check if modules have is_locked field
             if (modulesFromData.length > 0) {
-                const sampleModule = modulesFromData[0];
-                console.log('🔍 LearnerModules - Sample Module Structure:', {
-                    name: sampleModule?.name,
-                    name1: sampleModule?.name1,
-                    hasIsLocked: 'is_locked' in sampleModule,
-                    isLockedValue: sampleModule?.is_locked,
-                    isLockedType: typeof sampleModule?.is_locked,
-                    assignment_based: sampleModule?.assignment_based,
-                    department: sampleModule?.department,
-                    order: sampleModule?.order
-                });
+                // const sampleModule = modulesFromData[0];
+                // console.log('🔍 LearnerModules - Sample Module Structure:', {
+                //     name: sampleModule?.name,
+                //     name1: sampleModule?.name1,
+                //     hasIsLocked: 'is_locked' in sampleModule,
+                //     isLockedValue: sampleModule?.is_locked,
+                //     isLockedType: typeof sampleModule?.is_locked,
+                //     assignment_based: sampleModule?.assignment_based,
+                //     department: sampleModule?.department,
+                //     order: sampleModule?.order
+                // });
             }
         }
         if (error) {
@@ -172,12 +172,12 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
         // Response format: { message: { modules: [...], meta: {...} } }
         modules = data.message.modules || [];
         meta = data.message.meta || {};
-        console.log(`✅ [FRONTEND] Using get_learner_module_data API - ${modules.length} modules with is_locked field`);
+        // console.log(`✅ [FRONTEND] Using get_learner_module_data API - ${modules.length} modules with is_locked field`);
     } else if (data?.modules && Array.isArray(data.modules)) {
         // Direct structure: { modules: [...], meta: {...} }
         modules = data.modules || [];
         meta = data.meta || {};
-        console.log(`✅ [FRONTEND] Using get_learner_module_data API (direct) - ${modules.length} modules with is_locked field`);
+        // console.log(`✅ [FRONTEND] Using get_learner_module_data API (direct) - ${modules.length} modules with is_locked field`);
     } else if (data?.message && Array.isArray(data.message)) {
         // Array format: { message: [{ module: {...}, progress: {...} }] }
         modules = data.message.map((item: any) => ({
@@ -192,7 +192,7 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
             not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
             total_count: modules.length
         };
-        console.log(`✅ [FRONTEND] Using get_learner_module_data API (array) - ${modules.length} modules with is_locked field`);
+        // console.log(`✅ [FRONTEND] Using get_learner_module_data API (array) - ${modules.length} modules with is_locked field`);
     }
     // FALLBACK: Use get_learner_dashboard only if useLearnerModuleData is not available
     else if (dashboardData?.message && Array.isArray(dashboardData.message) && dashboardData.message.length > 0) {
@@ -206,11 +206,11 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                 is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : undefined
             };
             // Debug logging for is_locked
-            if (item.module?.is_locked !== undefined) {
-                console.log(`🔒 [FRONTEND] Module ${item.module?.name} (${item.module?.name1}) - is_locked from dashboard API: ${item.module.is_locked}`);
-            } else {
-                console.warn(`⚠️ [FRONTEND] Module ${item.module?.name} (${item.module?.name1}) - is_locked is MISSING from dashboard API, will use fallback logic`);
-            }
+            // if (item.module?.is_locked !== undefined) {
+            //     console.log(`🔒 [FRONTEND] Module ${item.module?.name} (${item.module?.name1}) - is_locked from dashboard API: ${item.module.is_locked}`);
+            // } else {
+            //     console.warn(`⚠️ [FRONTEND] Module ${item.module?.name} (${item.module?.name1}) - is_locked is MISSING from dashboard API, will use fallback logic`);
+            // }
             return moduleData;
         });
 
@@ -222,7 +222,7 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
             not_started_modules: modules.filter((m: any) => m.progress?.status === "Not Started").length,
             total_count: modules.length
         };
-        console.log(`⚠️ [FRONTEND] Using get_learner_dashboard API (fallback) - ${modules.length} modules, is_locked may be missing`);
+        // console.log(`⚠️ [FRONTEND] Using get_learner_dashboard API (fallback) - ${modules.length} modules, is_locked may be missing`);
     }
 
     // Check if modules have the nested structure (module.module, module.progress)
@@ -234,7 +234,7 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                 // CRITICAL: Preserve is_locked field if it exists
                 is_locked: item.module?.is_locked !== undefined ? item.module.is_locked : item.is_locked
             };
-            console.log(`🔍 [FRONTEND] Nested structure - Module ${moduleData.name} (${moduleData.name1}) - is_locked: ${moduleData.is_locked}`);
+            // console.log(`🔍 [FRONTEND] Nested structure - Module ${moduleData.name} (${moduleData.name1}) - is_locked: ${moduleData.is_locked}`);
             return moduleData;
         });
     }
@@ -247,15 +247,15 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
     })));
     useEffect(() => {
         if (modules.length > 0) {
-            console.log('🔍 [FRONTEND] Final modules array:', modules.map((m: any) => ({
-                name: m.name,
-                name1: m.name1,
-                is_locked: m.is_locked,
-                hasIsLocked: 'is_locked' in m,
-                assignment_based: m.assignment_based,
-                department: m.department,
-                order: m.order
-            })));
+            // console.log('🔍 [FRONTEND] Final modules array:', modules.map((m: any) => ({
+            //     name: m.name,
+            //     name1: m.name1,
+            //     is_locked: m.is_locked,
+            //     hasIsLocked: 'is_locked' in m,
+            //     assignment_based: m.assignment_based,
+            //     department: m.department,
+            //     order: m.order
+            // })));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [modulesString]);
@@ -708,12 +708,12 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                             const status = module.progress?.status || "Not Started";
 
                                             // Debug the module progress data structure
-                                            console.log(`Module ${module.name1} progress data:`, module.progress);
-                                            console.log(`Module ${module.name1} completion_details:`, module.progress?.completion_details);
+                                            // console.log(`Module ${module.name1} progress data:`, module.progress);
+                                            // console.log(`Module ${module.name1} completion_details:`, module.progress?.completion_details);
 
                                             // Use the progress value from the API, with fallback to completion details
                                             let progress = module.progress?.overall_progress ?? module.progress?.progress ?? 0;
-                                            console.log(`Module ${module.name1} initial progress:`, progress);
+                                            // console.log(`Module ${module.name1} initial progress:`, progress);
 
                                             // If overall_progress is 0 but there are completion details, calculate progress
                                             if (progress === 0 && module.progress?.completion_details) {
@@ -722,12 +722,12 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                                 // Try chapter-based progress first
                                                 if (total_lesson_chapter_items > 0) {
                                                     progress = Math.round((chapters_completed / total_lesson_chapter_items) * 100);
-                                                    console.log(`Module ${module.name1}: Calculated progress from chapters: ${progress}% (${chapters_completed}/${total_lesson_chapter_items} chapters)`);
+                                                    // console.log(`Module ${module.name1}: Calculated progress from chapters: ${progress}% (${chapters_completed}/${total_lesson_chapter_items} chapters)`);
                                                 }
                                                 // Fallback to content-based progress if chapter progress is still 0
                                                 else if (total_content_items > 0) {
                                                     progress = Math.round((contents_completed / total_content_items) * 100);
-                                                    console.log(`Module ${module.name1}: Calculated progress from contents: ${progress}% (${contents_completed}/${total_content_items} contents)`);
+                                                    // console.log(`Module ${module.name1}: Calculated progress from contents: ${progress}% (${contents_completed}/${total_content_items} contents)`);
                                                 }
                                             }
 
@@ -743,7 +743,7 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                             // This fixes the issue where completed modules show their actual progress instead of 100%
                                             if (status === "Completed" && progress < 100) {
                                                 // Keep the actual progress value (e.g., 74%)
-                                                console.log(`Module ${module.name1} is completed but shows ${progress}% progress`);
+                                                // console.log(`Module ${module.name1} is completed but shows ${progress}% progress`);
                                             }
 
                                             const isCompleted = status === "Completed";
@@ -770,16 +770,16 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                                 // Backend returns false for unlocked modules, true for locked modules
                                                 // IMPORTANT: false is a valid value, so we must check !== undefined && !== null
                                                 isLocked = Boolean(module.is_locked);
-                                                console.log(`🔒 [FRONTEND] Module ${module.name} (${module.name1}) - Using backend is_locked: ${module.is_locked} (type: ${typeof module.is_locked}) -> isLocked: ${isLocked}`);
+                                                // console.log(`🔒 [FRONTEND] Module ${module.name} (${module.name1}) - Using backend is_locked: ${module.is_locked} (type: ${typeof module.is_locked}) -> isLocked: ${isLocked}`);
                                                 if (isLocked) {
                                                     lockReason = "Complete previous modules to unlock this module.";
-                                                    console.log(`🔒 [FRONTEND] Module ${module.name} (${module.name1}) - LOCKED (is_locked=true from backend)`);
+                                                    // console.log(`🔒 [FRONTEND] Module ${module.name} (${module.name1}) - LOCKED (is_locked=true from backend)`);
                                                 } else {
-                                                    console.log(`✅ [FRONTEND] Module ${module.name} (${module.name1}) - UNLOCKED (is_locked=false from backend)`);
+                                                    // console.log(`✅ [FRONTEND] Module ${module.name} (${module.name1}) - UNLOCKED (is_locked=false from backend)`);
                                                 }
                                             } else {
                                                 // is_locked is undefined or null - use fallback calculation
-                                                console.warn(`⚠️ [FRONTEND] Module ${module.name} (${module.name1}) - is_locked is ${module.is_locked} (undefined/null), using fallback calculation`);
+                                                // console.warn(`⚠️ [FRONTEND] Module ${module.name} (${module.name1}) - is_locked is ${module.is_locked} (undefined/null), using fallback calculation`);
                                                 // Fallback to frontend calculation (for backward compatibility only)
                                                 // IMPORTANT: Filter by department to ensure independent locking per department
                                                 if (module.assignment_based === "Department" && module.order && module.order > 0) {

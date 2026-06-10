@@ -718,33 +718,29 @@ export default function AnalyticsDashboard() {
           'Module ID': module.module_id || module.name || 'N/A',
           'Module Name': module.module_name?.replace(/<[^>]*>/g, '') || module.name?.replace(/<[^>]*>/g, '') || 'N/A',
           'Description': module.description?.replace(/<[^>]*>/g, '') || 'N/A',
-          'Short Text': module.short_text?.replace(/<[^>]*>/g, '') || 'N/A',
-          'Duration': module.duration || 'N/A',
           'Department': module.department || 'N/A',
-          'Assignment Type': module.assignment_type || module.assignment_based || 'N/A',
-          'Status': module.status || 'N/A',
-          'Is Published': module.is_published ? 'Yes' : 'No',
           'Has Scoring': module.has_scoring ? 'Yes' : 'No',
-          'Has Progress': module.has_progress ? 'Yes' : 'No',
-          'Total Score': module.total_score || 0,
-          'Order': module.order || 0,
-          'Created By': module.created_by || 'N/A',
-          'Published By': module.published_by || 'N/A',
-          'Image': module.image || 'N/A',
-          'Assigned Count': module.enrolled_count || 0,
           'Completed Count': module.completed_count || 0,
+          'Assignment Count': module.enrolled_count || 0,
           'Completion Rate': module.completion_rate || 0,
           'Average Score': module.avg_score || 0,
+          'Created By': module.created_by || 'N/A',
+          'Published By': module.published_by || 'N/A',
           'In Progress Count': module.in_progress_count || 0,
-          'Not Started Count': module.not_started_count || 0
+          'Not Started Count': module.not_started_count || 0,
+          'Duration': module.duration || 'N/A',
+          'Assignment': module.assignment_type || module.assignment_based || 'N/A',
+          'Status': module.status || 'N/A',
+          'Total Score': module.total_score || 0,
+          'Assigned Count': module.enrolled_count || 0,
+          'Has Progress': module.has_progress ? 'Yes' : 'No'
         }));
 
         const moduleHeaders = [
-          'Module ID', 'Module Name', 'Description', 'Short Text', 'Duration', 'Department',
-          'Assignment Type', 'Status', 'Is Published', 'Has Scoring', 'Has Progress',
-          'Total Score', 'Order', 'Created By', 'Published By', 'Image',
-          'Assigned Count', 'Completed Count', 'Completion Rate', 'Average Score',
-          'In Progress Count', 'Not Started Count'
+          'Module ID', 'Module Name', 'Description', 'Department', 'Has Scoring', 'Completed Count',
+          'Assignment Count', 'Completion Rate', 'Average Score', 'Created By', 'Published By',
+          'In Progress Count', 'Not Started Count', 'Duration', 'Assignment', 'Status',
+          'Total Score', 'Assigned Count', 'Has Progress'
         ];
         const moduleCSV = convertToCSV(moduleData, moduleHeaders);
         downloadCSV(moduleCSV, `analytics_modules_detailed_${currentDate}.csv`);
@@ -1155,6 +1151,24 @@ export default function AnalyticsDashboard() {
       }
     }
 
+    // Priority 2.5: Try DD-MM-YYYY format with time
+    const ddMMYYYYDashTimeMatch = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (ddMMYYYYDashTimeMatch) {
+      const day = parseInt(ddMMYYYYDashTimeMatch[1], 10);
+      const month = parseInt(ddMMYYYYDashTimeMatch[2], 10) - 1;
+      const year = parseInt(ddMMYYYYDashTimeMatch[3], 10);
+      const hour = ddMMYYYYDashTimeMatch[4] ? parseInt(ddMMYYYYDashTimeMatch[4], 10) : 0;
+      const minute = ddMMYYYYDashTimeMatch[5] ? parseInt(ddMMYYYYDashTimeMatch[5], 10) : 0;
+      const second = ddMMYYYYDashTimeMatch[6] ? parseInt(ddMMYYYYDashTimeMatch[6], 10) : 0;
+
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+        const parsedDate = new Date(year, month, day, hour, minute, second);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.getTime();
+        }
+      }
+    }
+
     // Priority 3: Try standard Date constructor (handles ISO strings, etc.)
     const date = new Date(str);
     if (!isNaN(date.getTime())) {
@@ -1191,6 +1205,72 @@ export default function AnalyticsDashboard() {
     }
 
     return 0;
+  };
+
+  const normalizeBackendDate = (dateInput: any): number | string | null => {
+    if (dateInput === null || dateInput === undefined || dateInput === '' || dateInput === '0' || dateInput === 0) {
+      return null;
+    }
+
+    if (typeof dateInput === 'number') {
+      // Convert epoch seconds to milliseconds if needed
+      if (dateInput > 0 && dateInput < 1_000_000_000_000) {
+        return dateInput * 1000;
+      }
+      return dateInput;
+    }
+
+    const trimmed = String(dateInput).trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    if (/^\d+$/.test(trimmed)) {
+      const dateNumber = Number(trimmed);
+      if (dateNumber > 0 && dateNumber < 1_000_000_000_000) {
+        return dateNumber * 1000;
+      }
+      return dateNumber;
+    }
+
+    return trimmed;
+  };
+
+  const formatDateTime = (dateInput: any): string | null => {
+    if (dateInput === null || dateInput === undefined || dateInput === '' || dateInput === 0 || dateInput === '0') {
+      return null;
+    }
+
+    let date = new Date(dateInput);
+    if (isNaN(date.getTime())) {
+      const trimmed = String(dateInput).trim();
+      const timestamp = parseDateToTimestamp(trimmed);
+      if (timestamp > 0) {
+        date = new Date(timestamp);
+      }
+    }
+
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+
+    const isMidnight = date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0;
+    const datePart = date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+
+    if (isMidnight) {
+      return datePart;
+    }
+
+    return `${datePart}, ${date.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })}`;
   };
 
   // Filter and sort quiz analytics based on email search query, module name, and sort order
@@ -2198,10 +2278,8 @@ export default function AnalyticsDashboard() {
 
             if (statusLower.includes('completed')) {
               normalizedStatus = 'completed';
-            } else if (statusLower.includes('progress')) {
+            } else if (statusLower.includes('progress') || statusLower.includes('started')) {
               normalizedStatus = 'in_progress';
-            } else if (statusLower.includes('started')) {
-              normalizedStatus = 'not_started';
             }
 
           }
@@ -2212,12 +2290,10 @@ export default function AnalyticsDashboard() {
             department: moduleInfo?.department || sidebarContent?.data?.department || 'General', // Use module's department
             status: normalizedStatus,
             progress: learner.progress || 0,
-            score: learner.score || 0,
             // Map to the fields the frontend expects
             avg_progress: learner.progress || 0,
-            avg_score: learner.score || 0,
-            started_on: learner.started_on,
-            completed_on: learner.completed_on,
+            started_on: normalizeBackendDate(learner.started_on),
+            completed_on: normalizeBackendDate(learner.completed_on),
             modules_enrolled: 1, // Placeholder
             completion_rate: learner.progress || 0,
             // Additional user details
@@ -3401,7 +3477,7 @@ export default function AnalyticsDashboard() {
                             </td>
                             <td className="p-3 text-sm">{qa.date_attended}</td>
                             <td className="p-3 text-sm">{qa.time_spent}</td>
-                            <td className="p-3 text-sm text-muted-foreground">N/A</td>
+                            <td className="p-3 text-sm text-muted-foreground">{qa.time_limit || 'N/A'}</td>
                             <td className="p-3 text-sm">
                               <Button
                                 variant="outline"
@@ -3939,7 +4015,7 @@ export default function AnalyticsDashboard() {
                                   <th className="text-left p-3 font-medium text-sm">Module</th>
                                   <th className="text-left p-3 font-medium text-sm">Status</th>
                                   <th className="text-left p-3 font-medium text-sm">Progress</th>
-                                  <th className="text-left p-3 font-medium text-sm">Score</th>
+
                                   <th className="text-left p-3 font-medium text-sm">Start Date</th>
                                 </tr>
                               </thead>
@@ -3964,7 +4040,7 @@ export default function AnalyticsDashboard() {
                                     if (filteredModules.length === 0) {
                                       return (
                                         <tr>
-                                          <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                                          <td colSpan={4} className="p-8 text-center text-muted-foreground">
                                             <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                                             <p>No modules found for this filter</p>
                                           </td>
@@ -4003,9 +4079,7 @@ export default function AnalyticsDashboard() {
                                             </div>
                                           </div>
                                         </td>
-                                        <td className="p-3">
-                                          <span className="text-sm">{module.score}</span>
-                                        </td>
+
                                         <td className="p-3">
                                           <span className="text-sm text-muted-foreground">{module.start_date}</span>
                                         </td>
@@ -4014,7 +4088,7 @@ export default function AnalyticsDashboard() {
                                   })()
                                 ) : (
                                   <tr>
-                                    <td colSpan={5} className="p-8 text-center text-gray-600">
+                                    <td colSpan={4} className="p-8 text-center text-gray-600">
                                       <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                                       <p>No modules assigned to this learner</p>
                                     </td>
@@ -4249,7 +4323,7 @@ export default function AnalyticsDashboard() {
                         </button>
                       </div>
 
-                      <div className="bg-white rounded-lg border">
+                      <div className="bg--background rounded-lg border">
                         <div>
                           <table className="w-full">
                             <thead className="bg-muted/50">
@@ -4259,7 +4333,7 @@ export default function AnalyticsDashboard() {
                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Department</th>
                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Status</th>
                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Progress</th>
-                                <th className="text-left p-3 text-sm font-medium text-muted-foreground">Score</th>
+
                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Started On</th>
                                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">Completed On</th>
                               </tr>
@@ -4267,7 +4341,7 @@ export default function AnalyticsDashboard() {
                             <tbody>
                               {loadingLearners ? (
                                 <tr>
-                                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
                                     <div className="flex flex-col items-center justify-center gap-2">
                                       <Lottie animationData={loadingAnimation} loop style={{ width: 80, height: 80 }} />
                                       <div>Loading learners...</div>
@@ -4297,8 +4371,8 @@ export default function AnalyticsDashboard() {
                                         <td className="p-3 text-sm font-medium bg-muted/50">{learner.learner_name || learner.full_name || 'N/A'}</td>
                                         <td className="p-3 text-sm bg-muted/50">{learner.email || 'N/A'}</td>
                                         <td className="p-3 text-sm bg-muted/50">{learner.department || 'N/A'}</td>
-                                        <td className="p-3 text-sm bg-muted/50">
-                                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${learner.status === 'completed' ? 'bg-primary/10 text-primary' :
+                                        <td className="p-3 text-sm bg-muted/50 whitespace-nowrap">
+                                          <span className={`inline-flex whitespace-nowrap px-2 py-1 rounded-full text-xs font-medium ${learner.status === 'completed' ? 'bg-primary/10 text-primary' :
                                             learner.status === 'in_progress' ? 'bg-primary/10 text-primary' :
                                               learner.status === 'not_started' ? 'bg-muted text-muted-foreground' :
                                                 'bg-muted text-muted-foreground'
@@ -4309,32 +4383,12 @@ export default function AnalyticsDashboard() {
                                           </span>
                                         </td>
                                         <td className="p-3 text-sm bg-muted/50">{learner.avg_progress ? `${Math.round(learner.avg_progress)}%` : '0%'}</td>
-                                        <td className="p-3 text-sm bg-muted/50">{learner.avg_score || 'N/A'}</td>
+
                                         <td className="p-3 text-sm bg-muted/50">
-                                          {learner.started_on ?
-                                            new Date(learner.started_on).toLocaleString('en-GB', {
-                                              day: '2-digit',
-                                              month: '2-digit',
-                                              year: 'numeric',
-                                              hour: '2-digit',
-                                              minute: '2-digit',
-                                              second: '2-digit',
-                                              hour12: false
-                                            }) : 'Not started'
-                                          }
+                                          {formatDateTime(learner.started_on) || 'Not started'}
                                         </td>
                                         <td className="p-3 text-sm bg-muted/50">
-                                          {learner.completed_on ?
-                                            new Date(learner.completed_on).toLocaleString('en-GB', {
-                                              day: '2-digit',
-                                              month: '2-digit',
-                                              year: 'numeric',
-                                              hour: '2-digit',
-                                              minute: '2-digit',
-                                              second: '2-digit',
-                                              hour12: false
-                                            }) : 'Not completed'
-                                          }
+                                          {formatDateTime(learner.completed_on) || 'Not completed'}
                                         </td>
                                       </tr>
                                     );
@@ -4342,7 +4396,7 @@ export default function AnalyticsDashboard() {
                                 })()
                               ) : (
                                 <tr>
-                                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
                                     No learners found for this filter.
                                   </td>
                                 </tr>
@@ -4652,7 +4706,7 @@ export default function AnalyticsDashboard() {
                       <h4 className="text-lg font-semibold mb-3">Answer Analysis</h4>
                       <div className="space-y-3">
                         <div className="flex gap-4 text-sm text-muted-foreground">
-                          <span>Time Limit: N/A</span>
+                          <span>Time Limit: {qaDetailsData.time_limit || 'N/A'}</span>
                           <span>Time Spent: {qaDetailsData.time_spent || 'N/A'}</span>
                         </div>
 

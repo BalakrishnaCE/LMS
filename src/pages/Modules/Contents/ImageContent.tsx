@@ -22,7 +22,7 @@ export default function ImageContent({
   const [imageLoaded, setImageLoaded] = useState(false);
   
   // Debug logging
-  console.log('ImageContent - Content data:', content);
+  // console.log('ImageContent - Content data:', content);
 
   // Normalize URL to handle both relative and full URLs
   // Uses lms.noveloffice.org as base URL in both development and production

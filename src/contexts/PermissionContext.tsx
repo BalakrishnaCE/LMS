@@ -110,7 +110,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
         globalPermissionCache.set(currentUser, permissionData);
         setUserType(userData.user_type);
         setIsLoading(false);
-        console.log('🔍 Cached permissions for user:', currentUser, 'type:', userData.user_type);
+        // console.log('🔍 Cached permissions for user:', currentUser, 'type:', userData.user_type);
       }
     }
 

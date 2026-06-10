@@ -165,7 +165,7 @@ export default function AdminModuleDetail() {
             }
 
             if (moduleData) {
-                console.log('AdminModuleDetail - Successfully parsed module data:', moduleData);
+                // console.log('AdminModuleDetail - Successfully parsed module data:', moduleData);
                 setModule(moduleData);
                 setIsLoading(false);
             } else {

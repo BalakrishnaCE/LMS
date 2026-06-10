@@ -41,15 +41,15 @@ export function ProtectedRoute({
 
   // Check role-based access
   if (allowedRoles.length > 0) {
-    console.log("Protected route check:", {
-      path,
-      allowedRoles,
-      isLMSAdmin,
-      isLMSStudent,
-      isLMSContentEditor,
-      currentUser
-    });
-    
+    // console.log("Protected route check:", {
+    //   path,
+    //   allowedRoles,
+    //   isLMSAdmin,
+    //   isLMSStudent,
+    //   isLMSContentEditor,
+    //   currentUser
+    // });
+
     const hasAccess = allowedRoles.some(role => {
       switch (role) {
         case "LMS Admin":
@@ -62,19 +62,19 @@ export function ProtectedRoute({
           return false;
       }
     });
-    
-    console.log("Access check result:", { hasAccess, allowedRoles });
+
+    // console.log("Access check result:", { hasAccess, allowedRoles });
 
     if (!hasAccess) {
       // Redirect based on role
-      const redirectPath = isLMSAdmin 
-        ? "/" 
-        : isLMSContentEditor 
-          ? "/modules" 
-          : isLMSStudent 
-            ? "/learner-dashboard" 
+      const redirectPath = isLMSAdmin
+        ? "/"
+        : isLMSContentEditor
+          ? "/modules"
+          : isLMSStudent
+            ? "/learner-dashboard"
             : "/login";
-      
+
       return (
         <Route path={path}>
           <Redirect to={redirectPath} />

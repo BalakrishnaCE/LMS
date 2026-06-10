@@ -535,19 +535,7 @@ export default function MainSection({
 
             {/* Show drag-drop area even when no lessons exist */}
             <div className="w-full mb-8">
-              <h3 className="text-lg font-semibold mb-4">Content Creation Area</h3>
-              <p className="text-sm text-muted-foreground mb-4">Drag content types from the right sidebar or click to select</p>
-              <DroppableContentDropArea
-                setDrawerOpen={setDrawerOpen}
-                addContentToChapter={() => {
-                  // Show message that lesson needs to be created first
-                  toast.info("Please create a lesson first before adding content");
-                }}
-                activeLessonId={''}
-                activeChapterId={''}
-              />
-
-              {/* Demo content preview */}
+              {/* The actual drag/drop card is removed until a lesson exists */}
               <div className="mt-6 p-4 bg-muted/30 rounded-lg border-2 border-dashed border-muted">
                 <h4 className="text-sm font-medium text-muted-foreground mb-2">Preview: After creating a lesson, you'll see:</h4>
                 <div className="text-xs text-muted-foreground space-y-1">
@@ -917,7 +905,7 @@ export default function MainSection({
         </Dialog>
         {/*  Drawer for Content Types using shadcn/ui Drawer */}
         <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} direction="right">
-          <DrawerContent className="overflow-scroll">
+          <DrawerContent className="overflow-y-auto overflow-x-hidden">
             <DrawerHeader>
               <DrawerTitle>Select Content Type</DrawerTitle>
             </DrawerHeader>
@@ -1289,7 +1277,7 @@ function SortableContentBlock({ id, content, chapter, setModule, onEditChange, s
   const handleSaveContent = async (data: any) => {
     try {
       // Debug logs
-      console.log('[MainSection] handleSaveContent data:', data);
+      // console.log('[MainSection] handleSaveContent data:', data);
 
       // Map type to doctype and fields
       let doctype = null;

@@ -71,6 +71,9 @@ function Admindashboard() {
     // Toggle state for showing archived modules
     const [showArchived, setShowArchived] = useState(false)
     
+    // Toggle state for showing only not ingested modules
+    const [showNotIngestedOnly, setShowNotIngestedOnly] = useState(false)
+    
     // Pagination state for learners
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 20
@@ -142,7 +145,13 @@ function Admindashboard() {
                                                 exit={{ opacity: 0, x: 20 }}
                                                 transition={{ duration: 0.3 }}
                                             >
-                                                <Module itemsPerPage={8} showArchived={showArchived} onShowArchivedChange={setShowArchived} />
+                                                <Module 
+                                                    itemsPerPage={8} 
+                                                    showArchived={showArchived} 
+                                                    onShowArchivedChange={setShowArchived} 
+                                                    showNotIngestedOnly={showNotIngestedOnly}
+                                                    onShowNotIngestedOnlyChange={setShowNotIngestedOnly}
+                                                />
                                             </motion.div>
                                         </TabsContent>
                                         <TabsContent value="learners" key="learners" className="h-full">

@@ -513,12 +513,24 @@ function SettingsDialog({
                         <div className="mt-4 min-h-[450px]">
                           <TabsContent value="search" className="m-0">
                             <div className="space-y-4">
-                              <Input
-                                placeholder="Search learners..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                className="w-full border-2 border-border/50 focus:border-primary"
-                              />
+                              <div className="relative">
+                                <Input
+                                  placeholder="Search learners..."
+                                  value={search}
+                                  onChange={e => setSearch(e.target.value)}
+                                  className="w-full border-2 border-border/50 focus:border-primary pr-8"
+                                />
+                                {search && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                                    onClick={() => setSearch("")}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                               <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
                                 <Table>
                                   <TableHeader className="sticky top-0 bg-background z-10">
@@ -562,12 +574,24 @@ function SettingsDialog({
                           </TabsContent>
                           <TabsContent value="current" className="m-0">
                             <div className="space-y-4">
-                              <Input
-                                placeholder="Search learners..."
-                                value={currentLearnersSearch}
-                                onChange={e => setCurrentLearnersSearch(e.target.value)}
-                                className="w-full border-2 border-border/50 focus:border-primary"
-                              />
+                              <div className="relative">
+                                <Input
+                                  placeholder="Search learners..."
+                                  value={currentLearnersSearch}
+                                  onChange={e => setCurrentLearnersSearch(e.target.value)}
+                                  className="w-full border-2 border-border/50 focus:border-primary pr-8"
+                                />
+                                {currentLearnersSearch && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                                    onClick={() => setCurrentLearnersSearch("")}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                               <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
                                 <Table>
                                   <TableHeader className="sticky top-0 bg-background z-10">
@@ -922,6 +946,11 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
     limit: 150,
   });
 
+  const { data: existingModules } = useFrappeGetDocList("LMS Module", {
+    fields: ["name", "name1"],
+    limit: 1000,
+  });
+
   // Initialize edit state and learners when moduleInfo changes
   useEffect(() => {
     if (moduleInfo) {
@@ -960,6 +989,16 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   const handleSave = async (learnersToSave: LearnerRow[] = learners) => {
     if (!moduleInfo || !editState) return;
     
+    if (!editState.name || !editState.name.trim()) {
+      toast.error("Module name is required");
+      return;
+    }
+
+    if (existingModules && existingModules.some((mod: any) => mod.name !== moduleInfo.id && mod.name1?.toLowerCase() === editState.name.trim().toLowerCase())) {
+      toast.error("A module with this name already exists. Please choose a different name.");
+      return;
+    }
+
     // Validate duration only if provided: must be between 1 and 99
     // Treat empty string, null, undefined, 0, or "0" as optional (no duration)
     let durationNum: number | undefined = undefined;
@@ -1249,7 +1288,8 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   };
 
   return (
-    <AnimatePresence>
+    <>
+      <AnimatePresence>
       {isOpen && (
         <motion.aside
           key="sidebar"
@@ -1410,6 +1450,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
           </div>
         </motion.aside>
       )}
+      </AnimatePresence>
 
       {/* Settings Dialog */}
       <SettingsDialog
@@ -1440,6 +1481,6 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         onOpenChange={setShowDeleteChapterDialog}
         onConfirm={handleDeleteChapter}
       />
-    </AnimatePresence>
+    </>
   );
 }

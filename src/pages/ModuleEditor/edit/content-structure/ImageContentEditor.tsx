@@ -55,7 +55,7 @@ const ImageContentEditor: React.FC<ImageContentEditorProps> = ({ content, onSave
     
     try {
       const url = await uploadFileToFrappe(file);
-      console.log('📸 Uploaded image URL:', url);
+      // console.log('📸 Uploaded image URL:', url);
       
       // Store the relative path
       setAttach(url);
@@ -108,7 +108,7 @@ const ImageContentEditor: React.FC<ImageContentEditorProps> = ({ content, onSave
                 console.error('❌ Failed to load preview image:', e.currentTarget.src);
               }}
               onLoad={() => {
-                console.log('✅ Preview image loaded successfully');
+                // console.log('✅ Preview image loaded successfully');
               }}
             />
           </div>
