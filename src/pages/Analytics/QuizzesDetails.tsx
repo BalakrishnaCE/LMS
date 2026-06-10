@@ -20,7 +20,9 @@ import {
   FileText,
   Eye,
   Users,
-  Timer
+  Timer,
+  Search,
+  X
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -338,12 +340,23 @@ export default function QuizzesDetails() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by quiz title..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
+                className="pl-10 pr-10"
               />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  type="button"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
             <Select value={scoreFilter} onValueChange={setScoreFilter}>
               <SelectTrigger className="w-40">

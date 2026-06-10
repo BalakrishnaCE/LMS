@@ -528,8 +528,17 @@ export default function DepartmentPage() {
                 placeholder="Search departments..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 pr-10"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  type="button"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -893,8 +902,17 @@ export default function DepartmentPage() {
                               placeholder="Search members by name or email..."
                               value={memberSearchQuery}
                               onChange={(e) => setMemberSearchQuery(e.target.value)}
-                              className="pl-10"
+                              className="pl-10 pr-10"
                             />
+                            {memberSearchQuery && (
+                              <button
+                                onClick={() => setMemberSearchQuery("")}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                type="button"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}

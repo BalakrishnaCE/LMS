@@ -1,11 +1,11 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion } from 'framer-motion';
-import { 
-  BookOpen, 
-  Clock, 
-  CheckCircle, 
-  AlertTriangle, 
+import {
+  BookOpen,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
   FileText,
   Play,
   X
@@ -47,20 +47,12 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!open) return;
-      
-      // Prevent dialog from closing on Escape, Space, or Enter
-      if (event.key === 'Escape' || event.key === ' ' || event.key === 'Enter') {
+
+      // Only prevent Escape from closing the dialog automatically
+      // Do NOT block Space or Enter — they are needed for typing in editors
+      if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
-        
-        // Only allow Escape to close the dialog if it's pressed while focused on the close button
-        if (event.key === 'Escape') {
-          const activeElement = document.activeElement;
-          const closeButton = activeElement?.closest('[data-radix-dialog-close]');
-          if (closeButton) {
-            onOpenChange(false);
-          }
-        }
       }
     };
 
@@ -74,8 +66,8 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
   }, [open]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Prevent default keyboard behavior that closes the dialog
-    if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
+    // Only prevent Escape on the dialog content itself
+    if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
     }
@@ -85,14 +77,14 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
     {
       icon: <BookOpen className="h-5 w-5 text-primary" />,
       title: "Read Carefully",
-      description: isQuiz 
+      description: isQuiz
         ? "Read each question and all answer options carefully before selecting your answer."
         : "Read each question carefully and provide detailed, thoughtful answers."
     },
     {
       icon: <Clock className="h-5 w-5 text-primary" />,
       title: "Time Management",
-      description: timeLimit 
+      description: timeLimit
         ? `You have ${timeLimit} minutes to complete this ${type}. Use your time wisely.`
         : `Take your time to provide quality answers. There's no time limit.`
     },
@@ -116,8 +108,8 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
-        <Dialog.Content 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4" 
+        <Dialog.Content
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ outline: 'none' }}
           onKeyDown={handleKeyDown}
         >
@@ -185,7 +177,7 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
               {description && (
                 <div className="mb-6">
                   <h3 className="font-semibold mb-2">Description</h3>
-                  <div 
+                  <div
                     className="text-sm text-muted-foreground prose prose-sm max-w-none"
                     dangerouslySetInnerHTML={{ __html: description }}
                   />
@@ -225,7 +217,7 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
                       Ready to begin?
                     </p>
                     <p className="text-muted-foreground">
-                      {isQuiz 
+                      {isQuiz
                         ? "Make sure you have a stable internet connection and won't be interrupted during the quiz."
                         : "Take your time to provide thoughtful, well-structured answers that demonstrate your understanding."
                       }
@@ -238,7 +230,7 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
             {/* Footer */}
             <div className="p-6 border-t flex justify-between items-center">
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => onOpenChange(false)}
                   disabled={loading}
                   className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
@@ -246,7 +238,7 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
                   Cancel
                 </button>
                 {hasExistingProgress && onViewProgress && (
-                  <button 
+                  <button
                     onClick={onViewProgress}
                     disabled={loading}
                     className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 gap-2"
@@ -256,7 +248,7 @@ const InstructionDialog: React.FC<InstructionDialogProps> = ({
                   </button>
                 )}
               </div>
-              <button 
+              <button
                 onClick={onStart}
                 disabled={loading}
                 className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 gap-2"

@@ -79,6 +79,10 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
       return;
     }
 
+    // Close the instruction dialog first so its document-level keydown listener
+    // (which blocks Space/Enter) gets cleaned up before the QA editor opens
+    setShowInstructions(false);
+
     // Handle existing progress
     if (existingProgress && existingProgress.length > 0) {
       const progress = existingProgress[0];
@@ -180,6 +184,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
         qa_id: data.name,
         module: moduleId,
         answers: [answerData],
+        is_submit: false,
       });
       
       setSubmitted(prev => ({ ...prev, [currentQuestion.question]: true }));
@@ -211,6 +216,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
             qa_id: data.name,
             module: moduleId,
             answers: [answerData],
+            is_submit: false,
           });
           setSubmitted(prev => ({ ...prev, [currentQuestion.question]: true }));
         } catch (err) {
@@ -236,6 +242,7 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
         qa_id: data.name,
         module: moduleId,
         answers: answersArray,
+        is_submit: true,
       });
       
       setAllSubmitted(true);
@@ -579,14 +586,14 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
                   {index + 1}
                 </div>
                 <div className="flex-1 space-y-3">
-                  <div className="prose prose-sm max-w-none">
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
                     <div dangerouslySetInnerHTML={{ __html: question.question || "" }} />
                   </div>
                   
                   <div className="bg-muted/50 rounded-lg p-4">
                     <h4 className="font-semibold text-sm text-muted-foreground mb-2">Suggested Answer:</h4>
                     {question.suggested_answer ? (
-                      <div className="prose prose-sm max-w-none">
+                      <div className="prose prose-sm max-w-none dark:prose-invert">
                         <div dangerouslySetInnerHTML={{ __html: question.suggested_answer }} />
                       </div>
                     ) : (
@@ -755,22 +762,22 @@ const QuestionAnswer: React.FC<QuestionAnswerProps> = ({ questionAnswerId, conte
                     {data?.questions?.[currentQuestionIndex] && (() => {
                       const q = data.questions[currentQuestionIndex];
                       return (
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 hover:shadow-md transition-shadow duration-200">
+                        <div className="bg-card rounded-xl shadow-sm border border-border p-8 hover:shadow-md transition-shadow duration-200">
                           <div className="flex items-center justify-between mb-6">
                             <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center text-sm font-bold shadow-sm">
                               Q{currentQuestionIndex + 1}
                             </div>
-                            <div className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                            <div className="text-sm font-medium text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30 px-3 py-1 rounded-full">
                               {q.score} points
                             </div>
                           </div>
-                          <div className="text-xl font-semibold text-gray-900 mb-6 leading-relaxed"
+                          <div className="text-xl font-semibold text-foreground mb-6 leading-relaxed"
                           dangerouslySetInnerHTML={{ __html: q.question }}
                           />
                           {q.suggested_answer && isLMSAdmin && (
-                            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                              <div className="text-sm font-medium text-blue-800 mb-2">Suggested Answer:</div>
-                              <div className="prose prose-sm text-blue-700" dangerouslySetInnerHTML={{ __html: q.suggested_answer }} />
+                            <div className="mb-6 p-4 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg">
+                              <div className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Suggested Answer:</div>
+                              <div className="prose prose-sm max-w-none text-blue-700 dark:text-blue-200 dark:prose-invert" dangerouslySetInnerHTML={{ __html: q.suggested_answer }} />
                             </div>
                           )}
                           <div className="mb-2">
