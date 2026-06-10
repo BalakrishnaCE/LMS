@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, Minus } from "lucide-react";
+import { Search, Plus, Minus, X } from "lucide-react";
 import { useFrappeGetCall } from "frappe-react-sdk";
 
 // Types
@@ -117,9 +117,20 @@ export default function FAQPage() {
               setSearchQuery(e.target.value);
               setExpandedIndex(null);
             }}
-            className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all placeholder:text-muted-foreground"
+            className="w-full pl-9 pr-9 py-1.5 rounded-lg border border-border bg-muted/30 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all placeholder:text-muted-foreground"
           />
-
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setExpandedIndex(null);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              type="button"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
 
       </div>

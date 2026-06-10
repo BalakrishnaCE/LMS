@@ -14,13 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +38,8 @@ interface QuestionAnswerProgress {
     question: string;
     answer: string;
     suggested_answer: string;
+    alloted_marks?: number;
+    question_score?: number;
   }[];
   time_limit_mins?: number;
   name?: string;
@@ -61,25 +57,37 @@ export const QADetailsDrawer: React.FC<QADetailsDrawerProps> = ({
   onClose,
   item,
 }) => {
-  const [isScoring, setIsScoring] = useState(false);
-  const [score, setScore] = useState("");
+  const [responseMarks, setResponseMarks] = useState<string[]>([]);
   const { call } = useFrappePostCall("updateQAScore");
+
+  React.useEffect(() => {
+    if (item && item.responses) {
+      setResponseMarks(item.responses.map(r => r.alloted_marks !== undefined && r.alloted_marks !== null ? String(r.alloted_marks) : ""));
+    } else {
+      setResponseMarks([]);
+    }
+  }, [item]);
 
   if (!isOpen || !item) return null;
 
-  const handleAddScore = () => {
-    setIsScoring(true);
+  const handleMarkChange = (index: number, value: string) => {
+    const newMarks = [...responseMarks];
+    newMarks[index] = value;
+    setResponseMarks(newMarks);
   };
 
-  const handleSaveScore = () => {
+  const handleApproveAIScore = () => {
     if (!item) return;
+    const marksList = responseMarks.map(m => m === "" ? 0 : Number(m));
+    const totalScore = marksList.reduce((acc, val) => acc + val, 0);
+
     call({
       name: item.name,
       user: item.user,
       qa_id: item.qa_id,
-      score: parseInt(score, 10),
+      score: totalScore,
+      response_marks: JSON.stringify(marksList)
     }).then(() => {
-      setIsScoring(false);
       onClose();
     });
   };
@@ -179,7 +187,14 @@ export const QADetailsDrawer: React.FC<QADetailsDrawerProps> = ({
                 Detailed Q&A results for {item.user}
               </DrawerDescription>
             </div>
-            <Button onClick={handleExport} variant="outline">Export to PDF</Button>
+            <div className="flex items-center gap-2">
+              {item.score_added === 0 && (
+                <Button onClick={handleApproveAIScore} className="bg-[#14b8a6] hover:bg-[#0d9488] text-white">
+                  approve AI Score
+                </Button>
+              )}
+              <Button onClick={handleExport} variant="outline">Export to PDF</Button>
+            </div>
           </DrawerHeader>
           
           <div className="px-4 pb-4 overflow-auto max-h-[calc(90vh-120px)]">
@@ -209,9 +224,6 @@ export const QADetailsDrawer: React.FC<QADetailsDrawerProps> = ({
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Answer Analysis</CardTitle>
-                  {item.score_added === 0 && (
-                    <Button onClick={handleAddScore}>Add Score</Button>
-                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-row justify-between mb-4">
@@ -227,6 +239,8 @@ export const QADetailsDrawer: React.FC<QADetailsDrawerProps> = ({
                           <TableHead>Question</TableHead>
                           <TableHead>Answer</TableHead>
                           <TableHead>Suggested Answer</TableHead>
+                          <TableHead className="w-24">Alloted</TableHead>
+                          <TableHead className="w-24">Q. Score</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -241,6 +255,18 @@ export const QADetailsDrawer: React.FC<QADetailsDrawerProps> = ({
                                 <TableCell>
                                   {convertHtmlToText(q.suggested_answer)}
                                 </TableCell>
+                                <TableCell>
+                                  <Input 
+                                    type="number"
+                                    value={responseMarks[index] || ""}
+                                    onChange={(e) => handleMarkChange(index, e.target.value)}
+                                    className="w-20 bg-transparent"
+                                    disabled={item.score_added !== 0}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {q.question_score || 0}
+                                </TableCell>
                             </TableRow>
                         ))}
                       </TableBody>
@@ -252,29 +278,6 @@ export const QADetailsDrawer: React.FC<QADetailsDrawerProps> = ({
           </div>
         </DrawerContent>
       </Drawer>
-      <Dialog open={isScoring} onOpenChange={setIsScoring}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Score</DialogTitle>
-          </DialogHeader>
-          <div className="p-4">
-            <Input
-              type="number"
-              placeholder="Enter score"
-              value={score}
-              onChange={(e) => setScore(e.target.value)}
-              max={item.max_score}
-            />
-            <p className="text-sm text-muted-foreground mt-1">
-              Max score is {item.max_score}
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsScoring(false)}>Cancel</Button>
-            <Button onClick={handleSaveScore}>Save Score</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }; 

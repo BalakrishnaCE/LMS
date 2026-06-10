@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 interface Question {
   question: string;
-  score: number;
+  score: number | '';
   suggested_answer: string;
 }
 
@@ -36,8 +36,8 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
 
   const [title, setTitle] = useState(safeContent.title);
   const [description, setDescription] = useState(safeContent.description);
-  const [maxScore, setMaxScore] = useState(safeContent.max_score);
-  const [timeLimitMins, setTimeLimitMins] = useState(safeContent.time_limit_mins);
+  const [maxScore, setMaxScore] = useState<number | ''>(safeContent.max_score || '');
+  const [timeLimitMins, setTimeLimitMins] = useState<number | ''>(safeContent.time_limit_mins || '');
   const [questions, setQuestions] = useState<Question[]>(
     Array.isArray(safeContent.questions) ? safeContent.questions : []
   );
@@ -45,15 +45,15 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
   useEffect(() => {
     setTitle(safeContent.title);
     setDescription(safeContent.description);
-    setMaxScore(safeContent.max_score);
-    setTimeLimitMins(safeContent.time_limit_mins);
+    setMaxScore(safeContent.max_score || '');
+    setTimeLimitMins(safeContent.time_limit_mins || '');
     setQuestions(Array.isArray(safeContent.questions) ? safeContent.questions : []);
   }, [safeContent]);
 
   const addQuestion = () => {
     const newQuestion: Question = {
       question: '',
-      score: 1,
+      score: 0,
       suggested_answer: ''
     };
     setQuestions([...questions, newQuestion]);
@@ -73,11 +73,21 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
     const payload = {
       title,
       description,
-      max_score: maxScore,
-      time_limit_mins: timeLimitMins,
-      questions: questions
+      max_score: Number(maxScore),
+      time_limit_mins: Number(timeLimitMins),
+      questions: questions.map(q => ({ ...q, score: Number(q.score) }))
     };
     onSave(payload);
+  };
+
+  const isFormValid = () => {
+    if (!title || title.trim() === '') return false;
+    if (!maxScore || maxScore <= 0) return false;
+    if (!timeLimitMins || timeLimitMins <= 0) return false;
+    if (questions.length === 0) return false;
+    if (questions.some(q => !q.score || q.score <= 0)) return false;
+    if (questions.some(q => !q.suggested_answer || q.suggested_answer.trim() === '')) return false;
+    return true;
   };
 
   return (
@@ -92,7 +102,7 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="title" className='mb-3'>Q&A Title</Label>
+            <Label htmlFor="title" className='mb-3'>Q&A Title <span className="text-red-500">*</span></Label>
             <Input
               id="title"
               value={title}
@@ -111,26 +121,26 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="maxScore" className='mb-3'>Maximum Score</Label>
+              <Label htmlFor="maxScore" className='mb-3'>Maximum Score <span className="text-red-500">*</span></Label>
               <Input
                 id="maxScore"
                 type="number"
                 value={maxScore}
-                onChange={(e) => setMaxScore(Number(e.target.value))}
+                onChange={(e) => setMaxScore(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="Maximum possible score"
-                min={0}
+                min={1}
               />
             </div>
             
             <div>
-              <Label htmlFor="timeLimit" className='mb-3'>Time Limit (minutes)</Label>
+              <Label htmlFor="timeLimit" className='mb-3'>Time Limit (minutes) <span className="text-red-500">*</span></Label>
               <Input
                 id="timeLimit"
                 type="number"
                 value={timeLimitMins}
-                onChange={(e) => setTimeLimitMins(Number(e.target.value))}
-                placeholder="Time limit in minutes (0 = no limit)"
-                min={0}
+                onChange={(e) => setTimeLimitMins(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="Time limit in minutes"
+                min={1}
               />
             </div>
           </div>
@@ -166,14 +176,14 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
               </div>
 
               <div>
-                <Label className='mb-3'>Score</Label>
+                <Label className='mb-3'>Score <span className="text-red-500">*</span></Label>
                 <Input
                   type="number"
                   value={question.score}
-                  onChange={(e) => updateQuestion(questionIndex, 'score', Number(e.target.value))}
+                  onChange={(e) => updateQuestion(questionIndex, 'score', e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder="Points for this question"
                   className="w-32"
-                  min={0}
+                  min={1}
                 />
                 <p className="text-muted-foreground text-sm">
                   Points for this question
@@ -181,11 +191,11 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
               </div>
 
               <div>
-                <Label className='mb-3'>Suggested Answer</Label>
+                <Label className='mb-3'>Suggested Answer <span className="text-red-500">*</span></Label>
                 <Textarea
                   value={question.suggested_answer}
                   onChange={(e) => updateQuestion(questionIndex, 'suggested_answer', e.target.value)}
-                  placeholder="Enter suggested answer (optional)"
+                  placeholder="Enter suggested answer"
                   className="w-full"
                 />
               </div>
@@ -203,7 +213,7 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
 
       {/* Actions */}
       <div className="flex gap-2 pt-4">
-        <Button onClick={handleSave} disabled={!title || questions.length === 0}>
+        <Button onClick={handleSave} disabled={!isFormValid()}>
           Save Q&A
         </Button>
         {onCancel && (

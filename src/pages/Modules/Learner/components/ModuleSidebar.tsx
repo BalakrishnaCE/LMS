@@ -242,7 +242,7 @@ export function ModuleSidebar({
           <Button 
             variant="outline" 
             size="sm" 
-            className="gap-2 hover:bg-primary hover:text-secondary w-full"
+            className="gap-2 hover:bg-primary dark:hover:bg-primary hover:text-primary-foreground dark:hover:text-primary-foreground w-full"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Modules

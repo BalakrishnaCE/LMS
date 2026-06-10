@@ -24,7 +24,10 @@ import {
   AlertCircle,
   Search,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Bot,
+  Loader2,
+  Loader
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import jsPDF from "jspdf";
@@ -41,6 +44,31 @@ import novelLmsLogo from '@/assets/novel-lms-logo.png';
 import { useLMSAnalytics } from "@/lib/api";
 import { useFrappeGetCall } from "frappe-react-sdk";
 import { LMS_API_BASE_URL } from "@/config/routes";
+
+const AIPendingIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+  >
+    {/* 12 segments arranged in a circle with graduated opacity */}
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.95" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.85" transform="rotate(30 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.75" transform="rotate(60 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.65" transform="rotate(90 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.55" transform="rotate(120 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.45" transform="rotate(150 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.35" transform="rotate(180 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.3" transform="rotate(210 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.25" transform="rotate(240 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.2" transform="rotate(270 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.15" transform="rotate(300 12 12)" />
+    <rect x="11.2" y="1" width="1.6" height="4.5" rx="0.8" opacity="0.1" transform="rotate(330 12 12)" />
+    {/* Bot icon in center */}
+    <Bot x="6.5" y="6.5" width="11" height="11" stroke="currentColor" strokeWidth="2" fill="none" />
+  </svg>
+);
 
 interface FilterState {
   dateRange: string;
@@ -217,11 +245,8 @@ export default function AnalyticsDashboard() {
   const [qaDetailsData, setQaDetailsData] = useState<any>(null);
   const [loadingQaDetails, setLoadingQaDetails] = useState(false);
   const [qaAllotedMarks, setQaAllotedMarks] = useState<number[]>([]);
-  const [showAddScoreModal, setShowAddScoreModal] = useState(false);
-  const [scoreValue, setScoreValue] = useState('');
-  const [loadingAddScore, setLoadingAddScore] = useState(false);
-  const [scoreUpdateSuccess, setScoreUpdateSuccess] = useState(false);
-  const [scoreError, setScoreError] = useState('');
+  const [isQaMarksEdited, setIsQaMarksEdited] = useState(false);
+  const [loadingApproveScore, setLoadingApproveScore] = useState(false);
   const [learnerSidebarData, setLearnerSidebarData] = useState<any>(null);
   const [loadingLearnerSidebar, setLoadingLearnerSidebar] = useState(false);
   const [learnerModuleFilter, setLearnerModuleFilter] = useState<string>('all');
@@ -967,9 +992,9 @@ export default function AnalyticsDashboard() {
     }
   };
 
-  const fetchQaAnalytics = async () => {
-    // Don't fetch if already loading or if data already exists
-    if (loadingQaAnalytics || (qaAnalyticsData.length > 0 && quizAnalyticsView === 'qa')) {
+  const fetchQaAnalytics = async (forceRefresh: boolean = false) => {
+    // Don't fetch if already loading or if data already exists (unless force refresh)
+    if (loadingQaAnalytics || (!forceRefresh && qaAnalyticsData.length > 0 && quizAnalyticsView === 'qa')) {
       return;
     }
     setLoadingQaAnalytics(true);
@@ -1776,57 +1801,39 @@ export default function AnalyticsDashboard() {
     setQaDetailsData(null);
   };
 
-  const handleAddScore = () => {
-    setShowAddScoreModal(true);
-    setScoreValue('');
-    setScoreUpdateSuccess(false);
-    setScoreError('');
-  };
+  const handleApproveAIScore = async () => {
+    if (!qaDetailsData) return;
 
-  const handleScoreInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setScoreValue(value);
-
-    // Clear previous error
-    setScoreError('');
-
-    // Validate score if value is not empty
-    if (value) {
-      const numericValue = parseFloat(value);
-      if (!isNaN(numericValue)) {
-        if (numericValue < 0) {
-          setScoreError('Score cannot be negative');
-        } else if (qaDetailsData?.max_score && numericValue > qaDetailsData.max_score) {
-          setScoreError(`Score cannot exceed maximum score of ${qaDetailsData.max_score}`);
+    setLoadingApproveScore(true);
+    try {
+      // Validate: Check each allotted mark doesn't exceed its question_score
+      if (qaDetailsData.question_answer_responses) {
+        for (let i = 0; i < qaDetailsData.question_answer_responses.length; i++) {
+          const allotted = qaAllotedMarks[i] ?? 0;
+          const questionScore = qaDetailsData.question_answer_responses[i]?.question_score ?? 0;
+          if (allotted > questionScore) {
+            toast.error(`Allotted score (${allotted}) cannot exceed Q. Score (${questionScore}) for question ${i + 1}`);
+            setLoadingApproveScore(false);
+            return;
+          }
         }
       }
-    }
-  };
 
-  const handleSaveScore = async () => {
-    if (!qaDetailsData || !scoreValue) return;
+      // Calculate total score from allotted marks
+      const totalScore = qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0);
+      const maxScore = qaDetailsData.max_score ?? 0;
+      if (totalScore > maxScore) {
+        toast.error(`Total score (${totalScore}) cannot exceed maximum score (${maxScore})`);
+        setLoadingApproveScore(false);
+        return;
+      }
 
-    const numericValue = parseFloat(scoreValue);
-
-    // Check if score is negative
-    if (numericValue < 0) {
-      setScoreError('Score cannot be negative');
-      return;
-    }
-
-    // Check if score exceeds max score
-    if (qaDetailsData?.max_score && numericValue > qaDetailsData.max_score) {
-      setScoreError(`Score cannot exceed maximum score of ${qaDetailsData.max_score}`);
-      return;
-    }
-
-    setLoadingAddScore(true);
-    try {
       const params = new URLSearchParams({
         name: qaDetailsData.name,
         user: qaDetailsData.user,
         qa_id: qaDetailsData.name,
-        score: scoreValue
+        score: String(totalScore),
+        response_marks: JSON.stringify(qaAllotedMarks)
       });
 
       const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.updateQAScore`, {
@@ -1838,39 +1845,22 @@ export default function AnalyticsDashboard() {
         body: params
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update score');
-      }
-
       const data = await response.json();
-      // console.log('Update Score API Response:', data);
-
-      // Check for success in nested structure: data.message.message.success
       const isSuccess = data.message?.message?.success || data.message?.success || data.success;
 
       if (isSuccess) {
-        setScoreUpdateSuccess(true);
-        // Show success message in popup instead of toast
-        setTimeout(() => {
-          setShowAddScoreModal(false);
-          setScoreValue('');
-          setScoreUpdateSuccess(false);
-          // Refresh the Q&A details
-          if (qaDetailsData.name) {
-            fetchQaDetails(qaDetailsData.name);
-          }
-          // Refresh the QA analytics data to move user from pending to scored
-          fetchQaAnalytics();
-        }, 2000); // Close after 2 seconds
+        toast.success(qaScoreFilter === 'pending' ? 'AI Score approved successfully' : 'Scores updated successfully');
+        closeQaDetailsModal();
+        fetchQaAnalytics(true);
       } else {
-        console.error('Update Score API Error:', data.message?.message?.error || data.message?.error);
-        toast.error('Failed to update score');
+        const errorMsg = data.message?.error || data.message?.message || 'Failed to approve score';
+        toast.error(errorMsg);
       }
-    } catch (error) {
-      console.error('Error updating score:', error);
-      toast.error('Failed to update score');
+    } catch (e) {
+      console.error('Approve score error', e);
+      toast.error('Failed to approve AI score');
     } finally {
-      setLoadingAddScore(false);
+      setLoadingApproveScore(false);
     }
   };
 
@@ -1882,6 +1872,7 @@ export default function AnalyticsDashboard() {
     } else {
       setQaAllotedMarks([]);
     }
+    setIsQaMarksEdited(false);
   }, [qaDetailsData]);
 
   const handleAllotedChange = (index: number, value: string, maxScore: number = 0) => {
@@ -1889,7 +1880,14 @@ export default function AnalyticsDashboard() {
     // Constrain the value between 0 and maxScore (question_score)
     if (!isNaN(num)) {
       const constrainedValue = Math.max(0, Math.min(num, maxScore));
-      setQaAllotedMarks(prev => prev.map((v: number, i: number) => (i === index ? constrainedValue : v)));
+      setQaAllotedMarks(prev => {
+        const next = prev.map((v: number, i: number) => (i === index ? constrainedValue : v));
+        // Check if actually changed
+        if (prev[index] !== constrainedValue) {
+          setIsQaMarksEdited(true);
+        }
+        return next;
+      });
     }
   };
 
@@ -1924,15 +1922,19 @@ export default function AnalyticsDashboard() {
         score: String(total),
         response_marks: JSON.stringify(qaAllotedMarks)
       });
-      const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.updateQAScore?${params.toString()}`, {
+      const response = await fetch(`${LMS_API_BASE_URL}/api/method/novel_lms.novel_lms.api.analytics.updateQAScore`, {
         method: 'POST',
-        credentials: 'include'
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        credentials: 'include',
+        body: params
       });
       const data = await response.json();
       const isSuccess = data.message?.message?.success || data.message?.success || data.success;
       if (isSuccess) {
         fetchQaDetails(qaDetailsData.name);
-        fetchQaAnalytics();
+        fetchQaAnalytics(true);
         toast.success('Scores saved successfully');
       } else {
         const errorMsg = data.message?.error || data.message?.message || 'Failed to save scores';
@@ -2612,8 +2614,17 @@ export default function AnalyticsDashboard() {
                     placeholder="Search modules..."
                     value={moduleSearchQuery}
                     onChange={(e) => setModuleSearchQuery(e.target.value)}
-                    className="pl-10 border-2 border-border/50 focus:border-primary"
+                    className="pl-10 pr-10 border-2 border-border/50 focus:border-primary"
                   />
+                  {moduleSearchQuery && (
+                    <button
+                      onClick={() => setModuleSearchQuery("")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      type="button"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Department Filter */}
@@ -2954,8 +2965,17 @@ export default function AnalyticsDashboard() {
                       placeholder="Search by email..."
                       value={quizSearchQuery}
                       onChange={(e) => setQuizSearchQuery(e.target.value)}
-                      className="pl-10 border-2 border-border/50 focus:border-primary"
+                      className="pl-10 pr-10 border-2 border-border/50 focus:border-primary"
                     />
+                    {quizSearchQuery && (
+                      <button
+                        onClick={() => setQuizSearchQuery("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        type="button"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Module Filter - Text Input (by typing) */}
@@ -2966,8 +2986,17 @@ export default function AnalyticsDashboard() {
                       placeholder="Filter by module name..."
                       value={quizModuleFilter}
                       onChange={(e) => setQuizModuleFilter(e.target.value)}
-                      className="pl-10 border-2 border-border/50 focus:border-primary"
+                      className="pl-10 pr-10 border-2 border-border/50 focus:border-primary"
                     />
+                    {quizModuleFilter && (
+                      <button
+                        onClick={() => setQuizModuleFilter("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        type="button"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -3271,9 +3300,10 @@ export default function AnalyticsDashboard() {
                     variant={qaScoreFilter === 'pending' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setQaScoreFilter('pending')}
-                    className="h-8"
+                    className="h-8 flex items-center gap-1.5"
                   >
-                    Pending Score ({qaPendingData.length})
+                    <AIPendingIcon className="h-4 w-4" />
+                    AI Analysis Pending ({qaPendingData.length})
                   </Button>
                 </div>
 
@@ -3287,8 +3317,17 @@ export default function AnalyticsDashboard() {
                       placeholder="Search by email..."
                       value={qaSearchQuery}
                       onChange={(e) => setQaSearchQuery(e.target.value)}
-                      className="pl-10 border-2 border-border/50 focus:border-primary"
+                      className="pl-10 pr-10 border-2 border-border/50 focus:border-primary"
                     />
+                    {qaSearchQuery && (
+                      <button
+                        onClick={() => setQaSearchQuery("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        type="button"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Module Filter - Text Input (by typing) */}
@@ -3299,8 +3338,17 @@ export default function AnalyticsDashboard() {
                       placeholder="Filter by module name..."
                       value={qaModuleFilter}
                       onChange={(e) => setQaModuleFilter(e.target.value)}
-                      className="pl-10 border-2 border-border/50 focus:border-primary"
+                      className="pl-10 pr-10 border-2 border-border/50 focus:border-primary"
                     />
+                    {qaModuleFilter && (
+                      <button
+                        onClick={() => setQaModuleFilter("")}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        type="button"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -3368,7 +3416,7 @@ export default function AnalyticsDashboard() {
                                 className="cursor-pointer hover:text-primary transition-colors select-none"
                                 onClick={() => handleQaSort("score")}
                               >
-                                Score (%)
+                                AI Score (%)
                               </span>
                               {qaSortColumn === "score" ? (
                                 qaSortOrder === "asc" ? (
@@ -3385,7 +3433,7 @@ export default function AnalyticsDashboard() {
                             </div>
                           </th>
                         ) : (
-                          <th className="text-left p-3 font-medium text-sm text-muted-foreground">Score (%)</th>
+                          <th className="text-left p-3 font-medium text-sm text-muted-foreground">AI Score (%)</th>
                         )}
                         <th className="text-left p-3 font-semibold text-sm">
                           <div className="flex items-center gap-2">
@@ -3634,8 +3682,17 @@ export default function AnalyticsDashboard() {
                     placeholder="Search by email or name..."
                     value={learnerSearchQuery}
                     onChange={(e) => setLearnerSearchQuery(e.target.value)}
-                    className="pl-10 border-2 border-border/50 focus:border-primary"
+                    className="pl-10 pr-10 border-2 border-border/50 focus:border-primary"
                   />
+                  {learnerSearchQuery && (
+                    <button
+                      onClick={() => setLearnerSearchQuery("")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      type="button"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -4640,15 +4697,42 @@ export default function AnalyticsDashboard() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {qaScoreFilter === 'pending' && (
+                  {qaScoreFilter === 'pending' ? (
                     <Button
+                      onClick={handleApproveAIScore}
+                      disabled={loadingApproveScore}
                       variant="default"
                       size="sm"
-                      onClick={handleAddScore}
                       className="h-8"
                     >
-                      Add Score
+                      {loadingApproveScore ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                          Approving...
+                        </>
+                      ) : (
+                        isQaMarksEdited ? 'Save & Approve score' : 'Approve AI Score'
+                      )}
                     </Button>
+                  ) : (
+                    isQaMarksEdited && (
+                      <Button
+                        onClick={handleApproveAIScore}
+                        disabled={loadingApproveScore}
+                        variant="default"
+                        size="sm"
+                        className="h-8"
+                      >
+                        {loadingApproveScore ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                            Saving...
+                          </>
+                        ) : (
+                          'Save Score'
+                        )}
+                      </Button>
+                    )
                   )}
                   <Button
                     variant="outline"
@@ -4685,7 +4769,7 @@ export default function AnalyticsDashboard() {
                         <div className="text-lg font-bold">{qaDetailsData.user || 'N/A'}</div>
                       </div>
                       <div className="bg-muted/50 border border-muted rounded-lg p-4">
-                        <div className="text-sm font-medium text-muted-foreground">Score (%)</div>
+                        <div className="text-sm font-medium text-muted-foreground">AI Score (%)</div>
                         <div className="text-lg font-bold">
                           Max Score: {qaDetailsData.max_score || 'N/A'}<br />
                           Score: {qaDetailsData.score || 'N/A'} ({qaDetailsData.percentage_score || 0}%)
@@ -4717,7 +4801,7 @@ export default function AnalyticsDashboard() {
                                 <th className="text-left p-3 font-medium text-sm text-muted-foreground">Question</th>
                                 <th className="text-left p-3 font-medium text-sm text-muted-foreground">Answer</th>
                                 <th className="text-left p-3 font-medium text-sm text-muted-foreground">Suggested Answer</th>
-                                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Alloted</th>
+                                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Alloted Score</th>
                                 <th className="text-left p-3 font-medium text-sm text-muted-foreground">Q. Score</th>
                               </tr>
                             </thead>
@@ -4801,14 +4885,14 @@ export default function AnalyticsDashboard() {
                                 )}
                               <tr className="border-t-2 font-semibold bg-muted/30">
                                 <td className="p-3 text-sm font-medium" colSpan={3}>Total</td>
-                                <td className="p-3 text-sm font-medium">{qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0)}</td>
+                                <td className="p-3 pl-6 text-sm font-medium">{qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0)}</td>
                                 <td className="p-3 text-sm text-right pr-4">Max: {qaDetailsData.max_score ?? 0}</td>
                               </tr>
                             </tbody>
                           </table>
                         </div>
                         <div className="flex justify-end mt-3">
-                          <Button onClick={handleSaveAllotedScores}>Save Scores</Button>
+                          {/* <Button onClick={handleSaveAllotedScores}>Save Scores</Button> */}
                         </div>
                       </div>
                     </div>
@@ -4819,93 +4903,6 @@ export default function AnalyticsDashboard() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Score Modal */}
-      {showAddScoreModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/50"
-            onClick={() => setShowAddScoreModal(false)}
-          />
-
-          {/* Modal */}
-          <div className="relative bg-background rounded-lg shadow-lg w-full max-w-md mx-4 animate-in fade-in duration-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Add Score</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAddScoreModal(false)}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {scoreUpdateSuccess ? (
-                <div className="text-center py-4">
-                  <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                    <CheckCircle className="h-6 w-6 text-primary" />
-                  </div>
-                  <h4 className="text-lg font-semibold text-primary mb-2">Score Added Successfully!</h4>
-                  <p className="text-sm text-muted-foreground">
-                    The score has been updated for this user.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">Enter Score</label>
-                    <Input
-                      type="number"
-                      placeholder="Enter score"
-                      value={scoreValue}
-                      onChange={handleScoreInputChange}
-                      min="0"
-                      max={qaDetailsData?.max_score || 100}
-                      className={`mt-1 ${scoreError ? 'border-red-500 focus:border-red-500' : ''}`}
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Max score: {qaDetailsData?.max_score || 'N/A'}
-                    </p>
-                    {scoreError && (
-                      <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
-                        <AlertCircle className="h-4 w-4" />
-                        {scoreError}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowAddScoreModal(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="default"
-                      onClick={handleSaveScore}
-                      disabled={loadingAddScore || !scoreValue || !!scoreError}
-                    >
-                      {loadingAddScore ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                          Saving...
-                        </>
-                      ) : (
-                        'Save Score'
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

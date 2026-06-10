@@ -179,7 +179,7 @@ async function checkQuizQACompletion(module: CourseModule, user: UserInfo) {
         // console.error('Error fetching quiz progress:', err);
     }
     try {
-        const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[["user","=","${user?.name}"]]&fields=["score","max_score","name","question_answer"]`, { credentials: 'include' });
+        const qaRes = await fetch(`${LMS_API_BASE_URL}/api/resource/Question Answer Progress?filters=[["user","=","${user?.name}"]]&fields=["score","max_score","score_added","name","question_answer"]`, { credentials: 'include' });
         qaProgressList = (await qaRes.json())?.data || [];
 
     } catch (err) {
