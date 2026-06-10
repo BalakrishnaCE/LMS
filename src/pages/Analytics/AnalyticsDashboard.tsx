@@ -245,6 +245,7 @@ export default function AnalyticsDashboard() {
   const [qaDetailsData, setQaDetailsData] = useState<any>(null);
   const [loadingQaDetails, setLoadingQaDetails] = useState(false);
   const [qaAllotedMarks, setQaAllotedMarks] = useState<number[]>([]);
+  const [isQaMarksEdited, setIsQaMarksEdited] = useState(false);
   const [loadingApproveScore, setLoadingApproveScore] = useState(false);
   const [learnerSidebarData, setLearnerSidebarData] = useState<any>(null);
   const [loadingLearnerSidebar, setLoadingLearnerSidebar] = useState(false);
@@ -1848,7 +1849,7 @@ export default function AnalyticsDashboard() {
       const isSuccess = data.message?.message?.success || data.message?.success || data.success;
 
       if (isSuccess) {
-        toast.success('AI Score approved successfully');
+        toast.success(qaScoreFilter === 'pending' ? 'AI Score approved successfully' : 'Scores updated successfully');
         closeQaDetailsModal();
         fetchQaAnalytics(true);
       } else {
@@ -1871,6 +1872,7 @@ export default function AnalyticsDashboard() {
     } else {
       setQaAllotedMarks([]);
     }
+    setIsQaMarksEdited(false);
   }, [qaDetailsData]);
 
   const handleAllotedChange = (index: number, value: string, maxScore: number = 0) => {
@@ -1878,7 +1880,14 @@ export default function AnalyticsDashboard() {
     // Constrain the value between 0 and maxScore (question_score)
     if (!isNaN(num)) {
       const constrainedValue = Math.max(0, Math.min(num, maxScore));
-      setQaAllotedMarks(prev => prev.map((v: number, i: number) => (i === index ? constrainedValue : v)));
+      setQaAllotedMarks(prev => {
+        const next = prev.map((v: number, i: number) => (i === index ? constrainedValue : v));
+        // Check if actually changed
+        if (prev[index] !== constrainedValue) {
+          setIsQaMarksEdited(true);
+        }
+        return next;
+      });
     }
   };
 
@@ -4688,22 +4697,43 @@ export default function AnalyticsDashboard() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    onClick={handleApproveAIScore}
-                    disabled={loadingApproveScore}
-                    variant="default"
-                    size="sm"
-                    className="h-8"
-                  >
-                    {loadingApproveScore ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                        Approving...
-                      </>
-                    ) : (
-                      'approve AI Score'
-                    )}
-                  </Button>
+                  {qaScoreFilter === 'pending' ? (
+                    <Button
+                      onClick={handleApproveAIScore}
+                      disabled={loadingApproveScore}
+                      variant="default"
+                      size="sm"
+                      className="h-8"
+                    >
+                      {loadingApproveScore ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                          Approving...
+                        </>
+                      ) : (
+                        isQaMarksEdited ? 'Save & Approve score' : 'Approve AI Score'
+                      )}
+                    </Button>
+                  ) : (
+                    isQaMarksEdited && (
+                      <Button
+                        onClick={handleApproveAIScore}
+                        disabled={loadingApproveScore}
+                        variant="default"
+                        size="sm"
+                        className="h-8"
+                      >
+                        {loadingApproveScore ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                            Saving...
+                          </>
+                        ) : (
+                          'Save Score'
+                        )}
+                      </Button>
+                    )
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -4771,7 +4801,7 @@ export default function AnalyticsDashboard() {
                                 <th className="text-left p-3 font-medium text-sm text-muted-foreground">Question</th>
                                 <th className="text-left p-3 font-medium text-sm text-muted-foreground">Answer</th>
                                 <th className="text-left p-3 font-medium text-sm text-muted-foreground">Suggested Answer</th>
-                                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Alloted</th>
+                                <th className="text-left p-3 font-medium text-sm text-muted-foreground">Alloted Score</th>
                                 <th className="text-left p-3 font-medium text-sm text-muted-foreground">Q. Score</th>
                               </tr>
                             </thead>
@@ -4855,14 +4885,14 @@ export default function AnalyticsDashboard() {
                                 )}
                               <tr className="border-t-2 font-semibold bg-muted/30">
                                 <td className="p-3 text-sm font-medium" colSpan={3}>Total</td>
-                                <td className="p-3 text-sm font-medium">{qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0)}</td>
+                                <td className="p-3 pl-6 text-sm font-medium">{qaAllotedMarks.reduce((s: number, v: number) => s + (Number(v) || 0), 0)}</td>
                                 <td className="p-3 text-sm text-right pr-4">Max: {qaDetailsData.max_score ?? 0}</td>
                               </tr>
                             </tbody>
                           </table>
                         </div>
                         <div className="flex justify-end mt-3">
-                          <Button onClick={handleSaveAllotedScores}>Save Scores</Button>
+                          {/* <Button onClick={handleSaveAllotedScores}>Save Scores</Button> */}
                         </div>
                       </div>
                     </div>
