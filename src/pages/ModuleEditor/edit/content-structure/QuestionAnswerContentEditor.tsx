@@ -86,6 +86,7 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
     if (!timeLimitMins || timeLimitMins <= 0) return false;
     if (questions.length === 0) return false;
     if (questions.some(q => !q.score || q.score <= 0)) return false;
+    if (questions.some(q => !q.suggested_answer || q.suggested_answer.trim() === '')) return false;
     return true;
   };
 
@@ -190,11 +191,11 @@ export default function QuestionAnswerContentEditor({ content, onSave, onCancel 
               </div>
 
               <div>
-                <Label className='mb-3'>Suggested Answer</Label>
+                <Label className='mb-3'>Suggested Answer <span className="text-red-500">*</span></Label>
                 <Textarea
                   value={question.suggested_answer}
                   onChange={(e) => updateQuestion(questionIndex, 'suggested_answer', e.target.value)}
-                  placeholder="Enter suggested answer (optional)"
+                  placeholder="Enter suggested answer"
                   className="w-full"
                 />
               </div>

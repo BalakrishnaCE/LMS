@@ -616,7 +616,7 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                     transition={{ duration: 0.4, delay: 0.1 }}
                     className="flex gap-4 p-4"
                 >
-                    <div className="flex-1">
+                    <div className="flex-1 relative">
                         <Input
                             placeholder="Search modules..."
                             value={searchQuery}
