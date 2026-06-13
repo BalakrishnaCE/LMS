@@ -9,9 +9,16 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { navigate } from "wouter/use-browser-location"
 import { useUser } from "@/hooks/use-user"
 import { getRelativePath, getFullPath, BASE_PATH, ROUTES } from "@/config/routes"
+import { PenLine, Sparkles } from "lucide-react"
 
 export type NavItemIcon = Icon | React.ComponentType<{ className?: string }>
 
@@ -28,7 +35,7 @@ export function NavMain({
   items: NavMainItem[]
 }) {
   const [location] = useLocation();
-  const { isLMSAdmin, user } = useUser();
+  const { isLMSAdmin } = useUser();
   const isAiAllowed = true;
 
   // Get the current path without the base path
@@ -37,8 +44,11 @@ export function NavMain({
   // Special handling for admin dashboard - if we're on /admin-dashboard, highlight Dashboard
   const isAdminDashboard = currentPath === ROUTES.ADMIN_DASHBOARD || currentPath === ROUTES.HOME;
   
-  // Check if we're on the edit page to highlight Quick Create
-  const isEditPage = currentPath === ROUTES.EDIT || currentPath.startsWith(ROUTES.EDIT + '/');
+  // Check if we're on the edit page or AI wizard to highlight Quick Create
+  const isEditPage =
+    currentPath === ROUTES.EDIT ||
+    currentPath.startsWith(ROUTES.EDIT + '/') ||
+    currentPath === ROUTES.AI_MODULE_WIZARD;
 
   // Filter items based on AI access
   const filteredItems = items.filter(item => {
@@ -55,27 +65,78 @@ export function NavMain({
         <SidebarMenu>
           {isLMSAdmin && (
           <SidebarMenuItem className="flex items-center gap-2">
-            <SidebarMenuButton
-              tooltip="Quick Create"
-              className={
-                isEditPage
-                  ? "hover:text-white text-white bg-primary/90 min-w-8 duration-200 ease-linear"
-                  : "active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear hover:text-white"
-              }
-              onClick={() => navigate(BASE_PATH + '/edit')}
-            >
-              <IconCirclePlusFilled />
-              <span >Quick Create</span>
-            </SidebarMenuButton>
-            <Button
-              size="icon"
-              className="size-8 group-data-[collapsible=icon]:opacity-0 hover:text-white"
-              variant="outline"
-              onClick={() => navigate(BASE_PATH + '/edit')}
-            >
-              <IconPlus className="size-4" />
-              <span className="sr-only">Add New Module</span>
-            </Button>
+            {/* Quick Create label button — opens dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  tooltip="Quick Create"
+                  className={
+                    isEditPage
+                      ? "hover:text-white text-white bg-primary/90 min-w-8 duration-200 ease-linear"
+                      : "active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear hover:text-white"
+                  }
+                >
+                  <IconCirclePlusFilled />
+                  <span>Quick Create</span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="right"
+                align="start"
+                sideOffset={8}
+                className="min-w-[200px] rounded-xl shadow-lg border border-border p-1"
+              >
+                <DropdownMenuItem
+                  className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg text-sm font-medium"
+                  onClick={() => navigate(BASE_PATH + '/edit')}
+                >
+                  <PenLine className="w-4 h-4 text-muted-foreground" />
+                  <span>Create Module Manually</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg text-sm font-medium"
+                  onClick={() => navigate(BASE_PATH + ROUTES.AI_MODULE_WIZARD)}
+                >
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span>Create Module with AI</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Plus icon button — also opens dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon"
+                  className="size-8 group-data-[collapsible=icon]:opacity-0 hover:text-white"
+                  variant="outline"
+                >
+                  <IconPlus className="size-4" />
+                  <span className="sr-only">Add New Module</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="right"
+                align="start"
+                sideOffset={8}
+                className="min-w-[200px] rounded-xl shadow-lg border border-border p-1"
+              >
+                <DropdownMenuItem
+                  className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg text-sm font-medium"
+                  onClick={() => navigate(BASE_PATH + '/edit')}
+                >
+                  <PenLine className="w-4 h-4 text-muted-foreground" />
+                  <span>Create Module Manually</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg text-sm font-medium"
+                  onClick={() => navigate(BASE_PATH + ROUTES.AI_MODULE_WIZARD)}
+                >
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span>Create Module with AI</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
           )}
         </SidebarMenu>

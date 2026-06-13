@@ -19,6 +19,7 @@ import LearnerModuleDetail from "@/pages/Modules/Learner/ModuleDetail";
 import AdminModuleDetail from "@/pages/Modules/Admin/ModuleDetail";
 import ModuleEdit from "@/pages/ModuleEditor/edit/ModuleEdit";
 import ModuleCreationForm from "@/pages/ModuleEditor/edit/ModuleCreationForm";
+import AiModuleWizard from "@/pages/ModuleEditor/AiModuleWizard";
 import AnalyticsDashboard from "@/pages/Analytics/AnalyticsDashboard";
 import DepartmentPage from "@/pages/Department/Department";
 import { ErrorBoundary } from "@/lib/error-boundary";
@@ -120,6 +121,10 @@ function AppContent() {
           </Layout>
         )} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
 
+        <ProtectedRoute path="/ai-module-wizard" component={() => (
+          <AiModuleWizard />
+        )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
+
         <Route path="/:path*" component={NotFound} />
 
       </Switch>
@@ -133,7 +138,7 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider storageKey="novel-lms-theme" defaultTheme="light">
-        <div className="flex flex-col items-center justify-start min-h-svh font-sans">
+        <div className="min-h-svh font-sans">
           <NovelLMSFrappeProvider>
             <PermissionProvider>
               <NavigationProvider>
