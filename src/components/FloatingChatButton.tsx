@@ -7,6 +7,20 @@ import { BASE_PATH } from "@/config/routes";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUser } from "@/hooks/use-user";
 
+// --- Button drag position helpers ---
+const LUMI_POS_KEY = "novel_lms_lumi_pos";
+const getDefaultPos = () => ({ right: 24, bottom: 24 });
+const loadPos = () => {
+    try {
+        const raw = localStorage.getItem(LUMI_POS_KEY);
+        if (raw) return JSON.parse(raw) as { right: number; bottom: number };
+    } catch {}
+    return getDefaultPos();
+};
+const savePos = (pos: { right: number; bottom: number }) => {
+    try { localStorage.setItem(LUMI_POS_KEY, JSON.stringify(pos)); } catch {}
+};
+
 const DEFAULT_WIDTH = 360;
 const DEFAULT_HEIGHT = 550;
 const MIN_WIDTH = 320;
@@ -34,6 +48,13 @@ const FloatingChatButton = () => {
             window.removeEventListener("lms-quiz-state-change", handleQuizState as EventListener);
         };
     }, []);
+
+    // --- Button position drag state ---
+    const [btnPos, setBtnPos] = useState<{ right: number; bottom: number }>(loadPos);
+    const isBtnDragging = useRef(false);
+    const btnDragMoved = useRef(false);
+    const btnDragStart = useRef({ mouseX: 0, mouseY: 0, right: 0, bottom: 0 });
+
     const isDragging = useRef(false);
     const startPos = useRef({ x: 0, y: 0 });
     const startSize = useRef({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
@@ -137,6 +158,68 @@ const FloatingChatButton = () => {
             document.removeEventListener('mouseup', handleMouseUp);
         };
     }, [handleMouseMove, handleMouseUp]);
+
+    // --- Button drag handlers ---
+    const handleBtnMouseMove = useCallback((e: MouseEvent) => {
+        if (!isBtnDragging.current) return;
+        e.preventDefault();
+        const dx = e.clientX - btnDragStart.current.mouseX;
+        const dy = e.clientY - btnDragStart.current.mouseY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) btnDragMoved.current = true;
+        if (!btnDragMoved.current) return;
+
+        const ICON_SIZE = 56;
+        const newRight = Math.max(8, Math.min(
+            window.innerWidth - ICON_SIZE - 8,
+            btnDragStart.current.right - dx
+        ));
+        const newBottom = Math.max(8, Math.min(
+            window.innerHeight - ICON_SIZE - 8,
+            btnDragStart.current.bottom - dy
+        ));
+        setBtnPos({ right: newRight, bottom: newBottom });
+    }, []);
+
+    const handleBtnMouseUp = useCallback((_e: MouseEvent) => {
+        if (!isBtnDragging.current) return;
+        isBtnDragging.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', handleBtnMouseMove);
+        document.removeEventListener('mouseup', handleBtnMouseUp);
+
+        if (btnDragMoved.current) {
+            // Save position but don't toggle chat
+            setBtnPos(prev => { savePos(prev); return prev; });
+        } else {
+            // It was a click — toggle chat
+            setIsOpen(prev => !prev);
+        }
+    }, [handleBtnMouseMove]);
+
+    const handleBtnMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        isBtnDragging.current = true;
+        btnDragMoved.current = false;
+        btnDragStart.current = {
+            mouseX: e.clientX,
+            mouseY: e.clientY,
+            right: btnPos.right,
+            bottom: btnPos.bottom,
+        };
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'grabbing';
+        document.addEventListener('mousemove', handleBtnMouseMove);
+        document.addEventListener('mouseup', handleBtnMouseUp);
+    }, [btnPos, handleBtnMouseMove, handleBtnMouseUp]);
+
+    // Cleanup button drag listeners on unmount
+    useEffect(() => {
+        return () => {
+            document.removeEventListener('mousemove', handleBtnMouseMove);
+            document.removeEventListener('mouseup', handleBtnMouseUp);
+        };
+    }, [handleBtnMouseMove, handleBtnMouseUp]);
 
     // Listen for minimize event from full-screen window
     useEffect(() => {
@@ -399,38 +482,56 @@ const FloatingChatButton = () => {
                             shouldRestoreSession={shouldRestoreSession}
                             extraHeaderButtons={
                                 <TooltipProvider delayDuration={300}>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); toggleMaximize(); }}
-                                                className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-[#018790] dark:hover:bg-teal-100/20 hover:text-[#d6ecec] dark:hover:text-teal-100 backdrop-blur-md border border-[#018790] dark:border-teal-100/10 text-[#018790] dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95"
-                                            >
-                                                {isMaximized ? (
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        width="20"
-                                                        height="20"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        strokeWidth="2.5"
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        className="w-4 h-4"
-                                                    >
-                                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                                        <line x1="21" y1="3" x2="10" y2="14" />
-                                                        <polyline points="10 9 10 14 15 14" />
-                                                    </svg>
-                                                ) : (
-                                                    <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
-                                                )}
-                                            </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="bottom" className="bg-[#018790] text-white border-0 rounded-lg shadow-lg text-xs px-2.5 py-1.5">
-                                            Open in Full Screen
-                                        </TooltipContent>
-                                    </Tooltip>
+                                    <div className="flex items-center gap-1.5">
+                                        {/* Maximize / Open Full Screen */}
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); toggleMaximize(); }}
+                                                    className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-[#018790] dark:hover:bg-teal-100/20 hover:text-[#d6ecec] dark:hover:text-teal-100 backdrop-blur-md border border-[#018790] dark:border-teal-100/10 text-[#018790] dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95"
+                                                >
+                                                    {isMaximized ? (
+                                                        <svg
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            width="20"
+                                                            height="20"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2.5"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            className="w-4 h-4"
+                                                        >
+                                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                                            <line x1="21" y1="3" x2="10" y2="14" />
+                                                            <polyline points="10 9 10 14 15 14" />
+                                                        </svg>
+                                                    ) : (
+                                                        <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
+                                                    )}
+                                                </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom" className="bg-[#018790] text-white border-0 rounded-lg shadow-lg text-xs px-2.5 py-1.5">
+                                                Open in Full Screen
+                                            </TooltipContent>
+                                        </Tooltip>
+
+                                        {/* Close window */}
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}
+                                                    className="p-1.5 rounded-xl bg-teal-900/10 dark:bg-teal-100/10 hover:bg-red-500/80 dark:hover:bg-red-500/70 hover:text-white dark:hover:text-white backdrop-blur-md border border-[#018790] dark:border-teal-100/10 text-[#018790] dark:text-teal-100 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 hover:border-red-500/50"
+                                                >
+                                                    <X className="w-4 h-4" strokeWidth={2.5} />
+                                                </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom" className="bg-[#018790] text-white border-0 rounded-lg shadow-lg text-xs px-2.5 py-1.5">
+                                                Close window
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
                                 </TooltipProvider>
                             }
                         />
@@ -438,45 +539,43 @@ const FloatingChatButton = () => {
                 </div>
             )}
 
-            {/* Clickable Robot Button Area */}
+            {/* Draggable Lumi Button */}
             <div
-                className={`fixed bottom-6 right-6 z-50 flex flex-col items-center justify-center ${isOpen && isMaximized ? 'hidden' : ''}`}
-                onClick={() => setIsOpen(!isOpen)}
+                className={`fixed z-50 flex flex-col items-center justify-center select-none ${isOpen ? 'hidden' : ''}`}
+                style={{
+                    right: `${btnPos.right}px`,
+                    bottom: `${btnPos.bottom}px`,
+                    cursor: isBtnDragging.current ? 'grabbing' : 'grab',
+                    transition: isBtnDragging.current ? 'none' : 'right 0.15s ease, bottom 0.15s ease',
+                }}
+                onMouseDown={handleBtnMouseDown}
                 role="button"
                 aria-label="Open AI Chat"
+                title="Drag to reposition · Click to open"
             >
-                {isOpen ? (
-                    // When open, show a close button with matching gradient style
-                    <div className="w-14 h-14 rounded-3xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer text-white" style={{ backgroundColor: '#018790' }}>
-                        <X className="w-7 h-7" strokeWidth={2.5} />
-                    </div>
-                ) : (
-                    // When closed, show the CSS Robot inside a circular frame
-                    <div
-                        className="relative flex items-center justify-center w-14 h-14 bg-[#018790] dark:bg-[#016b73] rounded-full shadow-lg border-2 border-[#01a8a8] dark:border-[#018790] overflow-hidden hover:scale-110 transition-transform duration-300 cursor-pointer"
-                        style={{ boxShadow: theme === 'dark' ? '0 4px 12px rgba(1, 135, 144, 0.6), inset 0 0 10px rgba(255,255,255,0.15)' : '0 4px 16px rgba(1, 135, 144, 0.5), inset 0 0 12px rgba(255,255,255,0.2)' }}
-                    >
-                        {/* Scale down the entire robot to fit the frame */}
-                        <div className="transform scale-[0.45] translate-y-1">
-                            <div className="cb-container">
-                                <div className="cb-robot">
-                                    <div className="cb-head">
-                                        <div className="cb-visor">
-                                            <span className="cb-eye" />
-                                            <span className="cb-eye" />
-                                        </div>
+                {/* Always show the robot — close is handled by the X button in the chat header */}
+                <div
+                    className="relative flex items-center justify-center w-14 h-14 bg-[#018790] dark:bg-[#016b73] rounded-full shadow-lg border-2 border-[#01a8a8] dark:border-[#018790] overflow-hidden hover:scale-110 transition-transform duration-300"
+                    style={{ boxShadow: theme === 'dark' ? '0 4px 12px rgba(1, 135, 144, 0.6), inset 0 0 10px rgba(255,255,255,0.15)' : '0 4px 16px rgba(1, 135, 144, 0.5), inset 0 0 12px rgba(255,255,255,0.2)' }}
+                >
+                    {/* Scale down the entire robot to fit the frame */}
+                    <div className="transform scale-[0.45] translate-y-1">
+                        <div className="cb-container">
+                            <div className="cb-robot">
+                                <div className="cb-head">
+                                    <div className="cb-visor">
+                                        <span className="cb-eye" />
+                                        <span className="cb-eye" />
                                     </div>
-
-                                    <div className="cb-arm-left" />
-                                    <div className="cb-arm-right" />
-
-                                    <div className="cb-body" />
-                                    <div className="cb-shadow" />
                                 </div>
+                                <div className="cb-arm-left" />
+                                <div className="cb-arm-right" />
+                                <div className="cb-body" />
+                                <div className="cb-shadow" />
                             </div>
                         </div>
                     </div>
-                )}
+                </div>
             </div>
         </>
     );

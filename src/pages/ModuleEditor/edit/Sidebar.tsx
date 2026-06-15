@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { ModuleInfo } from "./ModuleEdit";
 import { useLocation } from "wouter";
 import { useNavigation } from "@/contexts/NavigationContext";
-import { ArrowLeftIcon, X, Pencil } from "lucide-react";
+import { ArrowLeftIcon, X, Pencil, Asterisk } from "lucide-react";
 import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc, useFrappeGetCall } from "frappe-react-sdk";
 import { toast } from "sonner";
 import {
@@ -649,6 +649,34 @@ function SettingsDialog({
                         </Tabs>
                       </div>
                     )}
+
+                    {/* Mandatory Module Toggle */}
+                    <div className="flex items-center justify-between p-4 rounded-xl border-2 border-border/50 bg-primary/5 hover:border-primary/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Asterisk className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Mandatory Module</p>
+                          <p className="text-xs text-muted-foreground">Learners must complete this module</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={!!editState?.mandatory}
+                        onClick={() => handleFieldChange("mandatory" as keyof ModuleInfo, !editState?.mandatory)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                          editState?.mandatory ? 'bg-primary' : 'bg-border'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
+                            editState?.mandatory ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
                 </TabsContent>
               </div>
@@ -1034,6 +1062,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
         // Send department as simple string
         department: editState.department || "",
         image: editState.image,
+        mandatory: editState.mandatory ? 1 : 0,
         // Send properly formatted learners array
         learners: normalizedLearners
       };

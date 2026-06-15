@@ -14,7 +14,7 @@ import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { useLearnerModuleData, useLearnerDashboard } from "@/lib/api"
-import { CheckCircle, Clock, ChevronDown, ChevronUp, Calendar, AlertTriangle, BookOpen, Target, X } from 'lucide-react';
+import { CheckCircle, Clock, ChevronDown, ChevronUp, Calendar, AlertTriangle, BookOpen, Target, X, Asterisk, LayoutGrid } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
@@ -57,6 +57,11 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
     const [searchQuery, setSearchQuery] = useState(() => {
         return localStorage.getItem('learner_modules_search') || ""
     })
+    const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
+    const handleStatusFilter = (filter: string) => {
+        setStatusFilter(prev => prev === filter ? null : filter);
+    };
     const { user } = useUser()
     const { addToHistory, getPreviousSearchState } = useNavigation()
     const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
@@ -273,13 +278,28 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
         localStorage.removeItem('learner_modules_search');
     };
 
-    // Client-side search (optional: can be moved to backend if needed)
-    const filteredModules = useMemo(() => {
-        if (!searchQuery) return modules
+    // Client-side search only — used for stat counts (always reflects full search result)
+    const searchFilteredModules = useMemo(() => {
+        if (!searchQuery) return modules;
         return modules.filter((mod: any) =>
             mod.name1?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-    }, [modules, searchQuery])
+        );
+    }, [modules, searchQuery]);
+
+    // Client-side search + status filter — used for displaying module cards
+    const filteredModules = useMemo(() => {
+        let result = searchFilteredModules;
+        if (statusFilter === 'Completed') {
+            result = result.filter((m: any) => m.progress?.status === 'Completed');
+        } else if (statusFilter === 'In Progress') {
+            result = result.filter((m: any) => m.progress?.status === 'In Progress');
+        } else if (statusFilter === 'Available') {
+            result = result.filter((m: any) => m.progress?.status === 'Not Started' || !m.progress?.status);
+        } else if (statusFilter === 'Mandatory') {
+            result = result.filter((m: any) => m.mandatory === 1 || m.mandatory === "1" || m.mandatory === true || String(m.mandatory).toLowerCase() === "true");
+        }
+        return result;
+    }, [searchFilteredModules, statusFilter])
 
 
 
@@ -386,11 +406,12 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
     const groupedModules = useMemo(() => groupByDepartment(sortedModules), [sortedModules]);
     const deptNames = useMemo(() => Object.keys(groupedModules).sort(), [groupedModules]);
 
-    // Calculate stats using production pattern
-    const completedCount = filteredModules.filter((m: any) => m.progress?.status === "Completed").length;
-    const inProgressCount = filteredModules.filter((m: any) => m.progress?.status === "In Progress").length;
-    const notStartedCount = filteredModules.filter((m: any) => m.progress?.status === "Not Started").length;
-    const calculatedAverageProgress = filteredModules.length > 0
+    // Calculate stats from searchFilteredModules (before status filter) so counts are always accurate
+    const completedCount = searchFilteredModules.filter((m: any) => m.progress?.status === "Completed").length;
+    const inProgressCount = searchFilteredModules.filter((m: any) => m.progress?.status === "In Progress").length;
+    const notStartedCount = searchFilteredModules.filter((m: any) => m.progress?.status === "Not Started").length;
+    const mandatoryCount = searchFilteredModules.filter((m: any) => m.mandatory === 1 || m.mandatory === "1" || m.mandatory === true || String(m.mandatory).toLowerCase() === "true").length;
+    const calculatedAverageProgress = searchFilteredModules.length > 0
         ? Math.round(filteredModules.reduce((sum: number, m: any) => {
             let progress = m.progress?.overall_progress ?? m.progress?.progress ?? 0;
 
@@ -452,12 +473,46 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
 
                         {/* Enhanced Animated Stats */}
                         <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+                            {/* All Modules */}
+                            <motion.button
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.15 }}
+                                onClick={() => setStatusFilter(null)}
+                                className={`flex items-center gap-3 px-4 py-2 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                    statusFilter === null
+                                        ? 'bg-primary/20 dark:bg-primary/30 border-primary ring-2 ring-primary/50 shadow-md scale-105'
+                                        : 'bg-primary/5 dark:bg-primary/10 border-primary/20 hover:bg-primary/10 dark:hover:bg-primary/20'
+                                }`}
+                                title="Click to view All modules"
+                            >
+                                <motion.div
+                                    className="w-4 h-4 flex items-center justify-center"
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                >
+                                    <LayoutGrid className="w-4 h-4 text-primary" />
+                                </motion.div>
+                                <div className="flex flex-col text-left">
+                                    <span className="text-sm font-semibold text-primary dark:text-primary">
+                                        {modules.length}
+                                    </span>
+                                    <span className="text-xs text-primary/80 dark:text-primary/80">All</span>
+                                </div>
+                            </motion.button>
+
                             {/* Completed Modules */}
-                            <motion.div
+                            <motion.button
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ duration: 0.4, delay: 0.2 }}
-                                className="flex items-center gap-3 bg-green-50 dark:bg-green-950/30 px-4 py-2 rounded-lg border border-green-200 dark:border-green-800"
+                                onClick={() => handleStatusFilter('Completed')}
+                                className={`flex items-center gap-3 px-4 py-2 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                    statusFilter === 'Completed'
+                                        ? 'bg-green-200 dark:bg-green-800/60 border-green-500 ring-2 ring-green-400 shadow-md scale-105'
+                                        : 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/40'
+                                }`}
+                                title="Click to filter Completed modules"
                             >
                                 <motion.div
                                     className="w-4 h-4 flex items-center justify-center"
@@ -466,20 +521,26 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                 >
                                     <CheckCircle className="w-4 h-4 text-green-500" />
                                 </motion.div>
-                                <div className="flex flex-col">
+                                <div className="flex flex-col text-left">
                                     <span className="text-sm font-semibold text-green-700 dark:text-green-400">
                                         {completedCount}
                                     </span>
                                     <span className="text-xs text-green-600 dark:text-green-500">Completed</span>
                                 </div>
-                            </motion.div>
+                            </motion.button>
 
                             {/* In Progress Modules */}
-                            <motion.div
+                            <motion.button
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ duration: 0.4, delay: 0.3 }}
-                                className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950/30 px-4 py-2 rounded-lg border border-blue-200 dark:border-blue-800"
+                                onClick={() => handleStatusFilter('In Progress')}
+                                className={`flex items-center gap-3 px-4 py-2 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                    statusFilter === 'In Progress'
+                                        ? 'bg-blue-200 dark:bg-blue-800/60 border-blue-500 ring-2 ring-blue-400 shadow-md scale-105'
+                                        : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40'
+                                }`}
+                                title="Click to filter In Progress modules"
                             >
                                 <motion.div
                                     className="w-4 h-4 flex items-center justify-center"
@@ -488,20 +549,26 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                 >
                                     <Clock className="w-4 h-4 text-blue-500" />
                                 </motion.div>
-                                <div className="flex flex-col">
+                                <div className="flex flex-col text-left">
                                     <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
                                         {inProgressCount}
                                     </span>
                                     <span className="text-xs text-blue-600 dark:text-blue-500">In Progress</span>
                                 </div>
-                            </motion.div>
+                            </motion.button>
 
                             {/* Available Modules */}
-                            <motion.div
+                            <motion.button
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ duration: 0.4, delay: 0.4 }}
-                                className="flex items-center gap-3 bg-gray-50 dark:bg-gray-950/30 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-800"
+                                onClick={() => handleStatusFilter('Available')}
+                                className={`flex items-center gap-3 px-4 py-2 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                    statusFilter === 'Available'
+                                        ? 'bg-gray-200 dark:bg-gray-700/60 border-gray-500 ring-2 ring-gray-400 shadow-md scale-105'
+                                        : 'bg-gray-50 dark:bg-gray-950/30 border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800/40'
+                                }`}
+                                title="Click to filter Available modules"
                             >
                                 <motion.div
                                     className="w-4 h-4 flex items-center justify-center"
@@ -510,13 +577,42 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                 >
                                     <BookOpen className="w-4 h-4 text-gray-500" />
                                 </motion.div>
-                                <div className="flex flex-col">
+                                <div className="flex flex-col text-left">
                                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-400">
                                         {notStartedCount}
                                     </span>
                                     <span className="text-xs text-gray-600 dark:text-gray-500">Available</span>
                                 </div>
-                            </motion.div>
+                            </motion.button>
+
+                            {/* Mandatory Modules */}
+                            <motion.button
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, delay: 0.45 }}
+                                onClick={() => handleStatusFilter('Mandatory')}
+                                className={`flex items-center gap-3 px-4 py-2 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                    statusFilter === 'Mandatory'
+                                        ? 'bg-amber-200 dark:bg-amber-800/60 border-amber-500 ring-2 ring-amber-400 shadow-md scale-105'
+                                        : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                                }`}
+                                title="Click to filter Mandatory modules"
+                            >
+                                <motion.div
+                                    className="w-6 h-6 flex items-center justify-center"
+                                    animate={{ scale: [1, 1.2, 1] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
+                                >
+                                    <Asterisk className="w-6 h-6 text-amber-500" />
+                                </motion.div>
+                                <div className="flex flex-col text-left">
+                                    <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                                        {mandatoryCount}
+                                    </span>
+                                    <span className="text-xs text-amber-600 dark:text-amber-500">Mandatory</span>
+                                </div>
+                            </motion.button>
+
 
                             {/* Average Progress */}
                             <motion.div
@@ -859,6 +955,13 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                                                 <span className="flex items-center gap-1 text-muted-foreground"><Calendar className="h-4 w-4" /> Duration: {module.duration || '-'} days</span>
                                                             )}
                                                         </div>
+                                                        
+                                                        {/* Mandatory Icon */}
+                                                        {(module.mandatory === 1 || module.mandatory === "1" || module.mandatory === true || String(module.mandatory).toLowerCase() === "true") ? (
+                                                            <div className="absolute top-2 left-2 z-20 flex items-center justify-center w-8 h-8 rounded-md border border-amber-400 dark:border-[#c27803] bg-amber-100 dark:bg-[#2c1705] drop-shadow-sm" title="Mandatory Module">
+                                                                <Asterisk className="h-5 w-5 text-amber-600 dark:text-[#f59e0b]" />
+                                                            </div>
+                                                        ) : null}
                                                         {/* Image or Letter Avatar */}
                                                         {hasImage ? (
                                                             <div className="w-full h-44 relative" style={{ marginTop: '2rem' }}>

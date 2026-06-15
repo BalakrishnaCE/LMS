@@ -21,8 +21,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
 import { motion } from "framer-motion"
-import { Download, X, CopyPlus, Bot } from "lucide-react"
+import { Download, X, CopyPlus, Bot, Asterisk, Filter, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import { LMS_API_BASE_URL, ROUTES } from "@/config/routes"
 
@@ -37,10 +42,6 @@ const debounce = (fn: Function, delay: number) => {
 
 interface ModulesProps {
     itemsPerPage: number;
-    showArchived?: boolean;
-    onShowArchivedChange?: (value: boolean) => void;
-    showNotIngestedOnly?: boolean;
-    onShowNotIngestedOnlyChange?: (value: boolean) => void;
 }
 
 
@@ -79,10 +80,6 @@ function downloadCSV(csv: string, filename: string) {
 
 function Modules({ 
     itemsPerPage, 
-    showArchived = false, 
-    onShowArchivedChange,
-    showNotIngestedOnly = false,
-    onShowNotIngestedOnlyChange
 }: ModulesProps) {
     const [page, setPage] = useState(1)
     // Initialize search query from localStorage
@@ -98,6 +95,9 @@ function Modules({
     const [selectedStatus, setSelectedStatus] = useState(() => {
         return localStorage.getItem('modules_status') || "all";
     })
+    const [showArchived, setShowArchived] = useState(false)
+    const [showNotIngestedOnly, setShowNotIngestedOnly] = useState(false)
+    const [mandatoryFilter, setMandatoryFilter] = useState("all")
     const [isExporting, setIsExporting] = useState(false)
     // Add image error state for all cards
     const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
@@ -111,6 +111,7 @@ function Modules({
     // Bot ingestion state
     const [showIngestConfirm, setShowIngestConfirm] = useState(false);
     const [moduleToIngest, setModuleToIngest] = useState<{ name: string; name1: string } | null>(null);
+    const [activeFilterTab, setActiveFilterTab] = useState<string>('Status');
 
     // Debounced save function for search query
     const saveSearchToStorage = useCallback(
@@ -189,10 +190,15 @@ function Modules({
     if (showNotIngestedOnly) {
         filters.push(["is_injest", "=", 0])
     }
+    if (mandatoryFilter === "mandatory") {
+        filters.push(["mandatory", "=", 1])
+    } else if (mandatoryFilter === "optional") {
+        filters.push(["mandatory", "=", 0])
+    }
 
     const { data: module_data } = useFrappeGetDocList("LMS Module",
         {
-            fields: ["name", "name1", "short_text", "description", "status", "image", "department", "is_injest"],
+            fields: ["name", "name1", "short_text", "description", "status", "image", "department", "is_injest", "mandatory"],
             limit: itemsPerPage,
             limit_start: (page - 1) * itemsPerPage,
             filters: filters
@@ -209,7 +215,7 @@ function Modules({
 
     const totalPages = Math.ceil((total_count?.length || 0) / itemsPerPage)
 
-    const module_list = module_data?.map((module: { name: string; name1: string; description: string; status: string; image: string; short_text: string; department: string; is_injest: number }) => ({
+    const module_list = module_data?.map((module: { name: string; name1: string; description: string; status: string; image: string; short_text: string; department: string; is_injest: number, mandatory: number }) => ({
         name: module.name,
         name1: module.name1,
         description: module.description,
@@ -218,16 +224,16 @@ function Modules({
         short_text: module.short_text,
         department: module.department,
         is_injest: module.is_injest,
+        mandatory: module.mandatory,
     }))
 
     const handlePageChange = (newPage: number) => {
         setPage(newPage)
     }
 
-    // Reset page when filters change
     useEffect(() => {
         setPage(1)
-    }, [searchQuery, selectedDepartment, selectedStatus, showArchived, showNotIngestedOnly])
+    }, [searchQuery, selectedDepartment, selectedStatus, showArchived, showNotIngestedOnly, mandatoryFilter])
 
     // Reset status filter when showArchived changes
     useEffect(() => {
@@ -382,11 +388,18 @@ function Modules({
         }
     };
 
+    const hasActiveFilters = 
+        selectedDepartment !== "all" ||
+        selectedStatus !== "all" ||
+        showArchived ||
+        showNotIngestedOnly ||
+        mandatoryFilter !== "all";
+
     return (
         <div className="overflow-x-auto">
 
-            <div className="flex gap-4 p-4 mb-4 flex-wrap">
-                <div className="flex-[5] relative min-w-0 shrink">
+            <div className="flex gap-4 p-4 mb-4 flex-wrap items-center">
+                <div className="flex-1 relative min-w-0 shrink">
                     <Input
                         placeholder="Search modules..."
                         value={searchQuery}
@@ -403,89 +416,134 @@ function Modules({
                         </button>
                     )}
                 </div>
-                <div className="w-[180px] flex-shrink-0">
-                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                        <SelectTrigger className="border-2 border-border/50 focus:border-primary">
-                            <SelectValue placeholder="Department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Departments</SelectItem>
-                            {sortedDepartments.map((dept) => (
-                                <SelectItem key={dept.name} value={dept.name}>
-                                    {dept.department || dept.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                {!showArchived ? (
-                    <div className="w-[180px] -ml-3 flex-shrink-0">
-                        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                            <SelectTrigger className="border-2 border-border/50 focus:border-primary">
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="Published">Published</SelectItem>
-                                <SelectItem value="Draft">Draft</SelectItem>
-                                <SelectItem value="Approval Pending">Approval Pending</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                ) : (
-                    <div className="w-[180px] -ml-3 flex-shrink-0"></div>
-                )}
-                <div className="flex items-center gap-2 flex-shrink-0 -ml-2">
-                    <Label htmlFor="archived-toggle" className="text-sm font-medium whitespace-nowrap">
-                        {showArchived ? "Archived" : "Archived"}
-                    </Label>
-                    <button
-                        id="archived-toggle"
-                        type="button"
-                        role="switch"
-                        aria-checked={showArchived}
-                        onClick={() => onShowArchivedChange?.(!showArchived)}
-                        className={`
-                            relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                            border-0 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-                            ${showArchived ? 'bg-[#018790]' : 'bg-gray-300 dark:bg-gray-600'}
-                        `}
-                    >
-                        <span
-                            className={`
-                                inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                                ${showArchived ? 'translate-x-6' : 'translate-x-1'}
-                            `}
-                        />
-                    </button>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                    <Label htmlFor="not-ingested-toggle" className="text-sm font-medium whitespace-nowrap">
-                        Not Ingested
-                    </Label>
-                    <button
-                        id="not-ingested-toggle"
-                        type="button"
-                        role="switch"
-                        aria-checked={showNotIngestedOnly}
-                        onClick={() => onShowNotIngestedOnlyChange?.(!showNotIngestedOnly)}
-                        className={`
-                            relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                            border-0 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-                            ${showNotIngestedOnly ? 'bg-[#018790]' : 'bg-gray-300 dark:bg-gray-600'}
-                        `}
-                    >
-                        <span
-                            className={`
-                                inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                                ${showNotIngestedOnly ? 'translate-x-6' : 'translate-x-1'}
-                            `}
-                        />
-                    </button>
-                </div>
+
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" className="flex items-center gap-2 border-2 border-border/50 relative">
+                            <Filter className="h-4 w-4" />
+                            Filters
+                            <ChevronDown className="h-4 w-4 ml-1 opacity-50" />
+                            {hasActiveFilters && (
+                                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary border-2 border-background" />
+                            )}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="end">
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <div>
+                                <h4 className="font-semibold text-foreground">Filters</h4>
+                                <p className="text-xs text-muted-foreground">Select criteria to filter your modules</p>
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => {
+                                    setSelectedStatus('all');
+                                    setSelectedDepartment('all');
+                                    setShowArchived(false);
+                                    setShowNotIngestedOnly(false);
+                                    setMandatoryFilter('all');
+                                }}
+                                className="text-primary hover:text-primary/80"
+                            >
+                                Clear all
+                            </Button>
+                        </div>
+                        <div className="flex h-[220px]">
+                            {/* Sidebar */}
+                            <div className="w-[130px] border-r p-2 flex flex-col gap-1 overflow-y-auto">
+                                {['Status', 'Departments', 'Archived', 'Ingested', 'Mandatory'].map(tab => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveFilterTab(tab)}
+                                        className={`text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                                            activeFilterTab === tab 
+                                                ? 'bg-secondary font-medium text-foreground' 
+                                                : 'hover:bg-muted/50 text-muted-foreground'
+                                        }`}
+                                    >
+                                        {tab}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Content */}
+                            <div className="flex-1 p-4 overflow-y-auto">
+                                <h5 className="font-medium mb-4 text-sm">{activeFilterTab}</h5>
+                                
+                                {activeFilterTab === 'Status' && (
+                                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select Status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Statuses</SelectItem>
+                                            <SelectItem value="Published">Published</SelectItem>
+                                            <SelectItem value="Draft">Draft</SelectItem>
+                                            <SelectItem value="Approval Pending">Approval Pending</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                                
+                                {activeFilterTab === 'Departments' && (
+                                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select Department" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Departments</SelectItem>
+                                            {sortedDepartments.map((dept) => (
+                                                <SelectItem key={dept.name} value={dept.name}>
+                                                    {dept.department || dept.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+
+                                {activeFilterTab === 'Archived' && (
+                                    <Select value={showArchived ? "archived" : "active"} onValueChange={(val) => setShowArchived(val === "archived")}>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select Archive Status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="active">Active Modules</SelectItem>
+                                            <SelectItem value="archived">Archived Modules</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
+
+                                {activeFilterTab === 'Ingested' && (
+                                    <Select value={showNotIngestedOnly ? "not_ingested" : "all"} onValueChange={(val) => setShowNotIngestedOnly(val === "not_ingested")}>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select Ingest Status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Modules</SelectItem>
+                                            <SelectItem value="not_ingested">Not Ingested</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
+
+                                {activeFilterTab === 'Mandatory' && (
+                                    <Select value={mandatoryFilter} onValueChange={setMandatoryFilter}>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select Mandatory" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Modules</SelectItem>
+                                            <SelectItem value="mandatory">Mandatory</SelectItem>
+                                            <SelectItem value="optional">Optional</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+                
                 <Button
                     variant="outline"
-                    className="w-auto flex-shrink-0 ml-2"
+                    className="w-auto flex-shrink-0"
                     onClick={handleExport}
                     disabled={isExporting}
                 >
@@ -555,10 +613,17 @@ function Modules({
                                 <div className="flex-1 flex flex-col">
                                     <div className="relative">
                                         {/* Status Bar */}
-                                        <div className={`w-full h-8 flex items-center justify-center text-sm font-medium ${statusColor} ${statusDarkColor} z-10`}
+                                        <div className={`w-full h-8 flex items-center justify-center text-sm font-medium ${statusColor} ${statusDarkColor} z-10 relative`}
                                             style={{ position: 'absolute', top: 0, left: 0 }}>
                                             {module.status === "Approval Pending" ? "Pending" : module.status}
                                         </div>
+                                        
+                                        {/* Mandatory Icon */}
+                                        {module.mandatory ? (
+                                            <div className="absolute top-2 left-2 z-20 flex items-center justify-center w-8 h-8 rounded-md border border-amber-400 dark:border-[#c27803] bg-amber-100 dark:bg-[#2c1705] drop-shadow-sm" title="Mandatory Module">
+                                                <Asterisk className="h-5 w-5 text-amber-600 dark:text-[#f59e0b]" />
+                                            </div>
+                                        ) : null}
                                         {/* Duplicate Icon Button - Positioned below status bar (h-8 = 2rem, so 2rem + 0.5rem = 2.5rem = top-10) */}
                                         <button
                                             onClick={(e) => {

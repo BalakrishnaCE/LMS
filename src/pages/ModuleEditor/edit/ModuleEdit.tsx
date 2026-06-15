@@ -36,6 +36,7 @@ export interface ModuleInfo {
   image?: string;
   learners?: { user: string }[];
   order?: number;
+  mandatory?: boolean;
 }
 
 export default function ModuleEdit() {

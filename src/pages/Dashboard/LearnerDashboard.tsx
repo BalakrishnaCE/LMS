@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Link } from "wouter"
-import { BookOpen, Clock, Award, Calendar, Target, Lock, PlayCircle, FastForward, CheckCircle } from "lucide-react"
+import { BookOpen, Clock, Award, Calendar, Target, Lock, PlayCircle, FastForward, CheckCircle, Star } from "lucide-react"
 import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
@@ -898,7 +898,17 @@ export default function LearnerDashboard() {
                                     {/* Progress and Meta */}
                                     <div className="flex flex-col gap-1 mt-2">
                                       <div className="flex flex-col space-y-1 text-xs">
-                                        <h3 className="text-lg font-semibold truncate">{module.name1}</h3>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <h3 className="text-lg font-semibold truncate">{module.name1}</h3>
+                                          {(module.mandatory === 1 || module.mandatory === "1" || module.mandatory === true || String(module.mandatory).toLowerCase() === "true") ? (
+                                            <span className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-[#eba834] bg-[#eba834]/10 px-2 py-0.5 rounded-full" title="Mandatory Module">
+                                              <div className="flex items-center justify-center w-3.5 h-3.5 bg-[#eba834] rounded-full">
+                                                <Star className="w-2 h-2 text-white fill-white" />
+                                              </div>
+                                              Mandatory
+                                            </span>
+                                          ) : null}
+                                        </div>
                                         <p className="text-sm text-muted-foreground truncate">{module.description?.replace(/<[^>]+>/g, '')}</p>
                                         <div className="flex items-center justify-between">
                                           <span className="text-muted-foreground">Progress</span>
@@ -983,7 +993,7 @@ export default function LearnerDashboard() {
                   </section>
                   {/* Ready to Start Modules */}
                   <section className="mt-8">
-                    <h3 className="text-lg font-semibold mb-2">Ready to Start</h3>
+                    <h3 className="text-lg font-semibold mb-2">What's New</h3>
                     {deadlinesLoading ? (
                       <div className="flex flex-col items-center justify-center p-8">
                         <Lottie animationData={loadingAnimation} loop style={{ width: 120, height: 120 }} />
@@ -1110,7 +1120,17 @@ export default function LearnerDashboard() {
                                       {/* Meta */}
                                       <div className="flex flex-col gap-1 mt-2">
                                         <div className="flex flex-col space-y-1 text-xs">
-                                          <h3 className="text-lg font-semibold truncate">{module.name1}</h3>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <h3 className="text-lg font-semibold truncate">{module.name1}</h3>
+                                          {(module.mandatory === 1 || module.mandatory === "1" || module.mandatory === true || String(module.mandatory).toLowerCase() === "true") ? (
+                                              <span className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-[#eba834] bg-[#eba834]/10 px-2 py-0.5 rounded-full" title="Mandatory Module">
+                                                <div className="flex items-center justify-center w-3.5 h-3.5 bg-[#eba834] rounded-full">
+                                                  <Star className="w-2 h-2 text-white fill-white" />
+                                                </div>
+                                                Mandatory
+                                              </span>
+                                            ) : null}
+                                          </div>
                                           <p className="text-sm text-muted-foreground truncate">{module.description?.replace(/<[^>]+>/g, '')}</p>
                                         </div>
                                         {duration !== 0 && <span className="text-xs text-muted-foreground mt-1">Duration: {duration} days</span>}
@@ -1445,7 +1465,7 @@ export default function LearnerDashboard() {
               {/* Ready to Start: Only modules with no progress, ordered */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Ready to Start</CardTitle>
+                  <CardTitle>What's New</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {deadlinesLoading ? (
