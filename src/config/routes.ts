@@ -35,7 +35,8 @@ export const ROUTES = {
   QUIZ: '/quiz',
   QUIZ_QUESTIONS: '/quiz-questions',
   AI_CHAT: '/ai',
-  FAQ: '/faq'
+  FAQ: '/faq',
+  AI_MODULE_WIZARD: '/ai-module-wizard'
 } as const;
 
 
