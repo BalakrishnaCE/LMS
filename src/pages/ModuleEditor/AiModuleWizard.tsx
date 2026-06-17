@@ -415,7 +415,7 @@ function StepProcessing({
         setProgressMsg("Waiting in task queue...");
 
         // Poll status
-        const pollUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.get_status?job_id=${jobId}`;
+        const pollUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.get_status?ai_job_id=${jobId}`;
         
         pollInterval = setInterval(async () => {
           try {
@@ -451,11 +451,9 @@ function StepProcessing({
             }
           } catch (pollErr) {
             console.error("Polling error:", pollErr);
-            if (pollErr instanceof Error && (pollErr.message.includes("failed") || pollErr.message.includes("Failed"))) {
-              if (pollInterval) clearInterval(pollInterval);
-              toast.error(pollErr.message);
-              onFailed();
-            }
+            if (pollInterval) clearInterval(pollInterval);
+            toast.error(pollErr instanceof Error ? pollErr.message : "Generation failed.");
+            onFailed();
           }
         }, 2000);
 
@@ -915,7 +913,7 @@ export default function AiModuleWizard() {
 
   const handleProcessingDone = (moduleId: string) => {
     setCreatedModuleName(moduleId);
-    setStep(3);
+    setStep(3); // Transition to the Review tab instead of instantly navigating
   };
 
   const handleProcessingFailed = () => {
