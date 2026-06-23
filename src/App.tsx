@@ -26,6 +26,7 @@ import { ErrorBoundary } from "@/lib/error-boundary";
 import FloatingChatButton from "@/components/FloatingChatButton";
 import AiChatPage from "@/pages/AiChat/AiChatPage";
 import FAQPage from "./pages/FAQ/FAQPage";
+import QuickCreate from "@/pages/QuickCreate/QuickCreate";
 // import AnalyticsDashboardNew from "@/pages/Analytics/AnalyticsDashboard";
 // import H5PReactDemo from '@/pages/Test/H5PReactDemo';
 // import TESTH5P from '@/pages/Test/TESTH5P';
@@ -123,6 +124,12 @@ function AppContent() {
 
         <ProtectedRoute path="/ai-module-wizard" component={() => (
           <AiModuleWizard />
+        )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
+
+        <ProtectedRoute path="/quick-create" component={() => (
+          <Layout>
+            <QuickCreate />
+          </Layout>
         )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
 
         <Route path="/:path*" component={NotFound} />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useFrappeGetCall, useFrappePostCall, useFrappeGetDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
 import { LMS_API_BASE_URL } from "@/config/routes";
@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button";
 import { ContentRenderer } from "@/pages/Modules/Learner/components/ContentRenderer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
-import { BookOpen, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Trash2, Bot } from "lucide-react";
+import { BookOpen, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Trash2, Bot, WandSparkles, X, Send, FileText, Plus } from "lucide-react";
 import { toast } from "sonner";
 import Lottie from "lottie-react";
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
 import loadingAnimation from '@/assets/Loading.json';
 import { ROUTES } from "@/config/routes";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // TypeScript interfaces
 interface Content {
@@ -46,6 +48,423 @@ interface Module {
     image?: string;
 }
 
+// ─── AI Processing View Component ─────────────────────────────────────────────
+
+function AiProcessingView() {
+    const [progress, setProgress] = useState(0);
+    const [scanPos, setScanPos] = useState(0);
+
+    useEffect(() => {
+        const scanTimer = setInterval(() => {
+            setScanPos(prev => (prev >= 100 ? 0 : prev + 2));
+        }, 50);
+
+        const progressTimer = setInterval(() => {
+            setProgress(prev => {
+                if (prev >= 95) return prev;
+                return Math.min(prev + Math.random() * 8 + 2, 95);
+            });
+        }, 280);
+
+        return () => {
+            clearInterval(scanTimer);
+            clearInterval(progressTimer);
+        };
+    }, []);
+
+    return (
+        <div className="flex flex-col items-center justify-center gap-10 h-full py-20 min-h-[500px]">
+            <style>{`
+        @keyframes pulse-ring {
+          0% { transform: scale(0.95); opacity: 0.7; }
+          50% { transform: scale(1.08); opacity: 0.3; }
+          100% { transform: scale(0.95); opacity: 0.7; }
+        }
+        @keyframes spin-gear {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes float-card {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes data-stream {
+          0% { opacity: 0; transform: translateX(-12px); }
+          30% { opacity: 1; }
+          70% { opacity: 1; }
+          100% { opacity: 0; transform: translateX(12px); }
+        }
+      `}</style>
+
+            {/* Document extraction card */}
+            <div className="relative flex items-center justify-center">
+                {/* Outer pulse ring */}
+                <div
+                    className="absolute rounded-3xl border-2 border-[#00c8b6]/30"
+                    style={{
+                        width: "180px",
+                        height: "220px",
+                        animation: "pulse-ring 2s ease-in-out infinite",
+                    }}
+                />
+                {/* Main document card */}
+                <div
+                    className="relative flex flex-col items-center justify-center gap-3 w-40 h-48 rounded-2xl border-2 shadow-xl overflow-hidden bg-[#00c8b6]/5 border-[#00c8b6]/20 text-[#00c8b6]"
+                    style={{ animation: "float-card 3s ease-in-out infinite" }}
+                >
+                    {/* Scanning line */}
+                    <div
+                        className="absolute left-0 right-0 h-0.5 bg-[#00c8b6]/60 z-10"
+                        style={{
+                            top: `${scanPos}%`,
+                            boxShadow: "0 0 8px 2px rgba(0,200,182,0.4)",
+                            transition: "top 30ms linear",
+                        }}
+                    />
+                    {/* Lines of fake text to scan */}
+                    <div className="w-full px-4 space-y-2 z-0">
+                        {[80, 65, 80, 50, 75, 60].map((w, i) => (
+                            <div
+                                key={i}
+                                className="h-1.5 rounded-full bg-current opacity-15"
+                                style={{ width: `${w}%` }}
+                            />
+                        ))}
+                    </div>
+
+                    {/* File icon + label */}
+                    <div className="absolute bottom-3 flex flex-col items-center gap-1 z-10">
+                        <FileText className="w-6 h-6 opacity-70" />
+                        <span className="text-[9px] font-bold tracking-widest uppercase opacity-60">
+                            FILE
+                        </span>
+                    </div>
+                </div>
+
+                {/* Orbiting gear */}
+                <div
+                    className="absolute -bottom-3 -right-3 w-9 h-9 rounded-full bg-[#00c8b6]/10 border border-[#00c8b6]/20 flex items-center justify-center shadow"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        className="w-5 h-5 text-[#00c8b6]"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        style={{ animation: "spin-gear 3s linear infinite" }}
+                    >
+                        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                        <path d="M19.622 10.395l-1.097-2.65L20 6l-2-2-1.735 1.483-2.707-1.113L12.935 2h-1.954l-.632 2.401-2.645 1.115L6 4 4 6l1.453 1.789-1.08 2.657L2 11v2l2.401.655L5.516 16.3 4 18l2 2 1.791-1.46 2.606 1.072L11 22h2l.604-2.387 2.651-1.098C16.697 18.833 18 20 18 20l2-2-1.484-1.75 1.098-2.652 2.386-.62V11l-2.378-.605Z" />
+                    </svg>
+                </div>
+
+                {/* Streaming data dots */}
+                <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex flex-col gap-2">
+                    {[0, 0.3, 0.6].map((delay, i) => (
+                        <div
+                            key={i}
+                            className="w-1.5 h-1.5 rounded-full bg-[#00c8b6]"
+                            style={{
+                                animation: `data-stream 1.4s ease-in-out ${delay}s infinite`,
+                            }}
+                        />
+                    ))}
+                </div>
+                <div className="absolute -right-8 top-1/2 -translate-y-1/2 flex flex-col gap-2">
+                    {[0.2, 0.5, 0.8].map((delay, i) => (
+                        <div
+                            key={i}
+                            className="w-1.5 h-1.5 rounded-full bg-[#00c8b6]"
+                            style={{
+                                animation: `data-stream 1.4s ease-in-out ${delay}s infinite`,
+                            }}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            {/* Label + progress */}
+            <div className="flex flex-col items-center gap-3 w-full max-w-md">
+                <p className="text-sm font-medium text-foreground text-center animate-pulse">Applying the changes...</p>
+                <div className="w-full max-w-xs space-y-2">
+                    <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-[#00c8b6] rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── AI Chat Sidebar Component ──────────────────────────────────────────────
+
+function AiChatSidebar({ 
+    isOpen, 
+    onClose, 
+    module, 
+    onProcessingStart, 
+    onProcessingComplete,
+    isProcessingAiChanges
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    module: any;
+    onProcessingStart: () => void;
+    onProcessingComplete: () => void;
+    isProcessingAiChanges?: boolean;
+}) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [chatInput, setChatInput] = useState("");
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+    const [chatMessages, setChatMessages] = useState<Array<{ 
+        role: 'system' | 'user' | 'assistant', 
+        text: string,
+        requiresConfirmation?: boolean,
+        status?: 'pending' | 'accepted' | 'rejected'
+    }>>([
+        { role: 'system', text: "" }
+    ]);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [chatMessages, isOpen]);
+
+    const handleSendMsg = () => {
+        if (!chatInput.trim() || isGenerating || isProcessingAiChanges) return;
+        const userInput = chatInput.trim();
+        setChatInput("");
+        setIsGenerating(true);
+        
+        setChatMessages(prev => {
+            const filtered = prev.filter(msg => msg.role !== 'system');
+            return [...filtered, { role: 'user', text: userInput }];
+        });
+        
+        // Simulate AI thinking and responding
+        setTimeout(() => {
+            setChatMessages(prev => [...prev, {
+                role: 'assistant',
+                text: `I will process the following changes based on your request:\n"${userInput}"\n\nDo you want to proceed with these changes?`,
+                requiresConfirmation: true,
+                status: 'pending'
+            }]);
+            setIsGenerating(false);
+        }, 1000);
+    };
+
+    const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (!isGenerating && !isProcessingAiChanges) {
+                handleSendMsg();
+            }
+        }
+    };
+
+    const handleConfirmAction = (index: number, action: 'accepted' | 'rejected') => {
+        setChatMessages(prev => prev.map((msg, i) => {
+            if (i === index) {
+                return { ...msg, status: action };
+            }
+            return msg;
+        }));
+
+        if (action === 'accepted') {
+            onProcessingStart();
+            
+            // Simulate processing time
+            setTimeout(() => {
+                onProcessingComplete();
+                setChatMessages(prev => [...prev, {
+                    role: 'assistant',
+                    text: "Changes have been successfully applied! You can review the updated module content in the main view."
+                }]);
+            }, 3000);
+        } else {
+            setTimeout(() => {
+                setChatMessages(prev => [...prev, {
+                    role: 'assistant',
+                    text: "Changes were rejected. Let me know what else you'd like to do."
+                }]);
+            }, 500);
+        }
+    };
+
+    return (
+        <div className={`bg-card border-l flex flex-col shadow-xl transition-all duration-300 ease-in-out sticky top-0 h-screen overflow-hidden flex-shrink-0 ${isOpen ? 'w-96 opacity-100' : 'w-0 opacity-0 border-none'}`}>
+            {/* Chat Header */}
+            <div className="flex items-center justify-between p-4 border-b bg-muted/30 whitespace-nowrap">
+                <div className="flex items-center gap-2">
+                    <WandSparkles className="w-5 h-5 text-[#00c8b6]" />
+                    <h3 className="font-semibold text-foreground">AI Enhancement</h3>
+                </div>
+                <Button variant="ghost" size="icon" onClick={onClose}>
+                    <X className="w-4 h-4" />
+                </Button>
+            </div>
+
+            {/* Chat Messages */}
+            <ScrollArea className="flex-1 w-full relative">
+                <div className="p-4 space-y-4">
+                {chatMessages.map((msg, idx) => (
+                    <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        <div className="text-xs text-muted-foreground mb-1">
+                            {msg.role === 'user' ? 'You' : 'Luna'}
+                        </div>
+                        <div className={`p-3 rounded-xl max-w-[90%] text-sm ${msg.role === 'user' ? 'bg-[#00c8b6]/20 text-foreground' : 'bg-muted text-foreground'}`}>
+                            {msg.role === 'system' ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-background flex items-center justify-center flex-shrink-0 border border-border/50">
+                                            <BookOpen className="w-5 h-5 text-[#00c8b6]" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-foreground">Luna's Generation Complete!</h4>
+                                            <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                                                Hi,I've successfully structured your course module with
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 bg-background/50 rounded-lg p-3 text-center border border-border/50">
+                                        <div>
+                                            <div className="font-bold text-[#00c8b6] text-lg">{module?.lessons?.length || 0}</div>
+                                            <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground mt-1">Lessons</div>
+                                        </div>
+                                        <div className="border-x border-border/50">
+                                            <div className="font-bold text-[#00c8b6] text-lg">{module?.lessons?.reduce((acc: number, l: any) => acc + (l.chapters?.length || 0), 0) || 0}</div>
+                                            <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground mt-1">Chapters</div>
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-[#00c8b6] text-lg">{module?.lessons?.reduce((acc: number, l: any) => acc + (l.chapters?.reduce((acc2: number, c: any) => acc2 + (c.contents?.filter((ct: any) => ct.content_type === "Quiz").length || 0), 0) || 0), 0) || 0}</div>
+                                            <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground mt-1">Quizzes</div>
+                                        </div>
+
+                                    </div>
+                                    <p className="text-xs text-foreground font-bold leading-relaxed mt-1">
+                                        Here you can Enhance the Module
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="whitespace-pre-wrap">{msg.text}</div>
+                            )}
+                            {msg.role === 'assistant' && msg.requiresConfirmation && (
+                                <div className="mt-3 flex items-center gap-2">
+                                    <Button 
+                                        size="sm" 
+                                        className="bg-[#00c8b6] hover:bg-[#00c8b6]/90 text-black text-xs h-8"
+                                        disabled={msg.status !== 'pending'}
+                                        onClick={() => handleConfirmAction(idx, 'accepted')}
+                                    >
+                                        {msg.status === 'accepted' ? 'Proceeded' : 'Proceed'}
+                                    </Button>
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        className="text-xs h-8 border-destructive/20 hover:bg-destructive/10 text-destructive"
+                                        disabled={msg.status !== 'pending'}
+                                        onClick={() => handleConfirmAction(idx, 'rejected')}
+                                    >
+                                        {msg.status === 'rejected' ? 'Rejected' : 'Reject'}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ))}
+                <div ref={messagesEndRef} />
+                </div>
+            </ScrollArea>
+
+            {/* Chat Input */}
+            <div className="p-4 border-t bg-muted/30">
+                <div className="relative flex flex-col w-full bg-background border border-[#00c8b6]/30 rounded-xl transition-colors focus-within:ring-1 focus-within:ring-[#00c8b6] focus-within:border-[#00c8b6]">
+                    
+                    {/* Attachments Preview Area */}
+                    {attachedFiles.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-3 px-3 pb-0">
+                            {attachedFiles.map((file, i) => (
+                                <div key={i} className="relative group">
+                                    <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
+                                        {file.type.startsWith('image/') ? (
+                                            <img src={URL.createObjectURL(file)} alt="attachment" className="h-full w-full object-cover" />
+                                        ) : (
+                                            <FileText className="h-6 w-6 text-muted-foreground" />
+                                        )}
+                                    </div>
+                                    <button 
+                                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                        onClick={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="relative flex items-end w-full">
+                        <input 
+                            type="file" 
+                            ref={fileInputRef}
+                            className="hidden" 
+                            accept="image/*,.pdf,.doc,.docx"
+                            multiple
+                            onChange={(e) => {
+                                if (e.target.files && e.target.files.length > 0) {
+                                    const newFiles = Array.from(e.target.files);
+                                    setAttachedFiles(prev => [...prev, ...newFiles]);
+                                    // Reset input so the same file can be selected again
+                                    e.target.value = '';
+                                }
+                            }}
+                        />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute left-2 bottom-[6px] z-10 h-8 w-8 rounded-full bg-muted/50 hover:bg-muted text-muted-foreground transition-colors"
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <Plus className="w-4 h-4" />
+                        </Button>
+                        <Textarea
+                            ref={textareaRef}
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            placeholder="Type your message here..."
+                            onKeyDown={handleKeyPress}
+                            rows={1}
+                            className="w-full bg-transparent border-0 pl-11 pr-12 py-3 text-sm focus-visible:ring-0 resize-none min-h-[44px] max-h-[120px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] shadow-none"
+                            onInput={(e) => {
+                                const target = e.currentTarget;
+                                target.style.height = 'auto';
+                                target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                            }}
+                        />
+                        <Button
+                            size="icon"
+                            className="absolute right-1 bottom-1 h-9 w-10 bg-transparent hover:bg-[#00c8b6]/20 text-[#00c8b6] disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={handleSendMsg}
+                            disabled={!chatInput.trim() || isGenerating || isProcessingAiChanges}
+                        >
+                            <Send className="w-4 h-4" />
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 
 export default function AdminModuleDetail() {
     const params = useParams<{ moduleName: string }>();
@@ -61,6 +480,10 @@ export default function AdminModuleDetail() {
     const [isIngesting, setIsIngesting] = useState(false);
     const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
+
+    // AI Chat State
+    const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+    const [isProcessingAiChanges, setIsProcessingAiChanges] = useState(false);
 
     const { data: moduleDocData, mutate: mutateModuleDoc } = useFrappeGetDoc("LMS Module", moduleName || "");
     const { call: triggerIngestion } = useFrappePostCall("novel_lms.lms_ai_bot.api.api.start_module_ingestion_v2");
@@ -347,9 +770,9 @@ export default function AdminModuleDetail() {
     // Main render
     return (
         <>
-            <div className="flex min-h-screen bg-muted gap-6 w-full">
+            <div className={`flex min-h-screen bg-muted w-full transition-all duration-300 ${isAiChatOpen ? 'gap-0' : 'gap-6'}`}>
                 {/* Sidebar on the left */}
-                <div className="w-80 border-r flex-shrink-0">
+                <div className={`border-r flex-shrink-0 transition-all duration-300 overflow-hidden ${isAiChatOpen ? 'w-0 opacity-0' : 'w-80 opacity-100'}`}>
                     <ModuleSidebar
                         module={module}
                         progress={null}
@@ -365,9 +788,12 @@ export default function AdminModuleDetail() {
                     />
                 </div>
                 {/* Main Content */}
-                <div className="flex-1 flex justify-center items-start p-8">
+                <div className="flex-1 flex justify-center items-start p-8 min-w-0">
                     <div className="w-full rounded-xl shadow p-8 bg-card">
-                        <div className="space-y-8">
+                        {isProcessingAiChanges ? (
+                            <AiProcessingView />
+                        ) : (
+                            <div className="space-y-8">
                             {/* Admin Preview Indicator and Delete Button - Always Visible */}
                             <div className="flex items-center justify-between">
                                 <div>
@@ -388,10 +814,15 @@ export default function AdminModuleDetail() {
                                     )}
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-md">
-                                        <BookOpen className="h-4 w-4" />
-                                        <span>Admin Preview</span>
-                                    </div>
+                                    {!isAiChatOpen && (
+                                        <div
+                                            className="flex items-center gap-2 text-sm text-foreground bg-muted/50 px-4 py-2 rounded-md cursor-pointer hover:bg-muted/80 transition-colors border border-border"
+                                            onClick={() => setIsAiChatOpen(true)}
+                                        >
+                                            <WandSparkles className="h-4 w-4" />
+                                            <span>Enhance with AI</span>
+                                        </div>
+                                    )}
                                     {moduleDocData?.is_injest === 1 && (
                                         <Button
                                             type="button"
@@ -477,8 +908,19 @@ export default function AdminModuleDetail() {
                                 </>
                             )}
                         </div>
+                        )}
                     </div>
                 </div>
+
+                {/* AI Chat Right Sidebar */}
+                <AiChatSidebar 
+                    isOpen={isAiChatOpen} 
+                    onClose={() => setIsAiChatOpen(false)} 
+                    module={module} 
+                    onProcessingStart={() => setIsProcessingAiChanges(true)} 
+                    onProcessingComplete={() => setIsProcessingAiChanges(false)}
+                    isProcessingAiChanges={isProcessingAiChanges}
+                />
             </div>
 
             {/* Delete Confirmation Dialog */}

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { LMS_API_BASE_URL } from '@/config/routes';
 
 interface TextContentProps {
   content: any;
@@ -30,7 +31,16 @@ export default function TextContent({
   }
 
   // Check if content body is empty or just whitespace
-  const bodyContent = content.body || content.value || "";
+  let bodyContent = content.body || content.value || "";
+  
+  // Fix relative image URLs to point to the backend
+  if (bodyContent) {
+    const apiBaseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const cleanApiBaseUrl = apiBaseUrl.replace(/\/$/, '');
+    bodyContent = bodyContent.replace(/src=["'](\/files\/[^"']+)["']/gi, `src="${cleanApiBaseUrl}$1"`);
+    bodyContent = bodyContent.replace(/src=["'](\/private\/files\/[^"']+)["']/gi, `src="${cleanApiBaseUrl}$1"`);
+  }
+
   const hasContent = bodyContent.trim() !== "" && bodyContent.trim() !== "<p></p>" && bodyContent.trim() !== "<p><br></p>";
 
   // Filter out placeholder titles like "txt", "text", etc.

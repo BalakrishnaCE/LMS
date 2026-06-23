@@ -10,9 +10,10 @@ import { quizContentInfo, QuizPreview } from './quiz';
 import { questionAnswerContentInfo, QuestionAnswerPreview } from './question_answer';
 import { slideContentInfo, SlidePreview } from './slide';
 import { iframeContentInfo, IframePreview } from './iframe';
-import { FileText, Image as ImageIcon, Video as VideoIcon, Volume2, CheckSquare, ListOrdered, File, HelpCircle, FolderKanban, Globe, MessageSquare, Presentation } from 'lucide-react';
+import { FileText, Image as ImageIcon, Video as VideoIcon, Volume2, CheckSquare, ListOrdered, File, HelpCircle, FolderKanban, Globe, MessageSquare, Presentation, BotMessageSquare } from 'lucide-react';
 
 export const contentsList = [
+  { id: 'ai', name: 'AI content', icon: BotMessageSquare, description: 'AI generated content' },
   { ...textContentInfo, icon: FileText, Preview: TextPreview },
   { ...imageContentInfo, icon: ImageIcon, Preview: ImagePreview },
   { ...videoContentInfo, icon: VideoIcon, Preview: VideoPreview },
