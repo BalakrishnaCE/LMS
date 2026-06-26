@@ -38,7 +38,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
-import novelLmsLogo from '@/assets/novel-lms-logo.png';
+import novelLmsLogo from '@/assets/new-LMS-Logo.png';
 
 // Import the new analytics hook
 import { useLMSAnalytics } from "@/lib/api";
