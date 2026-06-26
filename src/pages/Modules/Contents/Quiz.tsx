@@ -586,24 +586,24 @@ function QuizDialog({
                 <h3 className="text-xl font-semibold mb-4">Review Answers</h3>
                 <div className="space-y-4">
                   {resultData.map((item, index) => (
-                    <div key={item.question_id || index} className={`p-4 rounded-lg border ${item.is_correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                      <p className="font-medium mb-3 flex items-start">
+                    <div key={item.question_id || index} className={`p-4 rounded-lg border ${item.is_correct ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/50' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/50'}`}>
+                      <p className="font-medium mb-3 flex items-start text-foreground">
                         <span className="mr-2 min-w-[20px]">{index + 1}.</span> 
                         <span dangerouslySetInnerHTML={{ __html: item.question_text || 'Question' }} />
                       </p>
                       
                       <div className="space-y-2 text-sm md:text-base ml-7">
                         <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
-                          <span className="font-semibold w-24 flex-shrink-0 text-gray-700">Your Answer:</span>
-                          <span className={`${item.is_correct ? 'text-green-700 font-medium' : 'text-red-600 line-through'}`}>
-                            {item.marked_answer || <span className="italic text-gray-400">Not answered</span>}
+                          <span className="font-semibold w-24 flex-shrink-0 text-gray-700 dark:text-gray-300">Your Answer:</span>
+                          <span className={`${item.is_correct ? 'text-green-700 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 line-through'}`}>
+                            {item.marked_answer || <span className="italic text-gray-400 dark:text-gray-500">Not answered</span>}
                           </span>
                         </div>
                         
                         {!item.is_correct && item.correct_answer && (
                           <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
-                            <span className="font-semibold w-24 flex-shrink-0 text-gray-700">Correct:</span>
-                            <span className="text-green-700 font-medium">{item.correct_answer}</span>
+                            <span className="font-semibold w-24 flex-shrink-0 text-gray-700 dark:text-gray-300">Correct:</span>
+                            <span className="text-green-700 dark:text-green-400 font-medium">{item.correct_answer}</span>
                           </div>
                         )}
                       </div>
