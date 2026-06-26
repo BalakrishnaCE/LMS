@@ -22,7 +22,7 @@ import {
 import { useUser } from "@/hooks/use-user"
 import { ROUTES } from "@/config/routes"
 import { Link } from 'wouter'
-
+import logoImage from '@/assets/new-LMS-Logo.png'
 interface NavData {
   user: {
     name: string;
@@ -113,10 +113,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                className="data-[slot=sidebar-menu-button]:!p-1.5"
+                className="data-[slot=sidebar-menu-button]:!p-1.5 hover:bg-transparent active:bg-transparent data-[active=true]:bg-transparent data-[state=open]:bg-transparent !h-auto"
               >
-                <Link href={isLMSAdmin ? ROUTES.HOME : ROUTES.LEARNER_DASHBOARD} className="hover:text-white">
-                  <IconBook className="!size-5" />
+                <Link href={isLMSAdmin ? ROUTES.HOME : ROUTES.LEARNER_DASHBOARD} className="flex items-center">
+                  <img src={logoImage} alt="Novel LMS Logo" className="h-12 w-auto object-contain flex-shrink-0 -mr-3" />
                   <span className="text-base font-semibold">Novel LMS</span>
                 </Link>
               </SidebarMenuButton>

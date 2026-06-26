@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useFrappeAuth, useFrappePostCall, useFrappeGetCall } from 'frappe-react-sdk';
 import Lottie from 'lottie-react';
 import errorAnimation from '@/assets/Error.json';
@@ -208,6 +208,13 @@ function QuizDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [totalQuestions, setTotalQuestions] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (submitted && scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [submitted]);
 
   // Check for existing quiz progress using API
   const { data: quizProgressStatus, isLoading: progressLoading, mutate: refetchProgress } = useFrappeGetCall<{
@@ -516,50 +523,99 @@ function QuizDialog({
     const percent = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
     const scoreColor = percent >= 70 ? '#10b981' : percent >= 50 ? '#f59e0b' : '#ef4444';
 
+    // Get the result data from either the API or local state
+    const resultData = quizProgressStatus?.message?.quiz_data || quiz.questions.map(q => {
+      const userAnswer = answers[q.name] || '';
+      const correctOption = q.options?.find(opt => opt.correct === true || opt.correct === 1 || (opt as any).is_correct === true || (opt as any).is_correct === 1);
+      const correctAnswer = correctOption?.option_text || '';
+      return {
+        question_id: q.name,
+        question_text: q.question_text || q.quiz_question || q.name,
+        marked_answer: userAnswer,
+        correct_answer: correctAnswer,
+        is_correct: userAnswer && correctAnswer && userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase(),
+        question_score: q.score || 1
+      };
+    });
+
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-background rounded-lg p-8 max-w-md w-full mx-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-background rounded-lg p-6 md:p-8 max-w-3xl w-full max-h-[90vh] flex flex-col mx-4">
           <h2 className="text-2xl font-bold text-center mb-6">Quiz Completed!</h2>
 
-          {/* Score Circle */}
-          <div className="flex justify-center mb-6">
-            <div className="relative flex items-center justify-center" style={{ width: 140, height: 140 }}>
-              <svg width="140" height="140" viewBox="0 0 140 140">
-                <circle cx="70" cy="70" r="60" stroke="#e5e7eb" strokeWidth="14" fill="none" />
-                <circle
-                  cx="70" cy="70" r="60"
-                  stroke={scoreColor}
-                  strokeWidth="14"
-                  fill="none"
-                  strokeDasharray={2 * Math.PI * 60}
-                  strokeDashoffset={2 * Math.PI * 60 * (1 - percent / 100)}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-extrabold" style={{ color: scoreColor }}>{percent}%</span>
-                <span className="text-xs text-gray-500 mt-1">Score</span>
+          <div ref={scrollRef} className="overflow-y-auto pr-2 flex-1 custom-scrollbar">
+            <div className="flex flex-col md:flex-row gap-8 items-center md:items-start justify-center mb-8">
+              {/* Score Circle */}
+              <div className="flex-shrink-0">
+                <div className="relative flex items-center justify-center" style={{ width: 140, height: 140 }}>
+                  <svg width="140" height="140" viewBox="0 0 140 140">
+                    <circle cx="70" cy="70" r="60" stroke="#e5e7eb" strokeWidth="14" fill="none" />
+                    <circle
+                      cx="70" cy="70" r="60"
+                      stroke={scoreColor}
+                      strokeWidth="14"
+                      fill="none"
+                      strokeDasharray={2 * Math.PI * 60}
+                      strokeDashoffset={2 * Math.PI * 60 * (1 - percent / 100)}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-4xl font-extrabold" style={{ color: scoreColor }}>{percent}%</span>
+                    <span className="text-xs text-gray-500 mt-1">Score</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center md:text-left flex flex-col justify-center h-full md:pt-4">
+                <p className="text-xl font-medium">You got {correctAnswers} out of {totalQuestions} correct</p>
+                <p className="text-base text-gray-600 mt-2">
+                  {percent >= 70 ? 'Congratulations! You passed! 🎉' : percent >= 50 ? 'Good effort! Try again to improve. 💪' : 'Better luck next time! 📚'}
+                </p>
+                {isSaving && (
+                  <p className="text-sm text-orange-600 mt-2 font-medium animate-pulse">
+                    Saving your progress...
+                  </p>
+                )}
               </div>
             </div>
-          </div>
 
-          <div className="text-center mb-6">
-            <p className="text-lg">You got {correctAnswers} out of {totalQuestions} questions correct</p>
-            <p className="text-sm text-gray-600 mt-2">
-              Score: {correctAnswers} / {totalQuestions} ({percent}%)
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
-              {percent >= 70 ? 'Congratulations! You passed!' : percent >= 50 ? 'Good effort! Try again to improve.' : 'Better luck next time!'}
-            </p>
-            {isSaving && (
-              <p className="text-xs text-orange-600 mt-2 font-medium">
-                Saving your progress...
-              </p>
+            {/* Questions Review */}
+            {resultData && resultData.length > 0 && (
+              <div className="mt-6 border-t pt-6">
+                <h3 className="text-xl font-semibold mb-4">Review Answers</h3>
+                <div className="space-y-4">
+                  {resultData.map((item, index) => (
+                    <div key={item.question_id || index} className={`p-4 rounded-lg border ${item.is_correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                      <p className="font-medium mb-3 flex items-start">
+                        <span className="mr-2 min-w-[20px]">{index + 1}.</span> 
+                        <span dangerouslySetInnerHTML={{ __html: item.question_text || 'Question' }} />
+                      </p>
+                      
+                      <div className="space-y-2 text-sm md:text-base ml-7">
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
+                          <span className="font-semibold w-24 flex-shrink-0 text-gray-700">Your Answer:</span>
+                          <span className={`${item.is_correct ? 'text-green-700 font-medium' : 'text-red-600 line-through'}`}>
+                            {item.marked_answer || <span className="italic text-gray-400">Not answered</span>}
+                          </span>
+                        </div>
+                        
+                        {!item.is_correct && item.correct_answer && (
+                          <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
+                            <span className="font-semibold w-24 flex-shrink-0 text-gray-700">Correct:</span>
+                            <span className="text-green-700 font-medium">{item.correct_answer}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
-          <div className="flex justify-center">
-            <Button onClick={handleComplete} className="px-6">
+          <div className="flex justify-center mt-6 pt-4 border-t shrink-0">
+            <Button onClick={handleComplete} className="px-8 py-2">
               Close
             </Button>
           </div>
