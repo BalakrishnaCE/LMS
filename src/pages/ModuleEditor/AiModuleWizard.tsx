@@ -1,8 +1,17 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+
+import { useFrappeGetDocList } from "frappe-react-sdk";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { LMS_API_BASE_URL } from "@/config/routes";
 import { X, Upload, CheckCircle2, FileText, Image as ImageIcon } from "lucide-react";
@@ -153,22 +162,28 @@ function AnimatedProgressBar({ label }: { label: string }) {
 function StepUpload({
   files,
   onFilesChange,
-  instructions,
-  onInstructionsChange,
   onNext,
   onCancel,
+  department,
+  setDepartment,
+  assignmentBased,
+  setAssignmentBased,
+  departmentOptions,
 }: {
   files: UploadedFile[];
   onFilesChange: (files: UploadedFile[]) => void;
-  instructions: string;
-  onInstructionsChange: (v: string) => void;
   onNext: () => void;
   onCancel: () => void;
+  department: string;
+  setDepartment: (val: string) => void;
+  assignmentBased: string;
+  setAssignmentBased: (val: string) => void;
+  departmentOptions: Array<{ value: string; label: string }>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  const isStep1Valid = files.length > 0 && instructions.trim().length > 0;
+  const isStep1Valid = files.length > 0 && !!department;
 
   const addFiles = useCallback(
     (newFiles: FileList | File[]) => {
@@ -300,25 +315,39 @@ function StepUpload({
         </div>
       )}
 
-      {/* Instructions */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-semibold text-foreground">Any specific instructions?</label>
-          {!instructions.trim() && files.length > 0 && (
-            <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 animate-pulse flex items-center gap-1">
-              ✨ Please write instructions to continue
-            </span>
-          )}
+      {/* Fields */}
+      <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-2 shrink-0">
+        <div className="space-y-2 text-left">
+          <Label htmlFor="department" className="text-xs font-bold text-foreground">
+            Department <span className="text-destructive">*</span>
+          </Label>
+          <Select value={department} onValueChange={setDepartment}>
+            <SelectTrigger id="department" className="w-full">
+              <SelectValue placeholder="Select department" />
+            </SelectTrigger>
+            <SelectContent>
+              {departmentOptions.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Textarea
-          value={instructions}
-          onChange={e => onInstructionsChange(e.target.value)}
-          placeholder="e.g. keep it beginner-friendly, 4 lessons max, include quiz at end of each lesson…"
-          className={`min-h-[90px] resize-none text-sm focus-visible:ring-primary/50 transition-colors duration-300 ${!instructions.trim() && files.length > 0
-              ? "border-amber-300 focus-visible:ring-amber-500/50 bg-amber-500/[0.02] placeholder:text-amber-500/50"
-              : ""
-            }`}
-        />
+
+        <div className="space-y-2 text-left">
+          <Label htmlFor="assignmentBased" className="text-xs font-bold text-foreground">
+            Assignment Based
+          </Label>
+          <Select value={assignmentBased} onValueChange={setAssignmentBased}>
+            <SelectTrigger id="assignmentBased" className="w-full">
+              <SelectValue placeholder="Select assignment type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Department">Department</SelectItem>
+              <SelectItem value="Everyone">Everyone</SelectItem>
+              <SelectItem value="Manual">Manual</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Actions */}
@@ -326,14 +355,13 @@ function StepUpload({
         <Button variant="ghost" onClick={onCancel} className="text-muted-foreground">
           Cancel
         </Button>
-        {isStep1Valid && (
-          <Button
-            onClick={onNext}
-            className="px-8 bg-primary hover:bg-primary/90 text-primary-foreground transition-all duration-300 animate-in fade-in slide-in-from-right-4"
-          >
-            Next
-          </Button>
-        )}
+        <Button
+          onClick={onNext}
+          disabled={!isStep1Valid}
+          className="px-8 bg-primary hover:bg-primary/90 text-primary-foreground transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Next
+        </Button>
       </div>
     </div>
   );
@@ -346,14 +374,27 @@ function StepProcessing({
   instructions,
   onDone,
   onFailed,
+  resumedJobId,
+  department,
+  assignmentBased,
 }: {
   files: UploadedFile[];
   instructions: string;
   onDone: (moduleId: string) => void;
   onFailed: () => void;
+  resumedJobId?: string | null;
+  department: string;
+  assignmentBased: string;
 }) {
-  const [progressMsg, setProgressMsg] = useState("Preparing file uploads...");
+  const [progressMsg, setProgressMsg] = useState(() => {
+    if (resumedJobId) {
+      return localStorage.getItem("active_ai_job_progress") || "Resuming background task...";
+    }
+    return "Preparing file uploads...";
+  });
   const [scanPos, setScanPos] = useState(0);
+  const [jobId, setJobId] = useState<string | null>(resumedJobId || null);
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     // 1. Scanning line animation
@@ -366,53 +407,69 @@ function StepProcessing({
 
     const runBackendWorker = async () => {
       try {
-        const fileUrls: string[] = [];
+        let currentJobId: string = resumedJobId || "";
 
-        // Upload files sequentially
-        for (let i = 0; i < files.length; i++) {
+        if (!currentJobId) {
+          const fileUrls: string[] = [];
+
+          // Upload files sequentially
+          for (let i = 0; i < files.length; i++) {
+            if (!isMounted) return;
+            const ufile = files[i];
+            setProgressMsg(`Uploading file ${i + 1} of ${files.length}: ${ufile.file.name}...`);
+            const fileUrl = await uploadFileToFrappe(ufile.file);
+            fileUrls.push(fileUrl);
+          }
+
           if (!isMounted) return;
-          const ufile = files[i];
-          setProgressMsg(`Uploading file ${i + 1} of ${files.length}: ${ufile.file.name}...`);
-          const fileUrl = await uploadFileToFrappe(ufile.file);
-          fileUrls.push(fileUrl);
+          setProgressMsg("Extracting contents and starting curriculum draft...");
+
+          // Trigger generation API
+          const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
+          const generateUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.generate_module`;
+          
+          const response = await fetch(generateUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
+            body: JSON.stringify({
+              file_urls: fileUrls,
+              instructions: instructions,
+              department: department,
+              assignment_based: assignmentBased,
+            }),
+            credentials: "include",
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to start generation: ${response.statusText}`);
+          }
+
+          const genResult = await response.json();
+          const job = genResult.message;
+          if (!job || !job.success || !job.job_id) {
+            throw new Error(job?.error || "Failed to start AI generation job on server.");
+          }
+
+          const responseJobId = job.job_id as string;
+          currentJobId = responseJobId;
+          if (isMounted) {
+            setJobId(responseJobId);
+            localStorage.setItem("active_ai_job_id", responseJobId);
+            localStorage.setItem("active_ai_job_progress", "Waiting in task queue...");
+          }
         }
 
-        if (!isMounted) return;
-        setProgressMsg("Extracting contents and starting curriculum draft...");
-
-        // Trigger generation API
-        const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
-        const generateUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.generate_module`;
-        
-        const response = await fetch(generateUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-          },
-          body: JSON.stringify({
-            file_urls: fileUrls,
-            instructions: instructions,
-          }),
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to start generation: ${response.statusText}`);
+        if (!resumedJobId) {
+          if (!isMounted) return;
+          setProgressMsg("Waiting in task queue...");
         }
-
-        const genResult = await response.json();
-        const job = genResult.message;
-        if (!job || !job.success || !job.job_id) {
-          throw new Error(job?.error || "Failed to start AI generation job on server.");
-        }
-
-        const jobId = job.job_id;
-        if (!isMounted) return;
-        setProgressMsg("Waiting in task queue...");
 
         // Poll status
-        const pollUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.get_status?ai_job_id=${jobId}`;
+        const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
+        const pollUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.get_status?ai_job_id=${currentJobId}`;
         
         pollInterval = setInterval(async () => {
           try {
@@ -436,20 +493,27 @@ function StepProcessing({
 
             if (statusData.status === "finished") {
               if (pollInterval) clearInterval(pollInterval);
+              localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_progress");
               onDone(statusData.module_id);
             } else if (statusData.status === "failed") {
               if (pollInterval) clearInterval(pollInterval);
+              localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_progress");
               throw new Error(statusData.error || statusData.progress || "Generation job failed on server.");
             } else {
               // Update progress message from server
               if (statusData.progress) {
                 setProgressMsg(statusData.progress);
+                localStorage.setItem("active_ai_job_progress", statusData.progress);
               }
             }
           } catch (pollErr) {
             console.error("Polling error:", pollErr);
             if (pollInterval) clearInterval(pollInterval);
             toast.error(pollErr instanceof Error ? pollErr.message : "Generation failed.");
+            localStorage.removeItem("active_ai_job_id");
+            localStorage.removeItem("active_ai_job_progress");
             onFailed();
           }
         }, 2000);
@@ -458,6 +522,8 @@ function StepProcessing({
         console.error("AI Wizard Error:", err);
         if (isMounted) {
           toast.error(err instanceof Error ? err.message : "An unexpected error occurred.");
+          localStorage.removeItem("active_ai_job_id");
+          localStorage.removeItem("active_ai_job_progress");
           onFailed();
         }
       }
@@ -470,7 +536,7 @@ function StepProcessing({
       clearInterval(scanTimer);
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [files, instructions, onDone, onFailed]);
+  }, [files, instructions, onDone, onFailed, resumedJobId]);
 
   // Pick a file icon colour based on the first file type
   const firstType = files[0]?.file.type ?? "";
@@ -597,6 +663,15 @@ function StepProcessing({
       <div className="flex flex-col items-center gap-3 w-full max-w-md">
         <p className="text-sm font-medium text-foreground text-center animate-pulse">{progressMsg}</p>
         <AnimatedProgressBar label="" />
+        {jobId && (
+          <Button
+            variant="outline"
+            className="mt-6 font-semibold border-primary/30 hover:border-primary text-primary hover:bg-primary/5 transition-all duration-300 shadow-sm"
+            onClick={() => setLocation("/")}
+          >
+            Run in Background
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -607,21 +682,46 @@ function StepProcessing({
 export default function AiModuleWizard() {
   const [, setLocation] = useLocation();
 
-  const [step, setStep] = useState<Step>(1);
+  const [resumedJobId, setResumedJobId] = useState<string | null>(() => {
+    return localStorage.getItem("active_ai_job_id");
+  });
+  const [step, setStep] = useState<Step>(() => {
+    return localStorage.getItem("active_ai_job_id") ? 2 : 1;
+  });
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [instructions, setInstructions] = useState("");
+  const [department, setDepartment] = useState("");
+  const [assignmentBased, setAssignmentBased] = useState("Department");
+  const instructions = "";
 
-  const isStep1Valid = files.length > 0 && instructions.trim().length > 0;
+  const { data: departments } = useFrappeGetDocList("Department", {
+    fields: ["name", "department"],
+    limit: 100,
+  });
 
-  const handleCancel = () => setLocation("/");
+  const departmentOptions = (departments || []).map((dept) => ({
+    value: dept.name,
+    label: dept.department,
+  }));
+
+  const handleCancel = () => {
+    localStorage.removeItem("active_ai_job_id");
+    localStorage.removeItem("active_ai_job_progress");
+    setLocation("/");
+  };
 
   const handleStep1Next = () => setStep(2);
 
   const handleProcessingDone = (moduleId: string) => {
+    setResumedJobId(null);
+    localStorage.removeItem("active_ai_job_id");
+    localStorage.removeItem("active_ai_job_progress");
     setLocation(`/modules/${moduleId}`);
   };
 
   const handleProcessingFailed = () => {
+    setResumedJobId(null);
+    localStorage.removeItem("active_ai_job_id");
+    localStorage.removeItem("active_ai_job_progress");
     setStep(1);
   };
 
@@ -632,29 +732,8 @@ export default function AiModuleWizard() {
     <div className="h-screen bg-muted/30 flex flex-col overflow-hidden">
 
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-6 py-3.5 border-b border-border bg-background/90 backdrop-blur-sm shrink-0 z-10">
-        <button
-          className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          onClick={handleCancel}
-        >
-          Cancel
-        </button>
-
+      <header className="flex items-center justify-end px-6 py-3.5 border-b border-border bg-background/90 backdrop-blur-sm shrink-0 z-10">
         {/* <h1 className="text-base font-semibold text-foreground tracking-tight">AI Wizard</h1> */}
-
-        <Button
-          size="sm"
-          onClick={step === 1 ? handleStep1Next : undefined}
-          className={`
-            px-5 text-sm font-semibold transition-all
-            ${step === 1 && isStep1Valid
-              ? "bg-primary text-primary-foreground hover:bg-primary/90 opacity-100 scale-100"
-              : "opacity-0 pointer-events-none scale-95"
-            }
-          `}
-        >
-          Next
-        </Button>
       </header>
 
       {/* ── Step indicator ───────────────────────────────────────────────── */}
@@ -673,10 +752,13 @@ export default function AiModuleWizard() {
               <StepUpload
                 files={files}
                 onFilesChange={setFiles}
-                instructions={instructions}
-                onInstructionsChange={setInstructions}
                 onNext={handleStep1Next}
                 onCancel={handleCancel}
+                department={department}
+                setDepartment={setDepartment}
+                assignmentBased={assignmentBased}
+                setAssignmentBased={setAssignmentBased}
+                departmentOptions={departmentOptions}
               />
             )}
 
@@ -686,6 +768,9 @@ export default function AiModuleWizard() {
                 instructions={instructions}
                 onDone={handleProcessingDone}
                 onFailed={handleProcessingFailed}
+                resumedJobId={resumedJobId}
+                department={department}
+                assignmentBased={assignmentBased}
               />
             )}
           </div>

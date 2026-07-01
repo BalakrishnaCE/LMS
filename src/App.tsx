@@ -27,6 +27,7 @@ import FloatingChatButton from "@/components/FloatingChatButton";
 import AiChatPage from "@/pages/AiChat/AiChatPage";
 import FAQPage from "./pages/FAQ/FAQPage";
 import QuickCreate from "@/pages/QuickCreate/QuickCreate";
+import { AiJobTracker } from "@/components/AiJobTracker";
 // import AnalyticsDashboardNew from "@/pages/Analytics/AnalyticsDashboard";
 // import H5PReactDemo from '@/pages/Test/H5PReactDemo';
 // import TESTH5P from '@/pages/Test/TESTH5P';
@@ -136,6 +137,7 @@ function AppContent() {
 
       </Switch>
       <FloatingChatButton />
+      <AiJobTracker />
       <Toaster />
     </Router>
   );

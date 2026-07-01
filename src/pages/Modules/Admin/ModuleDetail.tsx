@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 
 import { BookOpen, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Trash2, Bot, WandSparkles, X, Send, FileText, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
 import Lottie from "lottie-react";
 import emptyAnimation from '@/assets/Empty.json';
 import errorAnimation from '@/assets/Error.json';
@@ -207,7 +208,8 @@ function AiChatSidebar({
     module, 
     onProcessingStart, 
     onProcessingComplete,
-    isProcessingAiChanges
+    isProcessingAiChanges,
+    onRefreshModule
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -215,21 +217,28 @@ function AiChatSidebar({
     onProcessingStart: () => void;
     onProcessingComplete: () => void;
     isProcessingAiChanges?: boolean;
+    onRefreshModule?: () => void;
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [chatInput, setChatInput] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
+    const [generatingProgress, setGeneratingProgress] = useState("Luna is thinking...");
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const [chatMessages, setChatMessages] = useState<Array<{ 
         role: 'system' | 'user' | 'assistant', 
         text: string,
+        files?: string[],
         requiresConfirmation?: boolean,
-        status?: 'pending' | 'accepted' | 'rejected'
+        status?: 'pending' | 'accepted' | 'rejected',
+        proposedChanges?: any[]
     }>>([
         { role: 'system', text: "" }
     ]);
+
+    const { call: startEnhancement } = useFrappePostCall("novel_lms.lms_ai_module_creation.api.generator.start_ai_enhancement");
+    const { call: applyChanges } = useFrappePostCall("novel_lms.lms_ai_module_creation.api.generator.apply_ai_enhancements");
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -239,27 +248,126 @@ function AiChatSidebar({
         scrollToBottom();
     }, [chatMessages, isOpen]);
 
-    const handleSendMsg = () => {
-        if (!chatInput.trim() || isGenerating || isProcessingAiChanges) return;
-        const userInput = chatInput.trim();
+    const handleSendMsg = async () => {
+        if ((!chatInput.trim() && attachedFiles.length === 0) || isGenerating || isProcessingAiChanges) return;
+        const userInput = chatInput.trim() || "Analyze the attached file and enhance the module accordingly.";
+        const filesToUpload = [...attachedFiles];
+        
+        // Show files locally instantly using temporary object URLs
+        const tempLocalUrls = filesToUpload.map(file => URL.createObjectURL(file));
+        
         setChatInput("");
+        setAttachedFiles([]);
         setIsGenerating(true);
+        setGeneratingProgress("Preparing file uploads...");
         
         setChatMessages(prev => {
             const filtered = prev.filter(msg => msg.role !== 'system');
-            return [...filtered, { role: 'user', text: userInput }];
+            return [...filtered, { role: 'user', text: userInput, files: tempLocalUrls }];
         });
         
-        // Simulate AI thinking and responding
-        setTimeout(() => {
+        try {
+            // Upload files sequentially
+            const uploadedUrls: string[] = [];
+            for (let i = 0; i < filesToUpload.length; i++) {
+                setGeneratingProgress(`Uploading file ${i + 1} of ${filesToUpload.length}: ${filesToUpload[i].name}...`);
+                try {
+                    const fileUrl = await uploadFileToFrappe(filesToUpload[i]);
+                    uploadedUrls.push(fileUrl);
+                } catch (uploadErr) {
+                    console.error("Failed to upload file:", filesToUpload[i].name, uploadErr);
+                    toast.error(`Failed to upload ${filesToUpload[i].name}`);
+                }
+            }
+
+            setGeneratingProgress("Waiting in queue...");
+            
+            const res = await startEnhancement({
+                module_id: module.name,
+                prompt: userInput,
+                file_urls: uploadedUrls.length > 0 ? JSON.stringify(uploadedUrls) : undefined
+            });
+            
+            if (res.message && res.message.success && res.message.job_id) {
+                const jobId = res.message.job_id;
+                
+                // Poll status API
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch(`${LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : ''}/api/method/novel_lms.lms_ai_module_creation.api.generator.get_status?ai_job_id=${jobId}`, {
+                            method: "GET",
+                            headers: {
+                                "Accept": "application/json",
+                            },
+                            credentials: "include",
+                        });
+                        
+                        if (!statusRes.ok) return;
+                        
+                        const statusResult = await statusRes.json();
+                        const statusData = statusResult.message;
+                        
+                        if (!statusData) return;
+                        
+                        if (statusData.status === "finished") {
+                            clearInterval(pollInterval);
+                            setIsGenerating(false);
+                            
+                            const responseData = statusData.result;
+                            if (responseData) {
+                                const changes = responseData.changes || [];
+                                const hasModifications = changes.some((c: any) => c.action !== "info");
+                                
+                                let replyText = responseData.explanation || "";
+                                const infoChange = changes.find((c: any) => c.action === "info");
+                                if (infoChange) {
+                                    replyText += "\n\n" + infoChange.value;
+                                }
+                                
+                                setChatMessages(prev => [...prev, {
+                                    role: 'assistant',
+                                    text: replyText || "I've processed your request.",
+                                    requiresConfirmation: hasModifications,
+                                    status: hasModifications ? 'pending' : undefined,
+                                    proposedChanges: changes
+                                }]);
+                            }
+                        } else if (statusData.status === "failed") {
+                            clearInterval(pollInterval);
+                            setIsGenerating(false);
+                            setChatMessages(prev => [...prev, {
+                                role: 'assistant',
+                                text: `AI failed: ${statusData.error || "Unknown server error"}`
+                            }]);
+                        } else {
+                            if (statusData.progress) {
+                                setGeneratingProgress(statusData.progress);
+                            }
+                        }
+                    } catch (pollErr) {
+                        console.error("Polling error:", pollErr);
+                        clearInterval(pollInterval);
+                        setIsGenerating(false);
+                        setChatMessages(prev => [...prev, {
+                            role: 'assistant',
+                            text: "Lost connection to the server while polling progress."
+                        }]);
+                    }
+                }, 1500);
+            } else {
+                setIsGenerating(false);
+                setChatMessages(prev => [...prev, {
+                    role: 'assistant',
+                    text: "Failed to initiate AI task on the server."
+                }]);
+            }
+        } catch (err: any) {
+            setIsGenerating(false);
             setChatMessages(prev => [...prev, {
                 role: 'assistant',
-                text: `I will process the following changes based on your request:\n"${userInput}"\n\nDo you want to proceed with these changes?`,
-                requiresConfirmation: true,
-                status: 'pending'
+                text: `Failed to connect: ${err.message || err}`
             }]);
-            setIsGenerating(false);
-        }, 1000);
+        }
     };
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -271,7 +379,7 @@ function AiChatSidebar({
         }
     };
 
-    const handleConfirmAction = (index: number, action: 'accepted' | 'rejected') => {
+    const handleConfirmAction = async (index: number, action: 'accepted' | 'rejected') => {
         setChatMessages(prev => prev.map((msg, i) => {
             if (i === index) {
                 return { ...msg, status: action };
@@ -282,14 +390,38 @@ function AiChatSidebar({
         if (action === 'accepted') {
             onProcessingStart();
             
-            // Simulate processing time
-            setTimeout(() => {
+            const targetMsg = chatMessages[index];
+            const proposedChanges = targetMsg.proposedChanges || [];
+            
+            try {
+                const res = await applyChanges({
+                    module_id: module.name,
+                    changes: JSON.stringify(proposedChanges)
+                });
+                
+                onProcessingComplete();
+                
+                if (res.message?.success) {
+                    setChatMessages(prev => [...prev, {
+                        role: 'assistant',
+                        text: "Changes have been successfully applied! You can review the updated module content in the main view."
+                    }]);
+                    if (onRefreshModule) {
+                        onRefreshModule();
+                    }
+                } else {
+                    setChatMessages(prev => [...prev, {
+                        role: 'assistant',
+                        text: `Failed to apply changes: ${res.message?.error || "Unknown error occurred"}`
+                    }]);
+                }
+            } catch (err: any) {
                 onProcessingComplete();
                 setChatMessages(prev => [...prev, {
                     role: 'assistant',
-                    text: "Changes have been successfully applied! You can review the updated module content in the main view."
+                    text: `An error occurred while applying changes: ${err.message || err}`
                 }]);
-            }, 3000);
+            }
         } else {
             setTimeout(() => {
                 setChatMessages(prev => [...prev, {
@@ -335,27 +467,43 @@ function AiChatSidebar({
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-2 bg-background/50 rounded-lg p-3 text-center border border-border/50">
+                                    <div className="grid grid-cols-2 gap-2 bg-background/50 rounded-lg p-3 text-center border border-border/50">
                                         <div>
                                             <div className="font-bold text-[#00c8b6] text-lg">{module?.lessons?.length || 0}</div>
                                             <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground mt-1">Lessons</div>
                                         </div>
-                                        <div className="border-x border-border/50">
+                                        <div className="border-l border-border/50">
                                             <div className="font-bold text-[#00c8b6] text-lg">{module?.lessons?.reduce((acc: number, l: any) => acc + (l.chapters?.length || 0), 0) || 0}</div>
                                             <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground mt-1">Chapters</div>
                                         </div>
-                                        <div>
-                                            <div className="font-bold text-[#00c8b6] text-lg">{module?.lessons?.reduce((acc: number, l: any) => acc + (l.chapters?.reduce((acc2: number, c: any) => acc2 + (c.contents?.filter((ct: any) => ct.content_type === "Quiz").length || 0), 0) || 0), 0) || 0}</div>
-                                            <div className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground mt-1">Quizzes</div>
-                                        </div>
-
                                     </div>
                                     <p className="text-xs text-foreground font-bold leading-relaxed mt-1">
                                         Here you can Enhance the Module
                                     </p>
                                 </div>
                             ) : (
-                                <div className="whitespace-pre-wrap">{msg.text}</div>
+                                <div className="space-y-2">
+                                    <div className="whitespace-pre-wrap">{msg.text}</div>
+                                    {msg.files && msg.files.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {msg.files.map((fileUrl, fidx) => {
+                                                const isBlob = fileUrl.startsWith('blob:');
+                                                const fileName = isBlob ? `Attachment ${fidx + 1}` : (fileUrl.split('/').pop() || 'File');
+                                                const isImg = isBlob || /\.(png|jpg|jpeg|webp|gif)$/i.test(fileUrl);
+                                                return (
+                                                    <div key={fidx} className="flex items-center gap-2 bg-background/50 rounded-lg p-1.5 border border-border/30 text-xs max-w-full">
+                                                        {isImg ? (
+                                                            <img src={fileUrl} alt="attachment" className="h-10 w-10 object-cover rounded border" />
+                                                        ) : (
+                                                            <FileText className="h-5 w-5 text-[#00c8b6]" />
+                                                        )}
+                                                        <span className="truncate text-[11px] font-medium text-foreground max-w-[120px]">{fileName}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
                             )}
                             {msg.role === 'assistant' && msg.requiresConfirmation && (
                                 <div className="mt-3 flex items-center gap-2">
@@ -381,6 +529,21 @@ function AiChatSidebar({
                         </div>
                     </div>
                 ))}
+                
+                {isGenerating && (
+                    <div className="flex flex-col items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="text-xs text-muted-foreground mb-1">Luna</div>
+                        <div className="flex items-center gap-2.5 p-3 rounded-xl bg-muted max-w-[90%] text-sm">
+                            <div className="flex gap-1 shrink-0">
+                                <span className="h-1.5 w-1.5 bg-[#00c8b6] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="h-1.5 w-1.5 bg-[#00c8b6] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="h-1.5 w-1.5 bg-[#00c8b6] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                            <span className="text-xs text-muted-foreground font-medium italic animate-pulse">{generatingProgress}</span>
+                        </div>
+                    </div>
+                )}
+
                 <div ref={messagesEndRef} />
                 </div>
             </ScrollArea>
@@ -454,7 +617,7 @@ function AiChatSidebar({
                             size="icon"
                             className="absolute right-1 bottom-1 h-9 w-10 bg-transparent hover:bg-[#00c8b6]/20 text-[#00c8b6] disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={handleSendMsg}
-                            disabled={!chatInput.trim() || isGenerating || isProcessingAiChanges}
+                            disabled={(!chatInput.trim() && attachedFiles.length === 0) || isGenerating || isProcessingAiChanges}
                         >
                             <Send className="w-4 h-4" />
                         </Button>
@@ -527,7 +690,7 @@ export default function AdminModuleDetail() {
     };
 
     // Use get_module_with_details API for admin users instead of LearnerModuleData
-    const { data: moduleDataResponse, error: moduleListError, isLoading: moduleDataLoading } = useFrappeGetCall<any>(
+    const { data: moduleDataResponse, error: moduleListError, isLoading: moduleDataLoading, mutate: mutateModuleDetails } = useFrappeGetCall<any>(
         'novel_lms.novel_lms.api.module_management.get_module_with_details', {
         module_id: moduleName
     }, {
@@ -920,6 +1083,7 @@ export default function AdminModuleDetail() {
                     onProcessingStart={() => setIsProcessingAiChanges(true)} 
                     onProcessingComplete={() => setIsProcessingAiChanges(false)}
                     isProcessingAiChanges={isProcessingAiChanges}
+                    onRefreshModule={mutateModuleDetails}
                 />
             </div>
 
