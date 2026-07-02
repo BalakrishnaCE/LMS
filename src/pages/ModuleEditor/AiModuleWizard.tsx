@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 import { LMS_API_BASE_URL } from "@/config/routes";
 import { X, Upload, CheckCircle2, FileText, Image as ImageIcon } from "lucide-react";
@@ -169,6 +170,8 @@ function StepUpload({
   assignmentBased,
   setAssignmentBased,
   departmentOptions,
+  instructions,
+  setInstructions,
 }: {
   files: UploadedFile[];
   onFilesChange: (files: UploadedFile[]) => void;
@@ -179,11 +182,13 @@ function StepUpload({
   assignmentBased: string;
   setAssignmentBased: (val: string) => void;
   departmentOptions: Array<{ value: string; label: string }>;
+  instructions: string;
+  setInstructions: (val: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  const isStep1Valid = files.length > 0 && !!department;
+  const isStep1Valid = !!department && (files.length > 0 || instructions.trim().length > 0);
 
   const addFiles = useCallback(
     (newFiles: FileList | File[]) => {
@@ -315,8 +320,25 @@ function StepUpload({
         </div>
       )}
 
+      {/* AI Prompt Section */}
+      <div className="space-y-2 text-left flex-1 flex flex-col min-h-[90px] mt-1 mb-2">
+        <Label htmlFor="aiPrompt" className="text-xs font-bold text-foreground">
+          AI Module Prompt
+        </Label>
+        <Textarea
+          id="aiPrompt"
+          placeholder="Describe the module topic (e.g., 'Create a module with sound pollution. Make it concise and precise.')"
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          className="flex-1 min-h-[60px] resize-none text-sm"
+        />
+        <p className="text-[10px] text-muted-foreground">
+          Guide the AI on how to process your files, or create a module/lessons purely from a prompt.
+        </p>
+      </div>
+
       {/* Fields */}
-      <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-2 shrink-0">
+      <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-1 shrink-0">
         <div className="space-y-2 text-left">
           <Label htmlFor="department" className="text-xs font-bold text-foreground">
             Department <span className="text-destructive">*</span>
@@ -355,13 +377,15 @@ function StepUpload({
         <Button variant="ghost" onClick={onCancel} className="text-muted-foreground">
           Cancel
         </Button>
-        <Button
-          onClick={onNext}
-          disabled={!isStep1Valid}
-          className="px-8 bg-primary hover:bg-primary/90 text-primary-foreground transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Next
-        </Button>
+        {!!department && (
+          <Button
+            onClick={onNext}
+            disabled={!isStep1Valid}
+            className="px-8 bg-primary hover:bg-primary/90 text-primary-foreground transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -390,7 +414,7 @@ function StepProcessing({
     if (resumedJobId) {
       return localStorage.getItem("active_ai_job_progress") || "Resuming background task...";
     }
-    return "Preparing file uploads...";
+    return files.length > 0 ? "Preparing file uploads..." : "Starting curriculum draft...";
   });
   const [scanPos, setScanPos] = useState(0);
   const [jobId, setJobId] = useState<string | null>(resumedJobId || null);
@@ -422,7 +446,7 @@ function StepProcessing({
           }
 
           if (!isMounted) return;
-          setProgressMsg("Extracting contents and starting curriculum draft...");
+          setProgressMsg(files.length > 0 ? "Extracting contents and starting curriculum draft..." : "Starting curriculum draft...");
 
           // Trigger generation API
           const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
@@ -612,7 +636,7 @@ function StepProcessing({
           <div className="absolute bottom-3 flex flex-col items-center gap-1 z-10">
             <FileText className="w-6 h-6 opacity-70" />
             <span className="text-[9px] font-bold tracking-widest uppercase opacity-60">
-              {firstType.includes("pdf") ? "PDF" : firstType.includes("ppt") ? "PPTX" : firstType.includes("word") || firstType.includes("doc") ? "DOCX" : "FILE"}
+              {files.length === 0 ? "PROMPT" : firstType.includes("pdf") ? "PDF" : firstType.includes("ppt") ? "PPTX" : firstType.includes("word") || firstType.includes("doc") ? "DOCX" : "FILE"}
             </span>
           </div>
         </div>
@@ -691,7 +715,7 @@ export default function AiModuleWizard() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [department, setDepartment] = useState("");
   const [assignmentBased, setAssignmentBased] = useState("Department");
-  const instructions = "";
+  const [instructions, setInstructions] = useState("");
 
   const { data: departments } = useFrappeGetDocList("Department", {
     fields: ["name", "department"],
@@ -759,6 +783,8 @@ export default function AiModuleWizard() {
                 assignmentBased={assignmentBased}
                 setAssignmentBased={setAssignmentBased}
                 departmentOptions={departmentOptions}
+                instructions={instructions}
+                setInstructions={setInstructions}
               />
             )}
 
