@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ContentRenderer } from "@/pages/Modules/Learner/components/ContentRenderer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
-import { BookOpen, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Trash2, Bot, WandSparkles, X, Send, FileText, Plus } from "lucide-react";
+import { BookOpen, ArrowLeft, ArrowRight, ArrowDown, ArrowUp, Trash2, Bot, WandSparkles, X, Send, FileText, Plus, Video, Music } from "lucide-react";
 import { toast } from "sonner";
 import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
 import Lottie from "lottie-react";
@@ -229,7 +229,7 @@ function AiChatSidebar({
     const [chatMessages, setChatMessages] = useState<Array<{ 
         role: 'system' | 'user' | 'assistant', 
         text: string,
-        files?: string[],
+        files?: Array<string | { url: string; name: string; type: string }>,
         requiresConfirmation?: boolean,
         status?: 'pending' | 'accepted' | 'rejected',
         proposedChanges?: any[]
@@ -253,8 +253,12 @@ function AiChatSidebar({
         const userInput = chatInput.trim() || "Analyze the attached file and enhance the module accordingly.";
         const filesToUpload = [...attachedFiles];
         
-        // Show files locally instantly using temporary object URLs
-        const tempLocalUrls = filesToUpload.map(file => URL.createObjectURL(file));
+        // Show files locally instantly using temporary object URLs with metadata
+        const tempLocalUrls = filesToUpload.map(file => ({
+            url: URL.createObjectURL(file),
+            name: file.name,
+            type: file.type
+        }));
         
         setChatInput("");
         setAttachedFiles([]);
@@ -486,14 +490,23 @@ function AiChatSidebar({
                                     <div className="whitespace-pre-wrap">{msg.text}</div>
                                     {msg.files && msg.files.length > 0 && (
                                         <div className="flex flex-wrap gap-2 mt-2">
-                                            {msg.files.map((fileUrl, fidx) => {
-                                                const isBlob = fileUrl.startsWith('blob:');
-                                                const fileName = isBlob ? `Attachment ${fidx + 1}` : (fileUrl.split('/').pop() || 'File');
-                                                const isImg = isBlob || /\.(png|jpg|jpeg|webp|gif)$/i.test(fileUrl);
+                                            {msg.files.map((fileItem, fidx) => {
+                                                const isObj = typeof fileItem === 'object' && fileItem !== null;
+                                                const fileUrl = isObj ? fileItem.url : fileItem;
+                                                const fileName = isObj ? fileItem.name : (fileUrl.split('/').pop() || 'File');
+                                                const fileType = isObj ? fileItem.type : '';
+                                                
+                                                const isImg = fileType.startsWith('image/') || (!fileType && /\.(png|jpg|jpeg|webp|gif)$/i.test(fileUrl));
+                                                const isVid = fileType.startsWith('video/') || (!fileType && /\.(mp4|mov|mkv|webm)$/i.test(fileUrl));
+                                                const isAud = fileType.startsWith('audio/') || (!fileType && /\.(mp3|wav|ogg|m4a)$/i.test(fileUrl));
                                                 return (
                                                     <div key={fidx} className="flex items-center gap-2 bg-background/50 rounded-lg p-1.5 border border-border/30 text-xs max-w-full">
                                                         {isImg ? (
                                                             <img src={fileUrl} alt="attachment" className="h-10 w-10 object-cover rounded border" />
+                                                        ) : isVid ? (
+                                                            <Video className="h-5 w-5 text-[#00c8b6]" />
+                                                        ) : isAud ? (
+                                                            <Music className="h-5 w-5 text-[#00c8b6]" />
                                                         ) : (
                                                             <FileText className="h-5 w-5 text-[#00c8b6]" />
                                                         )}
@@ -555,23 +568,32 @@ function AiChatSidebar({
                     {/* Attachments Preview Area */}
                     {attachedFiles.length > 0 && (
                         <div className="flex flex-wrap gap-2 pt-3 px-3 pb-0">
-                            {attachedFiles.map((file, i) => (
-                                <div key={i} className="relative group">
-                                    <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
-                                        {file.type.startsWith('image/') ? (
-                                            <img src={URL.createObjectURL(file)} alt="attachment" className="h-full w-full object-cover" />
-                                        ) : (
-                                            <FileText className="h-6 w-6 text-muted-foreground" />
-                                        )}
+                            {attachedFiles.map((file, i) => {
+                                const isImg = file.type.startsWith('image/');
+                                const isVid = file.type.startsWith('video/') || /\.(mp4|mov|mkv|webm)$/i.test(file.name);
+                                const isAud = file.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a)$/i.test(file.name);
+                                return (
+                                    <div key={i} className="relative group">
+                                        <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
+                                            {isImg ? (
+                                                <img src={URL.createObjectURL(file)} alt="attachment" className="h-full w-full object-cover" />
+                                            ) : isVid ? (
+                                                <Video className="h-6 w-6 text-[#00c8b6]" />
+                                            ) : isAud ? (
+                                                <Music className="h-6 w-6 text-[#00c8b6]" />
+                                            ) : (
+                                                <FileText className="h-6 w-6 text-muted-foreground" />
+                                            )}
+                                        </div>
+                                        <button 
+                                            className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                            onClick={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
                                     </div>
-                                    <button 
-                                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                        onClick={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))}
-                                    >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 
@@ -580,7 +602,7 @@ function AiChatSidebar({
                             type="file" 
                             ref={fileInputRef}
                             className="hidden" 
-                            accept="image/*,.pdf,.doc,.docx"
+                            accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.mkv,.webm,.mp3,.wav,.ogg,.m4a"
                             multiple
                             onChange={(e) => {
                                 if (e.target.files && e.target.files.length > 0) {

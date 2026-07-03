@@ -15,7 +15,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 import { LMS_API_BASE_URL } from "@/config/routes";
-import { X, Upload, CheckCircle2, FileText, Image as ImageIcon } from "lucide-react";
+import { X, Upload, CheckCircle2, FileText, Image as ImageIcon, Video, Music } from "lucide-react";
 import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
 
 type Step = 1 | 2;
@@ -38,9 +38,19 @@ const ACCEPTED_TYPES = [
   "image/jpg",
   "image/webp",
   "image/gif",
+  "video/mp4",
+  "video/quicktime",
+  "video/x-matroska",
+  "video/webm",
+  "audio/mpeg",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/x-m4a",
 ];
 
-const ACCEPTED_EXT = ".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.gif";
+const ACCEPTED_EXT = ".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.mkv,.webm,.mp3,.wav,.ogg,.m4a";
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
@@ -101,25 +111,40 @@ function StepIndicator({ current }: { current: Step }) {
 // ─── File Type Badge ──────────────────────────────────────────────────────────
 
 function FileTypeBadge({ type }: { type: string }) {
-  if (type.includes("pdf"))
+  const lowerType = type.toLowerCase();
+  if (lowerType.includes("pdf"))
     return (
       <div className="flex flex-col items-center justify-center w-10 h-12 bg-red-50 border border-red-200 rounded-md text-red-600 text-[9px] font-bold gap-0.5 shadow-sm shrink-0">
         <FileText className="w-5 h-5" />
         <span>PDF</span>
       </div>
     );
-  if (type.includes("word") || type.includes("docx") || type.includes("doc"))
+  if (lowerType.includes("word") || lowerType.includes("docx") || lowerType.includes("doc"))
     return (
       <div className="flex flex-col items-center justify-center w-10 h-12 bg-blue-50 border border-blue-200 rounded-md text-blue-600 text-[9px] font-bold gap-0.5 shadow-sm shrink-0">
         <FileText className="w-5 h-5" />
         <span>DOCX</span>
       </div>
     );
-  if (type.includes("presentation") || type.includes("ppt"))
+  if (lowerType.includes("presentation") || lowerType.includes("ppt"))
     return (
       <div className="flex flex-col items-center justify-center w-10 h-12 bg-orange-50 border border-orange-200 rounded-md text-orange-600 text-[9px] font-bold gap-0.5 shadow-sm shrink-0">
         <FileText className="w-5 h-5" />
         <span>PPTX</span>
+      </div>
+    );
+  if (lowerType.includes("video") || lowerType.includes("mp4") || lowerType.includes("quicktime") || lowerType.includes("mkv") || lowerType.includes("webm") || lowerType.includes("avi"))
+    return (
+      <div className="flex flex-col items-center justify-center w-10 h-12 bg-purple-50 border border-purple-200 rounded-md text-purple-600 text-[9px] font-bold gap-0.5 shadow-sm shrink-0">
+        <Video className="w-5 h-5" />
+        <span>VIDEO</span>
+      </div>
+    );
+  if (lowerType.includes("audio") || lowerType.includes("mpeg") || lowerType.includes("wav") || lowerType.includes("ogg") || lowerType.includes("mp3") || lowerType.includes("m4a"))
+    return (
+      <div className="flex flex-col items-center justify-center w-10 h-12 bg-pink-50 border border-pink-200 rounded-md text-pink-600 text-[9px] font-bold gap-0.5 shadow-sm shrink-0">
+        <Music className="w-5 h-5" />
+        <span>AUDIO</span>
       </div>
     );
   return (
@@ -194,7 +219,8 @@ function StepUpload({
     (newFiles: FileList | File[]) => {
       const accepted: UploadedFile[] = [];
       Array.from(newFiles).forEach(f => {
-        if (ACCEPTED_TYPES.includes(f.type)) {
+        const ext = "." + f.name.split('.').pop()?.toLowerCase();
+        if (ACCEPTED_TYPES.includes(f.type) || ACCEPTED_EXT.split(',').includes(ext)) {
           accepted.push({ file: f, id: `${f.name}-${Date.now()}-${Math.random()}` });
         } else {
           toast.error(`"${f.name}" is not a supported file type.`);
@@ -244,7 +270,7 @@ function StepUpload({
               Drag &amp; Drop or{" "}
               <span className="text-primary underline underline-offset-2">Browse Files</span>
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">Supported: PDF, DOCX, PPT, PNG, JPG</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Supported: PDF, DOCX, PPTX, IMG, Video, Audio</p>
           </div>
 
           {/* File type icons row */}
@@ -260,6 +286,12 @@ function StepUpload({
             </div>
             <div className="flex flex-col items-center justify-center w-10 h-12 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-600 text-[9px] font-bold gap-0.5 shadow-sm">
               <ImageIcon className="w-5 h-5" /><span>IMG</span>
+            </div>
+            <div className="flex flex-col items-center justify-center w-10 h-12 bg-purple-50 border border-purple-200 rounded-md text-purple-600 text-[9px] font-bold gap-0.5 shadow-sm">
+              <Video className="w-5 h-5" /><span>VIDEO</span>
+            </div>
+            <div className="flex flex-col items-center justify-center w-10 h-12 bg-pink-50 border border-pink-200 rounded-md text-pink-600 text-[9px] font-bold gap-0.5 shadow-sm">
+              <Music className="w-5 h-5" /><span>AUDIO</span>
             </div>
           </div>
         </div>
@@ -280,7 +312,7 @@ function StepUpload({
                 Drag &amp; drop more files or{" "}
                 <span className="text-primary underline">Browse Files</span>
               </p>
-              <p className="text-[10px] text-muted-foreground">Supported: PDF, DOCX, PPT, PNG, JPG</p>
+              <p className="text-[10px] text-muted-foreground">Supported: PDF, DOCX, PPTX, IMG, Video, Audio</p>
             </div>
           </div>
         </div>
@@ -306,7 +338,7 @@ function StepUpload({
                 key={f.id}
                 className="flex items-center gap-2.5 bg-muted/60 border border-border rounded-xl px-3 py-2 transition-all hover:bg-muted/80 shadow-sm"
               >
-                <FileTypeBadge type={f.file.type} />
+                <FileTypeBadge type={f.file.type || f.file.name} />
                 <span className="max-w-[150px] truncate text-xs font-medium text-foreground">{f.file.name}</span>
                 <button
                   className="text-muted-foreground hover:text-destructive transition-colors p-1 hover:bg-destructive/10 rounded-full"
