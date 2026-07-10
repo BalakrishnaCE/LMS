@@ -15,10 +15,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 import { LMS_API_BASE_URL } from "@/config/routes";
-import { X, Upload, CheckCircle2, FileText, Image as ImageIcon, Video, Music } from "lucide-react";
+import { X, Upload, CheckCircle2, FileText, Image as ImageIcon, Video, Music, Table } from "lucide-react";
 import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
 
-type Step = 1 | 2;
+type Step = 1 | 2 | 3;
+
+// Global promise to prevent duplicate API submissions on React StrictMode remounts
+let activeJobPromise: Promise<string> | null = null;
 
 interface UploadedFile {
   file: File;
@@ -29,10 +32,8 @@ interface UploadedFile {
 
 const ACCEPTED_TYPES = [
   "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/msword",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "image/png",
   "image/jpeg",
   "image/jpg",
@@ -50,15 +51,21 @@ const ACCEPTED_TYPES = [
   "audio/x-m4a",
 ];
 
-const ACCEPTED_EXT = ".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.mkv,.webm,.mp3,.wav,.ogg,.m4a";
+const ACCEPTED_EXT = ".pdf,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.mkv,.webm,.mp3,.wav,.ogg,.m4a";
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
-function StepIndicator({ current }: { current: Step }) {
-  const steps = [
-    { num: 1, label: "Upload Sources" },
-    { num: 2, label: "Configure" },
-  ];
+function StepIndicator({ current, hasConfigureStep }: { current: Step; hasConfigureStep: boolean }) {
+  const steps = hasConfigureStep
+    ? [
+        { num: 1, label: "Upload Sources" },
+        { num: 2, label: "Configure" },
+        { num: 3, label: "AI Processing" },
+      ]
+    : [
+        { num: 1, label: "Upload Sources" },
+        { num: 3, label: "AI Processing" },
+      ];
 
   return (
     <div className="flex items-center select-none">
@@ -119,18 +126,11 @@ function FileTypeBadge({ type }: { type: string }) {
         <span>PDF</span>
       </div>
     );
-  if (lowerType.includes("word") || lowerType.includes("docx") || lowerType.includes("doc"))
+  if (lowerType.includes("excel") || lowerType.includes("spreadsheet") || lowerType.includes("xlsx") || lowerType.includes("xls") || lowerType.includes("sheet"))
     return (
-      <div className="flex flex-col items-center justify-center w-10 h-12 bg-blue-50 border border-blue-200 rounded-md text-blue-600 text-[9px] font-bold gap-0.5 shadow-sm shrink-0">
-        <FileText className="w-5 h-5" />
-        <span>DOCX</span>
-      </div>
-    );
-  if (lowerType.includes("presentation") || lowerType.includes("ppt"))
-    return (
-      <div className="flex flex-col items-center justify-center w-10 h-12 bg-orange-50 border border-orange-200 rounded-md text-orange-600 text-[9px] font-bold gap-0.5 shadow-sm shrink-0">
-        <FileText className="w-5 h-5" />
-        <span>PPTX</span>
+      <div className="flex flex-col items-center justify-center w-10 h-12 bg-green-50 border border-green-200 rounded-md text-green-600 text-[9px] font-bold gap-0.5 shadow-sm shrink-0">
+        <Table className="w-5 h-5" />
+        <span>EXCEL</span>
       </div>
     );
   if (lowerType.includes("video") || lowerType.includes("mp4") || lowerType.includes("quicktime") || lowerType.includes("mkv") || lowerType.includes("webm") || lowerType.includes("avi"))
@@ -270,7 +270,7 @@ function StepUpload({
               Drag &amp; Drop or{" "}
               <span className="text-primary underline underline-offset-2">Browse Files</span>
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">Supported: PDF, DOCX, PPTX, IMG, Video, Audio</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Supported: PDF, EXCEL, IMG, Video, Audio</p>
           </div>
 
           {/* File type icons row */}
@@ -278,11 +278,8 @@ function StepUpload({
             <div className="flex flex-col items-center justify-center w-10 h-12 bg-red-50 border border-red-200 rounded-md text-red-600 text-[9px] font-bold gap-0.5 shadow-sm">
               <FileText className="w-5 h-5" /><span>PDF</span>
             </div>
-            <div className="flex flex-col items-center justify-center w-10 h-12 bg-blue-50 border border-blue-200 rounded-md text-blue-600 text-[9px] font-bold gap-0.5 shadow-sm">
-              <FileText className="w-5 h-5" /><span>DOCX</span>
-            </div>
-            <div className="flex flex-col items-center justify-center w-10 h-12 bg-orange-50 border border-orange-200 rounded-md text-orange-600 text-[9px] font-bold gap-0.5 shadow-sm">
-              <FileText className="w-5 h-5" /><span>PPTX</span>
+            <div className="flex flex-col items-center justify-center w-10 h-12 bg-green-50 border border-green-200 rounded-md text-green-600 text-[9px] font-bold gap-0.5 shadow-sm">
+              <Table className="w-5 h-5" /><span>EXCEL</span>
             </div>
             <div className="flex flex-col items-center justify-center w-10 h-12 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-600 text-[9px] font-bold gap-0.5 shadow-sm">
               <ImageIcon className="w-5 h-5" /><span>IMG</span>
@@ -312,7 +309,7 @@ function StepUpload({
                 Drag &amp; drop more files or{" "}
                 <span className="text-primary underline">Browse Files</span>
               </p>
-              <p className="text-[10px] text-muted-foreground">Supported: PDF, DOCX, PPTX, IMG, Video, Audio</p>
+              <p className="text-[10px] text-muted-foreground">Supported: PDF, EXCEL, IMG, Video, Audio</p>
             </div>
           </div>
         </div>
@@ -423,7 +420,190 @@ function StepUpload({
   );
 }
 
-// ─── Step 2: AI Processing ────────────────────────────────────────────────────
+// ─── Step 2: Customize / Configure AI Presentation ───────────────────────────
+function StepCustomize({
+  slideTheme,
+  setSlideTheme,
+  slideTransition,
+  setSlideTransition,
+  elementEntrance,
+  setElementEntrance,
+  narrationTone,
+  setNarrationTone,
+  targetAudience,
+  setTargetAudience,
+  learningGoal,
+  setLearningGoal,
+  slideCount,
+  setSlideCount,
+  onNext,
+  onBack,
+}: {
+  slideTheme: string;
+  setSlideTheme: (val: string) => void;
+  slideTransition: string;
+  setSlideTransition: (val: string) => void;
+  elementEntrance: string;
+  setElementEntrance: (val: string) => void;
+  narrationTone: string;
+  setNarrationTone: (val: string) => void;
+  targetAudience: string;
+  setTargetAudience: (val: string) => void;
+  learningGoal: string;
+  setLearningGoal: (val: string) => void;
+  slideCount: string;
+  setSlideCount: (val: string) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const themes = [
+    { name: "Modern Slate", colors: ["bg-slate-900", "bg-slate-500", "bg-slate-100"] },
+    { name: "Ocean Blue", colors: ["bg-blue-600", "bg-blue-300", "bg-blue-50"] },
+    { name: "Emerald Teal", colors: ["bg-teal-600", "bg-teal-300", "bg-teal-50"] },
+    { name: "Royal Purple", colors: ["bg-purple-600", "bg-purple-300", "bg-purple-50"] },
+    { name: "Tech Dark", colors: ["bg-slate-950", "bg-sky-400", "bg-slate-900"] },
+  ];
+
+  return (
+    <div className="flex flex-col gap-6 h-full text-left overflow-y-auto max-h-[75vh] px-1 py-2">
+      <div>
+        <h2 className="text-lg font-bold text-foreground">Configure Slide Deck Customizations</h2>
+        <p className="text-xs text-muted-foreground">Tailor the visual design, transitions, narration tone, and content focus for your presentation.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Left Side: Visual Styles */}
+        <div className="space-y-5">
+          {/* Theme Picker */}
+          <div className="space-y-2.5">
+            <Label className="text-xs font-bold text-foreground">Color Palette / Theme</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {themes.map((t) => {
+                const selected = slideTheme === t.name;
+                return (
+                  <div
+                    key={t.name}
+                    onClick={() => setSlideTheme(t.name)}
+                    className={`cursor-pointer border-2 rounded-xl p-3 flex flex-col justify-between h-20 transition-all ${
+                      selected
+                        ? "border-primary bg-primary/5 shadow-sm scale-[1.02]"
+                        : "border-border hover:border-muted-foreground/30 bg-background"
+                    }`}
+                  >
+                    <span className="text-[11px] font-semibold truncate leading-none">{t.name}</span>
+                    <div className="flex gap-1 mt-2">
+                      {t.colors.map((c, i) => (
+                        <div key={i} className={`w-3.5 h-3.5 rounded-full ${c} border border-black/10`} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Transitions and Entrance */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="slideTransition" className="text-xs font-bold text-foreground">Slide Transition</Label>
+              <Select value={slideTransition} onValueChange={setSlideTransition}>
+                <SelectTrigger id="slideTransition" className="w-full">
+                  <SelectValue placeholder="Select transition" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fade">Fade In/Out</SelectItem>
+                  <SelectItem value="slide">Slide Horizontal</SelectItem>
+                  <SelectItem value="zoom">Zoom Scale</SelectItem>
+                  <SelectItem value="flip">3D Card Flip</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="elementEntrance" className="text-xs font-bold text-foreground">Element Animation</Label>
+              <Select value={elementEntrance} onValueChange={setElementEntrance}>
+                <SelectTrigger id="elementEntrance" className="w-full">
+                  <SelectValue placeholder="Select entrance" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stagger">Staggered Slide-in</SelectItem>
+                  <SelectItem value="bounce">Bounce Pop-in</SelectItem>
+                  <SelectItem value="instant">Instant Fade</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Slide Count & Length */}
+          <div className="space-y-2">
+            <Label htmlFor="slideCount" className="text-xs font-bold text-foreground">Slide Count per Chapter</Label>
+            <Select value={slideCount} onValueChange={setSlideCount}>
+              <SelectTrigger id="slideCount" className="w-full">
+                <SelectValue placeholder="Select slide count" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Brief">Brief (3-5 slides per chapter)</SelectItem>
+                <SelectItem value="Standard">Standard (5-10 slides per chapter)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Right Side: Clarifying Questions */}
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="targetAudience" className="text-xs font-bold text-foreground">Target Audience (Who is this for?)</Label>
+            <Textarea
+              id="targetAudience"
+              placeholder="e.g. Sales team, high school students, technical administrators..."
+              value={targetAudience}
+              onChange={(e) => setTargetAudience(e.target.value)}
+              className="min-h-[60px] text-xs resize-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="learningGoal" className="text-xs font-bold text-foreground">Main Learning Goal / Outcome</Label>
+            <Textarea
+              id="learningGoal"
+              placeholder="e.g. Master risk management principles, understand gravity formulas..."
+              value={learningGoal}
+              onChange={(e) => setLearningGoal(e.target.value)}
+              className="min-h-[60px] text-xs resize-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="narrationTone" className="text-xs font-bold text-foreground">Voice Narration Tone</Label>
+            <Select value={narrationTone} onValueChange={setNarrationTone}>
+              <SelectTrigger id="narrationTone" className="w-full">
+                <SelectValue placeholder="Select narration tone" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Conversational & Friendly">Conversational &amp; Friendly</SelectItem>
+                <SelectItem value="Professional & Formal">Professional &amp; Formal</SelectItem>
+                <SelectItem value="Technical & Academic">Technical &amp; Academic</SelectItem>
+                <SelectItem value="Casual & Upbeat">Casual &amp; Upbeat</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between border-t pt-4 mt-auto">
+        <Button variant="outline" onClick={onBack}>
+          Back
+        </Button>
+        <Button onClick={onNext} className="px-8 bg-primary hover:bg-primary/90 text-primary-foreground">
+          Continue
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 3: AI Processing ────────────────────────────────────────────────────
 
 function StepProcessing({
   files,
@@ -433,6 +613,13 @@ function StepProcessing({
   resumedJobId,
   department,
   assignmentBased,
+  slideTheme,
+  slideTransition,
+  elementEntrance,
+  narrationTone,
+  targetAudience,
+  learningGoal,
+  slideCount,
 }: {
   files: UploadedFile[];
   instructions: string;
@@ -441,6 +628,13 @@ function StepProcessing({
   resumedJobId?: string | null;
   department: string;
   assignmentBased: string;
+  slideTheme: string;
+  slideTransition: string;
+  elementEntrance: string;
+  narrationTone: string;
+  targetAudience: string;
+  learningGoal: string;
+  slideCount: string;
 }) {
   const [progressMsg, setProgressMsg] = useState(() => {
     if (resumedJobId) {
@@ -466,54 +660,72 @@ function StepProcessing({
         let currentJobId: string = resumedJobId || "";
 
         if (!currentJobId) {
-          const fileUrls: string[] = [];
+          // If no active submission promise exists, create one
+          if (!activeJobPromise) {
+            activeJobPromise = (async () => {
+              const fileUrls: string[] = [];
 
-          // Upload files sequentially
-          for (let i = 0; i < files.length; i++) {
-            if (!isMounted) return;
-            const ufile = files[i];
-            setProgressMsg(`Uploading file ${i + 1} of ${files.length}: ${ufile.file.name}...`);
-            const fileUrl = await uploadFileToFrappe(ufile.file);
-            fileUrls.push(fileUrl);
+              // Upload files sequentially
+              for (let i = 0; i < files.length; i++) {
+                const ufile = files[i];
+                setProgressMsg(`Uploading file ${i + 1} of ${files.length}: ${ufile.file.name}...`);
+                const fileUrl = await uploadFileToFrappe(ufile.file);
+                fileUrls.push(fileUrl);
+              }
+
+              setProgressMsg(files.length > 0 ? "Extracting contents and starting curriculum draft..." : "Starting curriculum draft...");
+
+              // Trigger generation API
+              const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
+              const generateUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.generate_module`;
+              
+              const response = await fetch(generateUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+                },
+                body: JSON.stringify({
+                  file_urls: fileUrls,
+                  instructions: instructions,
+                  department: department,
+                  assignment_based: assignmentBased,
+                  slide_theme: slideTheme,
+                  slide_transition: slideTransition,
+                  element_entrance: elementEntrance,
+                  narration_tone: narrationTone,
+                  target_audience: targetAudience,
+                  learning_goal: learningGoal,
+                  slide_count: slideCount,
+                }),
+                credentials: "include",
+              });
+
+              if (!response.ok) {
+                throw new Error(`Failed to start generation: ${response.statusText}`);
+              }
+
+              const genResult = await response.json();
+              const job = genResult.message;
+              if (!job || !job.success || !job.job_id) {
+                throw new Error(job?.error || "Failed to start AI generation job on server.");
+              }
+
+              return job.job_id as string;
+            })();
           }
 
-          if (!isMounted) return;
-          setProgressMsg(files.length > 0 ? "Extracting contents and starting curriculum draft..." : "Starting curriculum draft...");
-
-          // Trigger generation API
-          const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
-          const generateUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.generate_module`;
-          
-          const response = await fetch(generateUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json",
-            },
-            body: JSON.stringify({
-              file_urls: fileUrls,
-              instructions: instructions,
-              department: department,
-              assignment_based: assignmentBased,
-            }),
-            credentials: "include",
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to start generation: ${response.statusText}`);
+          try {
+            // Await the active submission promise (shares the request between mounts)
+            currentJobId = await activeJobPromise;
+          } catch (apiErr) {
+            activeJobPromise = null; // Clear promise on error so retry works
+            throw apiErr;
           }
 
-          const genResult = await response.json();
-          const job = genResult.message;
-          if (!job || !job.success || !job.job_id) {
-            throw new Error(job?.error || "Failed to start AI generation job on server.");
-          }
-
-          const responseJobId = job.job_id as string;
-          currentJobId = responseJobId;
           if (isMounted) {
-            setJobId(responseJobId);
-            localStorage.setItem("active_ai_job_id", responseJobId);
+            setJobId(currentJobId);
+            localStorage.setItem("active_ai_job_id", currentJobId);
             localStorage.setItem("active_ai_job_progress", "Waiting in task queue...");
           }
         }
@@ -551,11 +763,13 @@ function StepProcessing({
               if (pollInterval) clearInterval(pollInterval);
               localStorage.removeItem("active_ai_job_id");
               localStorage.removeItem("active_ai_job_progress");
+              activeJobPromise = null; // Reset
               onDone(statusData.module_id);
             } else if (statusData.status === "failed") {
               if (pollInterval) clearInterval(pollInterval);
               localStorage.removeItem("active_ai_job_id");
               localStorage.removeItem("active_ai_job_progress");
+              activeJobPromise = null; // Reset
               throw new Error(statusData.error || statusData.progress || "Generation job failed on server.");
             } else {
               // Update progress message from server
@@ -566,6 +780,7 @@ function StepProcessing({
             }
           } catch (pollErr) {
             console.error("Polling error:", pollErr);
+            activeJobPromise = null; // Reset
             if (pollInterval) clearInterval(pollInterval);
             toast.error(pollErr instanceof Error ? pollErr.message : "Generation failed.");
             localStorage.removeItem("active_ai_job_id");
@@ -576,6 +791,7 @@ function StepProcessing({
 
       } catch (err) {
         console.error("AI Wizard Error:", err);
+        activeJobPromise = null; // Reset
         if (isMounted) {
           toast.error(err instanceof Error ? err.message : "An unexpected error occurred.");
           localStorage.removeItem("active_ai_job_id");
@@ -598,11 +814,9 @@ function StepProcessing({
   const firstType = files[0]?.file.type ?? "";
   const iconBg = firstType.includes("pdf")
     ? "bg-red-50 border-red-200 text-red-500"
-    : firstType.includes("word") || firstType.includes("doc")
-      ? "bg-blue-50 border-blue-200 text-blue-500"
-      : firstType.includes("ppt")
-        ? "bg-orange-50 border-orange-200 text-orange-500"
-        : "bg-primary/5 border-primary/20 text-primary";
+    : firstType.includes("excel") || firstType.includes("spreadsheet") || firstType.includes("xls") || firstType.includes("sheet")
+      ? "bg-green-50 border-green-200 text-green-500"
+      : "bg-primary/5 border-primary/20 text-primary";
 
   return (
     <div className="flex flex-col items-center justify-center gap-10 h-full py-4">
@@ -668,7 +882,7 @@ function StepProcessing({
           <div className="absolute bottom-3 flex flex-col items-center gap-1 z-10">
             <FileText className="w-6 h-6 opacity-70" />
             <span className="text-[9px] font-bold tracking-widest uppercase opacity-60">
-              {files.length === 0 ? "PROMPT" : firstType.includes("pdf") ? "PDF" : firstType.includes("ppt") ? "PPTX" : firstType.includes("word") || firstType.includes("doc") ? "DOCX" : "FILE"}
+              {files.length === 0 ? "PROMPT" : firstType.includes("pdf") ? "PDF" : firstType.includes("excel") || firstType.includes("spreadsheet") || firstType.includes("xls") || firstType.includes("sheet") ? "EXCEL" : "FILE"}
             </span>
           </div>
         </div>
@@ -742,12 +956,21 @@ export default function AiModuleWizard() {
     return localStorage.getItem("active_ai_job_id");
   });
   const [step, setStep] = useState<Step>(() => {
-    return localStorage.getItem("active_ai_job_id") ? 2 : 1;
+    return localStorage.getItem("active_ai_job_id") ? 3 : 1;
   });
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [department, setDepartment] = useState("");
   const [assignmentBased, setAssignmentBased] = useState("Department");
   const [instructions, setInstructions] = useState("");
+
+  // Slide customizations configurations
+  const [slideTheme, setSlideTheme] = useState("Modern Slate");
+  const [slideTransition, setSlideTransition] = useState("fade");
+  const [elementEntrance, setElementEntrance] = useState("stagger");
+  const [narrationTone, setNarrationTone] = useState("Conversational & Friendly");
+  const [targetAudience, setTargetAudience] = useState("");
+  const [learningGoal, setLearningGoal] = useState("");
+  const [slideCount, setSlideCount] = useState("Standard");
 
   const { data: departments } = useFrappeGetDocList("Department", {
     fields: ["name", "department"],
@@ -765,7 +988,18 @@ export default function AiModuleWizard() {
     setLocation("/");
   };
 
-  const handleStep1Next = () => setStep(2);
+  const isSlideRequested = (prompt: string) => {
+    return /video|slide|ppt|powerpoint|presentation|slideshow/i.test(prompt);
+  };
+  const hasConfigureStep = isSlideRequested(instructions);
+
+  const handleStep1Next = () => {
+    if (hasConfigureStep) {
+      setStep(2);
+    } else {
+      setStep(3);
+    }
+  };
 
   const handleProcessingDone = (moduleId: string) => {
     setResumedJobId(null);
@@ -781,8 +1015,6 @@ export default function AiModuleWizard() {
     setStep(1);
   };
 
-
-
   return (
     /* Full viewport — no scroll, everything fits */
     <div className="h-screen bg-muted/30 flex flex-col overflow-hidden">
@@ -794,7 +1026,7 @@ export default function AiModuleWizard() {
 
       {/* ── Step indicator ───────────────────────────────────────────────── */}
       <div className="flex justify-center py-5 shrink-0">
-        <StepIndicator current={step} />
+        <StepIndicator current={step} hasConfigureStep={hasConfigureStep} />
       </div>
 
       {/* ── Content area — grows to fill remaining height ─────────────────── */}
@@ -821,6 +1053,27 @@ export default function AiModuleWizard() {
             )}
 
             {step === 2 && (
+              <StepCustomize
+                slideTheme={slideTheme}
+                setSlideTheme={setSlideTheme}
+                slideTransition={slideTransition}
+                setSlideTransition={setSlideTransition}
+                elementEntrance={elementEntrance}
+                setElementEntrance={setElementEntrance}
+                narrationTone={narrationTone}
+                setNarrationTone={setNarrationTone}
+                targetAudience={targetAudience}
+                setTargetAudience={setTargetAudience}
+                learningGoal={learningGoal}
+                setLearningGoal={setLearningGoal}
+                slideCount={slideCount}
+                setSlideCount={setSlideCount}
+                onNext={() => setStep(3)}
+                onBack={() => setStep(1)}
+              />
+            )}
+
+            {step === 3 && (
               <StepProcessing
                 files={files}
                 instructions={instructions}
@@ -829,6 +1082,13 @@ export default function AiModuleWizard() {
                 resumedJobId={resumedJobId}
                 department={department}
                 assignmentBased={assignmentBased}
+                slideTheme={slideTheme}
+                slideTransition={slideTransition}
+                elementEntrance={elementEntrance}
+                narrationTone={narrationTone}
+                targetAudience={targetAudience}
+                learningGoal={learningGoal}
+                slideCount={slideCount}
               />
             )}
           </div>

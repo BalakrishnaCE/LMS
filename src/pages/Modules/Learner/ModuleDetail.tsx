@@ -8,7 +8,7 @@ import { CompletionScreen } from "@/pages/Modules/Learner/components/CompletionS
 import { Button } from "@/components/ui/button";
 import ContentRenderer from "@/pages/Modules/Learner/components/ContentRenderer";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { ROUTES, LMS_API_BASE_URL, getFullPath } from "@/config/routes";
+import { ROUTES, LMS_API_BASE_URL, LMS_FILE_BASE_URL, getFullPath } from '@/config/routes';
 import { motion, AnimatePresence } from "framer-motion";
 import Lottie from "lottie-react";
 import learningAnimation from "@/assets/learning-bg.json";
@@ -2001,7 +2001,7 @@ export default function ModuleDetail() {
                                                 const relativePath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 
                                                 // Determine base URL
-                                                const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                                const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
                                                 const cleanBaseUrl = baseUrl.replace(/\/$/, '');
 
                                                 return `${cleanBaseUrl}${relativePath}`;

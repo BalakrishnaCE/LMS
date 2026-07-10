@@ -12,6 +12,11 @@ export const getRelativePath = (fullPath: string) => fullPath.replace(BASE_PATH,
 // Use absolute URL in production
 export const LMS_API_BASE_URL = import.meta.env.PROD ? "https://lms.noveloffice.org/" : "";
 
+// LMS Files/Assets base URL (uses Nginx on port 80 in development)
+export const LMS_FILE_BASE_URL = import.meta.env.PROD 
+  ? "https://lms.noveloffice.org/" 
+  : `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}/`;
+
 // Common routes
 export const ROUTES = {
   HOME: '/',

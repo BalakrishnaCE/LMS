@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { LMS_API_BASE_URL } from "@/config/routes";
+import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes';
 
 interface FileAttachContentProps {
   content: {
@@ -27,7 +27,7 @@ export default function FileAttachContent({ content }: FileAttachContentProps) {
     // Determine base URL
     // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
     // In development: use http://lms.noveloffice.org
-    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
     const cleanBaseUrl = baseUrl.replace(/\/$/, '');
     
     return `${cleanBaseUrl}${relativePath}`;

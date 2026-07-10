@@ -44,7 +44,7 @@ import {
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
-import { LMS_API_BASE_URL } from "@/config/routes";
+import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes';
 // @ts-ignore
 import isEqual from 'lodash/isEqual';
 // Removed MultiSelect import
@@ -309,7 +309,7 @@ function SettingsDialog({
                                 // Determine base URL
                                 // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                                 // In development: use http://lms.noveloffice.org
-                                const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
                                 const cleanBaseUrl = baseUrl.replace(/\/$/, '');
 
                                 return `${cleanBaseUrl}${relativePath}`;
@@ -1389,7 +1389,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                                 // Determine base URL
                                 // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                                 // In development: use http://lms.noveloffice.org
-                                const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
                                 const cleanBaseUrl = baseUrl.replace(/\/$/, '');
 
                                 return `${cleanBaseUrl}${relativePath}`;

@@ -222,6 +222,7 @@ function AiChatSidebar({
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const isSendingRef = useRef(false);
     const [chatInput, setChatInput] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatingProgress, setGeneratingProgress] = useState("Luna is thinking...");
@@ -241,7 +242,15 @@ function AiChatSidebar({
     const { call: applyChanges } = useFrappePostCall("novel_lms.lms_ai_module_creation.api.generator.apply_ai_enhancements");
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        const viewport = messagesEndRef.current?.closest('[data-radix-scroll-area-viewport]');
+        if (viewport) {
+            viewport.scrollTo({
+                top: viewport.scrollHeight,
+                behavior: 'smooth'
+            });
+        } else {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
     };
 
     useEffect(() => {
@@ -249,7 +258,9 @@ function AiChatSidebar({
     }, [chatMessages, isOpen]);
 
     const handleSendMsg = async () => {
+        if (isSendingRef.current) return;
         if ((!chatInput.trim() && attachedFiles.length === 0) || isGenerating || isProcessingAiChanges) return;
+        isSendingRef.current = true;
         const userInput = chatInput.trim() || "Analyze the attached file and enhance the module accordingly.";
         const filesToUpload = [...attachedFiles];
         
@@ -371,6 +382,8 @@ function AiChatSidebar({
                 role: 'assistant',
                 text: `Failed to connect: ${err.message || err}`
             }]);
+        } finally {
+            isSendingRef.current = false;
         }
     };
 
@@ -602,7 +615,7 @@ function AiChatSidebar({
                             type="file" 
                             ref={fileInputRef}
                             className="hidden" 
-                            accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.mkv,.webm,.mp3,.wav,.ogg,.m4a"
+                            accept=".pdf,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.mkv,.webm,.mp3,.wav,.ogg,.m4a"
                             multiple
                             onChange={(e) => {
                                 if (e.target.files && e.target.files.length > 0) {

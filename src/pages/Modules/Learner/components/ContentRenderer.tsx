@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { useUser } from '@/hooks/use-user';
-import { LMS_API_BASE_URL } from '@/config/routes';
+import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes';
 import { CONTENT_TYPES, ContentType } from '@/config/contentTypes';
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
@@ -95,7 +95,7 @@ export function ContentRenderer({
         // Determine API base URL
         // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
         // In development: use http://lms.noveloffice.org
-        const apiBaseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+        const apiBaseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
         const cleanApiBaseUrl = apiBaseUrl.replace(/\/$/, '');
         const apiUrl = `${cleanApiBaseUrl}/api/method/novel_lms.novel_lms.api.content_access.get_content_with_permissions?content_type=${encodeURIComponent(contentType)}&content_reference=${contentReference}`;
         

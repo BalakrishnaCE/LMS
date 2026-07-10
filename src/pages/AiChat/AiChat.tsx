@@ -67,6 +67,8 @@ interface Message {
     text: string;
     sender: 'user' | 'ai';
     timestamp: Date;
+    source?: string;
+    sourceContent?: string;
 }
 
 interface ChatContext {
@@ -94,12 +96,12 @@ const formatMessageText = (text: string | any, isAi: boolean) => {
     }
 
     return (
-        <ReactMarkdown 
+        <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-                h3: ({node, ...props}) => <h3 className="messageHeading" {...props} />,
-                p: ({node, ...props}) => <p className="messageParagraph" {...props} />,
-                a: ({node, ...props}) => <a className="text-teal-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                h3: ({ node, ...props }) => <h3 className="messageHeading" {...props} />,
+                p: ({ node, ...props }) => <p className="messageParagraph" {...props} />,
+                a: ({ node, ...props }) => <a className="text-teal-600 hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
             }}
         >
             {sanitizedText}
@@ -298,7 +300,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 id: `r-${idx}`,
                                 text: qr.response,
                                 sender: 'ai',
-                                timestamp: new Date(qr.time_stamp || qr.modified) // or add small offset?
+                                timestamp: new Date(qr.time_stamp || qr.modified), // or add small offset?
+                                source: qr.source,
+                                sourceContent: qr.source_content
                             });
                         });
                     }
@@ -525,7 +529,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 const handleScroll = () => {
                     const { scrollTop, scrollHeight, clientHeight } = viewport;
                     // Very tight tolerance to detect if user has snapped back to bottom
-                    const isAtBottom = scrollHeight - scrollTop - clientHeight <= 20; 
+                    const isAtBottom = scrollHeight - scrollTop - clientHeight <= 20;
                     if (isAtBottom) {
                         isUserScrollingRef.current = false;
                     } else if (isLoading && !isUserScrollingRef.current) {
@@ -540,13 +544,13 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         }
                     }
                 };
-                
+
                 viewport.addEventListener('wheel', handleWheel, { passive: true });
                 viewport.addEventListener('touchstart', handleTouchStart, { passive: true });
                 viewport.addEventListener('pointerdown', handlePointerDown, { passive: true });
                 viewport.addEventListener('scroll', handleScroll, { passive: true });
                 handleScroll();
-                
+
                 return () => {
                     viewport.removeEventListener('wheel', handleWheel);
                     viewport.removeEventListener('touchstart', handleTouchStart);
@@ -834,7 +838,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         return null;
     };
 
-    const saveQueryResponse = async (cId: string, query: string, responseVal: string) => {
+    const saveQueryResponse = async (cId: string, query: string, responseVal: string, sourceVal?: string, sourceContentVal?: string) => {
         try {
             await fetch('/api/method/novel_lms.novel_lms.api.Chat.add_query_response', {
                 method: 'POST',
@@ -842,7 +846,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 body: JSON.stringify({
                     chat_id: cId,
                     query: query,
-                    response: responseVal
+                    response: responseVal,
+                    source: sourceVal,
+                    source_content: sourceContentVal
                 })
             });
         } catch (error) {
@@ -886,6 +892,8 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         chatStreamStore.startStream(streamingMessageId);
 
         let suggestedTitle = '';
+        let citationsList: string[] = [];
+        let contentsList: string[] = [];
 
         try {
             const response = await fetch(API_BASE_URL, {
@@ -927,7 +935,15 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                             const parsed = JSON.parse(dataStr);
                             if (parsed.suggested_title) {
                                 suggestedTitle = parsed.suggested_title;
-                            } else if (parsed.choices?.[0]?.delta?.content) {
+                            }
+                            if (parsed.citations && Array.isArray(parsed.citations)) {
+                                citationsList = parsed.citations;
+                            }
+                            if (parsed.contents && Array.isArray(parsed.contents)) {
+                                contentsList = parsed.contents;
+                            }
+
+                            if (parsed.choices?.[0]?.delta?.content) {
                                 chatStreamStore.appendChunk(parsed.choices[0].delta.content);
                             } else if (parsed.content) {
                                 chatStreamStore.appendChunk(parsed.content);
@@ -942,7 +958,14 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         setMessages(prev => {
                             const s = chatStreamStore.getState();
                             return prev.map(m =>
-                                m.id === streamingMessageId ? { ...m, text: s.accumulatedText } : m
+                                m.id === streamingMessageId 
+                                    ? { 
+                                        ...m, 
+                                        text: s.accumulatedText,
+                                        source: citationsList.join(' | '),
+                                        sourceContent: contentsList.join('\n\n')
+                                      } 
+                                    : m
                             );
                         });
                     }
@@ -957,7 +980,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             }
 
             if (currentChatId) {
-                saveQueryResponse(currentChatId, userQuery, chatStreamStore.getState().accumulatedText);
+                const sourceStr = citationsList.join(' | ');
+                const sourceContentStr = contentsList.join('\n\n');
+                saveQueryResponse(currentChatId, userQuery, chatStreamStore.getState().accumulatedText, sourceStr, sourceContentStr);
 
                 if (isFirstMessage && suggestedTitle) {
                     localStorage.setItem(`novel_lms_chat_title_${currentChatId}`, suggestedTitle);

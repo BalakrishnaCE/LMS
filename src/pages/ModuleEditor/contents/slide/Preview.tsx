@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { LMS_API_BASE_URL } from "@/config/routes";
+import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes';
 
 export default function SlidePreview({ 
   title = "Slide Presentation", 
@@ -94,7 +94,7 @@ export default function SlidePreview({
                     // Determine base URL
                     // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                     // In development: use http://lms.noveloffice.org
-                    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                    const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
                     const cleanBaseUrl = baseUrl.replace(/\/$/, '');
                     
                     return `${cleanBaseUrl}${relativePath}`;

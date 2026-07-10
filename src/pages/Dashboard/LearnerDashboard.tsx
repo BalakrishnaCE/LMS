@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Link } from "wouter"
 import { BookOpen, Clock, Award, Calendar, Target, Lock, PlayCircle, FastForward, CheckCircle, Star } from "lucide-react"
-import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
+import { ROUTES, LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes'
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import emptyAnimation from '@/assets/Empty.json';
@@ -873,7 +873,7 @@ export default function LearnerDashboard() {
                                             // Determine base URL
                                             // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                                             // In development: use http://lms.noveloffice.org
-                                            const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                            const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
                                             const cleanBaseUrl = baseUrl.replace(/\/$/, '');
 
                                             return `${cleanBaseUrl}${relativePath}`;
@@ -1095,7 +1095,7 @@ export default function LearnerDashboard() {
                                               // Determine base URL
                                               // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                                               // In development: use http://lms.noveloffice.org
-                                              const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                              const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
                                               const cleanBaseUrl = baseUrl.replace(/\/$/, '');
 
                                               return `${cleanBaseUrl}${relativePath}`;
@@ -1271,7 +1271,7 @@ export default function LearnerDashboard() {
                                               // Determine base URL
                                               // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                                               // In development: use http://lms.noveloffice.org
-                                              const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                              const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
                                               const cleanBaseUrl = baseUrl.replace(/\/$/, '');
 
                                               return `${cleanBaseUrl}${relativePath}`;

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Trash2, Plus, ChevronLeft, ChevronRight, MoveUp, MoveDown } from 'lucide-react';
 import { uploadFileToFrappe } from '@/lib/uploadFileToFrappe';
 import { toast } from 'sonner';
-import { LMS_API_BASE_URL } from "@/config/routes";
+import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes';
 
 interface SlideShowItem {
   image: string;
@@ -316,7 +316,7 @@ export default function SlideContentEditor({ content, onSave, onCancel }: SlideC
                 // Determine base URL
                 // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                 // In development: use http://lms.noveloffice.org
-                const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
                 const cleanBaseUrl = baseUrl.replace(/\/$/, '');
                 
                 return `${cleanBaseUrl}${relativePath}`;

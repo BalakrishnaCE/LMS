@@ -10,7 +10,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useUser } from "@/hooks/use-user"
 import { useNavigation } from "@/contexts/NavigationContext"
-import { ROUTES, LMS_API_BASE_URL } from "@/config/routes"
+import { ROUTES, LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes'
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { useLearnerModuleData, useLearnerDashboard } from "@/lib/api"
@@ -984,7 +984,7 @@ export function LearnerModules({ itemsPerPage = 8 }: ModulesProps) {
                                                                             // Determine base URL
                                                                             // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
                                                                             // In development: use http://lms.noveloffice.org
-                                                                            const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+                                                                            const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
                                                                             const cleanBaseUrl = baseUrl.replace(/\/$/, '');
 
                                                                             return `${cleanBaseUrl}${relativePath}`;

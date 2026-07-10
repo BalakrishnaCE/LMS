@@ -48,7 +48,7 @@ import SlideContentEditor from '@/pages/ModuleEditor/edit/content-structure/Slid
 import IframeContentEditor from '@/pages/ModuleEditor/edit/content-structure/IframeContentEditor';
 import { SlidePreview } from '@/pages/ModuleEditor/contents/slide';
 import { VideoPreview } from '@/pages/ModuleEditor/contents/video';
-import { LMS_API_BASE_URL, BASE_PATH } from "@/config/routes";
+import { LMS_API_BASE_URL, LMS_FILE_BASE_URL, BASE_PATH } from '@/config/routes';
 import { reorderContentBlocks } from './utils';
 
 const contentStyles = `
@@ -1079,7 +1079,7 @@ function ContentBlockEditor({ content, onSaveContent, onCancelContent, isNew, on
     // Determine base URL
     // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
     // In development: use http://lms.noveloffice.org
-    const baseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const baseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
     const cleanBaseUrl = baseUrl.replace(/\/$/, '');
 
     return `${cleanBaseUrl}${relativePath}`;

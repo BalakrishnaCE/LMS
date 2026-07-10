@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { LMS_API_BASE_URL } from '@/config/routes';
+import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes';
 
 interface TextContentProps {
   content: any;
@@ -35,7 +35,7 @@ export default function TextContent({
   
   // Fix relative image URLs to point to the backend
   if (bodyContent) {
-    const apiBaseUrl = LMS_API_BASE_URL || 'http://lms.noveloffice.org';
+    const apiBaseUrl = LMS_API_BASE_URL || LMS_FILE_BASE_URL;
     const cleanApiBaseUrl = apiBaseUrl.replace(/\/$/, '');
     bodyContent = bodyContent.replace(/src=["'](\/files\/[^"']+)["']/gi, `src="${cleanApiBaseUrl}$1"`);
     bodyContent = bodyContent.replace(/src=["'](\/private\/files\/[^"']+)["']/gi, `src="${cleanApiBaseUrl}$1"`);
