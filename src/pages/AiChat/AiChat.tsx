@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, memo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Loader2, ChevronRight, Copy, Check, Info, Minimize2, Plus, ArrowLeft } from 'lucide-react';
+import { Send, Loader2, ChevronRight, Copy, Check, Info, Minimize2, Plus, ArrowLeft, BookOpen, ThumbsUp, ThumbsDown } from 'lucide-react';
 import CssRobot from "@/components/CssRobot";
 import "./AIchat.css";
 import { useUser } from "@/hooks/use-user";
@@ -13,6 +13,14 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -62,11 +70,22 @@ interface FaqTopic {
     value: string;
 }
 
+interface Citation {
+    module?: string;
+    lesson?: string;
+    chapter?: string;
+    start_line?: number;
+    end_line?: number;
+}
+
 interface Message {
     id: string;
     text: string;
     sender: 'user' | 'ai';
     timestamp: Date;
+    citations?: Citation[];
+    backend_id?: string;
+    feedback?: { rating: 'up' | 'down', text?: string };
 }
 
 interface ChatContext {
@@ -107,7 +126,46 @@ const formatMessageText = (text: string | any, isAi: boolean) => {
     );
 };
 
-const MessageBubble = memo(({ message, onCopy, copiedId }: { message: Message, onCopy: (text: string, id: string) => void, copiedId: string | null }) => {
+const MessageBubble = memo(({ message, onCopy, copiedId, onFeedback, isStreaming, onMandatoryFeedbackChange }: { message: Message, onCopy: (text: string, id: string) => void, copiedId: string | null, onFeedback?: (msgId: string, rating: 'up' | 'down', text?: string) => Promise<void> | void, isStreaming?: boolean, onMandatoryFeedbackChange?: (isMandatory: boolean) => void }) => {
+    const [showCitations, setShowCitations] = useState(false);
+    const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+    const [pendingRating, setPendingRating] = useState<'up' | 'down' | null>(null);
+    const [feedbackText, setFeedbackText] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleThumbsUp = () => {
+        if (message.feedback || !onFeedback) return;
+        if (!message.backend_id) {
+            alert("Cannot rate this message as it is from an older session. Please ask a new question!");
+            return;
+        }
+        setPendingRating('up');
+        setShowFeedbackInput(true);
+    };
+
+    const handleThumbsDown = () => {
+        if (message.feedback || !onFeedback) return;
+        if (!message.backend_id) {
+            alert("Cannot rate this message as it is from an older session. Please ask a new question!");
+            return;
+        }
+        setPendingRating('down');
+        setShowFeedbackInput(true);
+        if (onMandatoryFeedbackChange) onMandatoryFeedbackChange(true);
+    };
+
+    const submitFeedback = async () => {
+        if (!message.backend_id || !onFeedback || !pendingRating) return;
+        if (pendingRating === 'down' && !feedbackText.trim()) return;
+
+        setIsSubmitting(true);
+        await onFeedback(message.backend_id, pendingRating, feedbackText.trim());
+        setIsSubmitting(false);
+        setShowFeedbackInput(false);
+        setPendingRating(null);
+        if (onMandatoryFeedbackChange) onMandatoryFeedbackChange(false);
+    };
+
     return (
         <div className={`flex w-full ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex flex-col max-w-[80%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
@@ -128,18 +186,135 @@ const MessageBubble = memo(({ message, onCopy, copiedId }: { message: Message, o
                         </div>
                     </div>
                 </div>
-                {message.sender === 'ai' && (
-                    <div className="flex items-center gap-1 mt-1 px-1">
+
+                {/* message.sender === 'ai' && message.citations && message.citations.length > 0 && (
+                    <div className="mt-0 w-full max-w-[100%]">
                         <button
-                            onClick={() => onCopy(message.text, message.id)}
-                            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => setShowCitations(!showCitations)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#018790]/20 dark:border-teal-500/20 bg-teal-50/50 dark:bg-teal-950/20 text-xs font-semibold text-[#018790] dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-all duration-200"
                         >
-                            {copiedId === message.id ? (
-                                <Check className="h-3.5 w-3.5" />
-                            ) : (
-                                <Copy className="h-3.5 w-3.5" />
-                            )}
+                            <BookOpen className="h-3.5 w-3.5" />
+                            <span>Sources ({message.citations.length})</span>
+                            <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${showCitations ? 'rotate-90' : ''}`} />
                         </button>
+                        {showCitations && (
+                            <div className="mt-2 grid grid-cols-1 gap-2 border-l-2 border-teal-500/40 pl-3 py-1 animate-in fade-in slide-in-from-left-2 duration-200">
+                                {message.citations.map((citation, index) => (
+                                    <div key={index} className="flex flex-col gap-0.5 p-2 rounded-lg bg-teal-500/5 dark:bg-teal-500/10 border border-teal-500/10 text-xs">
+                                        <div className="flex items-center gap-1.5 font-bold text-[#018790] dark:text-teal-200">
+                                            <span className="bg-teal-500/20 text-teal-800 dark:text-teal-200 px-1.5 py-0.5 rounded text-[10px] font-mono leading-none">Source {index + 1}</span>
+                                            {citation.module && <span className="truncate max-w-[200px]">{citation.module}</span>}
+                                        </div>
+                                        <div className="text-muted-foreground dark:text-gray-400 font-medium pl-1">
+                                            {citation.lesson && <span>{citation.lesson}</span>}
+                                            {citation.chapter && <span> › {citation.chapter}</span>}
+                                            {citation.start_line !== undefined && (
+                                                <span className="ml-2 bg-[#018790]/10 dark:bg-teal-500/20 text-[#018790] dark:text-teal-300 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                                                    Line {citation.start_line}{citation.end_line && citation.end_line !== citation.start_line ? ` - ${citation.end_line}` : ''}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) */}
+
+                {message.sender === 'ai' && !isStreaming && (
+                    <div className="flex flex-col gap-2 mt-1 px-1">
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => onCopy(message.text, message.id)}
+                                className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                title="Copy message"
+                            >
+                                {copiedId === message.id ? (
+                                    <Check className="h-3.5 w-3.5" />
+                                ) : (
+                                    <Copy className="h-3.5 w-3.5" />
+                                )}
+                            </button>
+                            <button
+                                onClick={handleThumbsUp}
+                                className={`p-1 rounded-md transition-colors ${(message.feedback?.rating === 'up' || pendingRating === 'up') ? 'bg-[#018790]/15 text-[#018790] dark:bg-teal-400/15 dark:text-teal-400' : 'hover:bg-muted text-muted-foreground hover:text-[#018790]'}`}
+                                title="Helpful"
+                                disabled={!!message.feedback}
+                            >
+                                <ThumbsUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                onClick={handleThumbsDown}
+                                className={`p-1 rounded-md transition-colors ${(message.feedback?.rating === 'down' || pendingRating === 'down') ? 'bg-destructive/15 text-destructive dark:bg-red-400/15 dark:text-red-400' : 'hover:bg-muted text-muted-foreground hover:text-destructive'}`}
+                                title="Not helpful"
+                                disabled={!!message.feedback}
+                            >
+                                <ThumbsDown className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                        <Dialog 
+                            open={showFeedbackInput && !message.feedback} 
+                            onOpenChange={(open) => {
+                                if (!open && !isSubmitting) {
+                                    if (pendingRating === 'up' && message.backend_id && onFeedback) {
+                                        onFeedback(message.backend_id, 'up', '');
+                                    }
+                                    setShowFeedbackInput(false);
+                                    setPendingRating(null);
+                                    if (onMandatoryFeedbackChange) onMandatoryFeedbackChange(false);
+                                }
+                            }}
+                        >
+                            <DialogContent 
+                                className="sm:max-w-[425px]"
+                                hideClose={pendingRating === 'down'}
+                                onInteractOutside={(e) => {
+                                    if (pendingRating === 'down') e.preventDefault();
+                                }}
+                                onEscapeKeyDown={(e) => {
+                                    if (pendingRating === 'down') e.preventDefault();
+                                }}
+                            >
+                                <DialogHeader>
+                                    <DialogTitle>{pendingRating === 'down' ? 'Provide Feedback' : 'Thank you for your feedback!'}</DialogTitle>
+                                    <DialogDescription>
+                                        {pendingRating === 'down' 
+                                            ? "Please let us know why this wasn't helpful so we can improve." 
+                                            : "Any additional comments you'd like to share?"}
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-4">
+                                    <Textarea
+                                        value={feedbackText}
+                                        onChange={(e) => setFeedbackText(e.target.value)}
+                                        placeholder={pendingRating === 'down' ? "Please let us know why this wasn't helpful (required)..." : "Any additional comments? (optional)..."}
+                                        className="min-h-[100px] resize-none"
+                                    />
+                                </div>
+                                <DialogFooter>
+                                    {pendingRating === 'down' && (
+                                        <Button 
+                                            variant="ghost" 
+                                            onClick={() => {
+                                                setShowFeedbackInput(false);
+                                                setPendingRating(null);
+                                                if (onMandatoryFeedbackChange) onMandatoryFeedbackChange(false);
+                                            }}
+                                            disabled={isSubmitting}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    )}
+                                    <Button 
+                                        onClick={submitFeedback}
+                                        disabled={isSubmitting || (pendingRating === 'down' && !feedbackText.trim())}
+                                    >
+                                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                        Submit
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 )}
             </div>
@@ -176,6 +351,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
     const [isLoading, setIsLoading] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [chatId, setChatId] = useState<string | null>(null);
+    const [isChatLocked, setIsChatLocked] = useState(false);
 
     // Fetch user departments on mount
     useEffect(() => {
@@ -288,6 +464,11 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
                     if (chat.query_responses && Array.isArray(chat.query_responses)) {
                         chat.query_responses.forEach((qr: any, idx: number) => {
+                            let feedback = undefined;
+                            if (qr.rating) {
+                                feedback = { rating: qr.rating, text: qr.user_feedback || "" };
+                            }
+
                             loadedMessages.push({
                                 id: `q-${idx}`,
                                 text: qr.context,
@@ -298,7 +479,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 id: `r-${idx}`,
                                 text: qr.response,
                                 sender: 'ai',
-                                timestamp: new Date(qr.time_stamp || qr.modified) // or add small offset?
+                                timestamp: new Date(qr.time_stamp || qr.modified), // or add small offset?
+                                backend_id: qr.name,
+                                feedback: feedback
                             });
                         });
                     }
@@ -738,7 +921,11 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 id: '1',
                 text: `Hi ${user?.full_name || user?.name || 'Learner'}! How can I help you today?`,
                 sender: 'ai',
-                timestamp: new Date()
+                timestamp: new Date(),
+                citations: [
+                    { module: "Example Module", lesson: "Example Lesson", chapter: "Example Chapter", start_line: 12, end_line: 18 },
+                    { module: "Another Module", chapter: "Introduction", start_line: 101, end_line: 110 }
+                ]
             }]);
         } else {
             await fetchDepartmentModules(dept.id);
@@ -834,9 +1021,9 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         return null;
     };
 
-    const saveQueryResponse = async (cId: string, query: string, responseVal: string) => {
+    const saveQueryResponse = async (cId: string, query: string, responseVal: string): Promise<string | null> => {
         try {
-            await fetch('/api/method/novel_lms.novel_lms.api.Chat.add_query_response', {
+            const response = await fetch('/api/method/novel_lms.novel_lms.api.Chat.add_query_response', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -845,8 +1032,30 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                     response: responseVal
                 })
             });
+            const data = await response.json();
+            if (data.message?.status === 'success') {
+                return data.message.message_id;
+            }
         } catch (error) {
             // console.error("Failed to save query response:", error);
+        }
+        return null;
+    };
+
+    const handleFeedback = async (msgId: string, rating: 'up' | 'down', text?: string) => {
+        if (!chatId) return;
+        try {
+            const response = await fetch('/api/method/novel_lms.novel_lms.api.Chat.add_chat_feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, message_id: msgId, rating, feedback_text: text })
+            });
+            const data = await response.json();
+            if (data.message?.status === 'success') {
+                setMessages(prev => prev.map(m => m.backend_id === msgId ? { ...m, feedback: { rating, text } } : m));
+            }
+        } catch (error) {
+            // console.error("Failed to save feedback", error);
         }
     };
 
@@ -879,7 +1088,11 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             id: streamingMessageId,
             text: '',
             sender: 'ai',
-            timestamp: new Date()
+            timestamp: new Date(),
+            citations: [
+                { module: "QA Dynamic Response", lesson: "Real-time Retrieval", chapter: "Generated Answer", start_line: 4, end_line: 12 },
+                { module: "Knowledge Base", chapter: "References", start_line: 15, end_line: 22 }
+            ]
         }]);
 
         // Register in the singleton BEFORE any await
@@ -957,7 +1170,10 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             }
 
             if (currentChatId) {
-                saveQueryResponse(currentChatId, userQuery, chatStreamStore.getState().accumulatedText);
+                const backendId = await saveQueryResponse(currentChatId, userQuery, chatStreamStore.getState().accumulatedText);
+                if (backendId) {
+                    setMessages(prev => prev.map(m => m.id === streamingMessageId ? { ...m, backend_id: backendId } : m));
+                }
 
                 if (isFirstMessage && suggestedTitle) {
                     localStorage.setItem(`novel_lms_chat_title_${currentChatId}`, suggestedTitle);
@@ -1521,12 +1737,15 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
                                 {currentStep === 'qa' && messages.length > 0 && (
                                     <>
-                                        {messages.map((message) => (
+                                        {messages.map((message, index) => (
                                             <MessageBubble
                                                 key={message.id}
                                                 message={message}
                                                 onCopy={handleCopy}
                                                 copiedId={copiedId}
+                                                onFeedback={handleFeedback}
+                                                isStreaming={isLoading && index === messages.length - 1 && message.sender === 'ai'}
+                                                onMandatoryFeedbackChange={setIsChatLocked}
                                             />
                                         ))}
                                         {isLoading && (
@@ -1570,12 +1789,15 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 <div className="flex flex-col gap-2 p-4 min-h-full">
                                     {currentStep === 'qa' && messages.length > 0 && (
                                         <>
-                                            {messages.map((message) => (
+                                            {messages.map((message, index) => (
                                                 <MessageBubble
                                                     key={message.id}
                                                     message={message}
                                                     onCopy={handleCopy}
                                                     copiedId={copiedId}
+                                                    onFeedback={handleFeedback}
+                                                    isStreaming={isLoading && index === messages.length - 1 && message.sender === 'ai'}
+                                                    onMandatoryFeedbackChange={setIsChatLocked}
                                                 />
                                             ))}
                                             {isLoading && (
@@ -1610,13 +1832,13 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 <div className="relative flex w-full items-end gap-2 bg-white/60 dark:bg-white/5 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-xl p-2 shadow-md z-10 transition-all duration-300 hover:bg-white/80 dark:hover:bg-white/10 hover:border-white/70 dark:hover:border-white/20 focus-within:bg-white/95 dark:focus-within:bg-black/60 focus-within:border-teal-400/50 dark:focus-within:border-teal-500/50">
                                     <Textarea
                                         ref={textareaRef}
-                                        placeholder="Type your message here..."
+                                        placeholder={isChatLocked ? "Please submit your feedback first..." : "Type your message here..."}
                                         value={inputValue}
                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInputValue(e.target.value)}
                                         onKeyDown={handleKeyPress}
                                         rows={1}
-                                        className="flex-1 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-black dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 resize-none min-h-[34px] max-h-[80px] overflow-y-auto py-2 text-sm [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] shadow-none"
-                                        disabled={isLoading}
+                                        className={`flex-1 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-black dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 resize-none min-h-[34px] max-h-[80px] overflow-y-auto py-2 text-sm [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] shadow-none ${isChatLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        disabled={isLoading || isChatLocked}
                                         style={{ height: 'auto' }}
                                         onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
                                             const target = e.currentTarget;
@@ -1627,8 +1849,8 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                     <Button
                                         onClick={handleSendMessage}
                                         size="icon"
-                                        disabled={isLoading || !inputValue.trim()}
-                                        className={`h-8 w-8 rounded-lg shrink-0 transition-all duration-300 ${!inputValue.trim()
+                                        disabled={isLoading || isChatLocked || !inputValue.trim()}
+                                        className={`h-8 w-8 rounded-lg shrink-0 transition-all duration-300 ${(!inputValue.trim() || isChatLocked)
                                             ? 'bg-teal-600/20 text-teal-700/60 cursor-not-allowed hover:bg-teal-600/20'
                                             : 'bg-[#018790] text-white hover:bg-teal-700 shadow-md hover:scale-105 active:scale-95'
                                             }`}
