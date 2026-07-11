@@ -8,7 +8,7 @@ import type { ModuleInfo } from "./ModuleEdit";
 import { useLocation } from "wouter";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { ArrowLeftIcon, X, Pencil, Asterisk } from "lucide-react";
-import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc, useFrappeGetCall } from "frappe-react-sdk";
+import { useFrappeUpdateDoc, useFrappeGetDocList, useFrappeCreateDoc, useFrappeDeleteDoc, useFrappeGetCall, useFrappePostCall } from "frappe-react-sdk";
 import { toast } from "sonner";
 import {
   Select,
@@ -967,6 +967,7 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
   const [chapterToDelete, setChapterToDelete] = useState<{ lessonId: string; chapterId: string } | null>(null);
   const [dragLessonActiveId, setDragLessonActiveId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const { call: syncModuleToNeo4j, loading: syncingModule } = useFrappePostCall("novel_lms.lumi_backend.api.sync_lms_module");
 
   // Fetch departments for the department selector
   const { data: departments } = useFrappeGetDocList("Department", {
@@ -1341,6 +1342,29 @@ export default function Sidebar({ isOpen, fullScreen, moduleInfo, module, onFini
                   }}
                 >
                   <ArrowLeftIcon className="w-4 h-4" /> Back to Module
+                </Button>
+                
+                {/* Sync to Neo4j Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mb-4 w-full bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200"
+                  disabled={syncingModule || moduleInfo?.is_injest !== 1}
+                  onClick={async () => {
+                    if (moduleInfo?.is_injest !== 1) {
+                      toast.error("Module must have 'Is Injest' enabled to sync.");
+                      return;
+                    }
+                    try {
+                      await syncModuleToNeo4j({ module_id: moduleInfo.id });
+                      toast.success("Sync initiated! The module is being synced to the Neo4j Knowledge Base.");
+                    } catch (e) {
+                      toast.error("Failed to initiate sync");
+                      console.error(e);
+                    }
+                  }}
+                >
+                  {syncingModule ? "Initiating Sync..." : "Sync to AI Knowledge Base"}
                 </Button>
 
                 <AnimatePresence mode="wait">

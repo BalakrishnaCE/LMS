@@ -37,6 +37,7 @@ export interface ModuleInfo {
   learners?: { user: string }[];
   order?: number;
   mandatory?: boolean;
+  is_injest?: number;
 }
 
 export default function ModuleEdit() {

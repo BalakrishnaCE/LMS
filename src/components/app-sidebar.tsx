@@ -2,13 +2,13 @@ import * as React from "react"
 import {
   IconChartBar,
   IconDashboard,
-  IconBook,
   IconListDetails,
   IconUsers,
 } from "@tabler/icons-react"
 import { Building2 } from "lucide-react"
 import { NavMain, type NavMainItem } from "@/components/nav-main"
 import { NavAiChat } from "@/components/nav-ai-chat"
+import { NavLumi1 } from "@/components/nav-lumi1"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -131,6 +131,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarContent>
           <NavMain items={navData.navMain} />
           <NavAiChat />
+          <NavLumi1 />
         </SidebarContent>
         <SidebarFooter>
           <NavUser user={navData.user} />

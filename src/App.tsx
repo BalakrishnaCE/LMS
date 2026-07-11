@@ -25,6 +25,10 @@ import { ErrorBoundary } from "@/lib/error-boundary";
 import FloatingChatButton from "@/components/FloatingChatButton";
 import AiChatPage from "@/pages/AiChat/AiChatPage";
 import FAQPage from "./pages/FAQ/FAQPage";
+import KnowledgePage from "@/pages/Lumi1/KnowledgePage";
+import ChatPage from "@/pages/Lumi1/ChatPage";
+import ApprovalsPage from "@/pages/Lumi1/ApprovalsPage";
+import SettingsPage from "@/pages/Lumi1/SettingsPage";
 // import AnalyticsDashboardNew from "@/pages/Analytics/AnalyticsDashboard";
 // import H5PReactDemo from '@/pages/Test/H5PReactDemo';
 // import TESTH5P from '@/pages/Test/TESTH5P';
@@ -119,6 +123,36 @@ function AppContent() {
             <FAQPage />
           </Layout>
         )} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
+
+        <ProtectedRoute path="/lumi_1" component={() => (
+          <Layout>
+            <KnowledgePage />
+          </Layout>
+        )} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
+
+        <ProtectedRoute path="/lumi_1/knowledge" component={() => (
+          <Layout>
+            <KnowledgePage />
+          </Layout>
+        )} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
+
+        <ProtectedRoute path="/lumi_1/chat" component={() => (
+          <Layout>
+            <ChatPage />
+          </Layout>
+        )} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
+
+        <ProtectedRoute path="/lumi_1/approvals" component={() => (
+          <Layout>
+            <ApprovalsPage />
+          </Layout>
+        )} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
+
+        <ProtectedRoute path="/lumi_1/settings" component={() => (
+          <Layout>
+            <SettingsPage />
+          </Layout>
+        )} allowedRoles={["LMS Admin"]} />
 
         <Route path="/:path*" component={NotFound} />
 

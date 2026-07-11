@@ -35,7 +35,12 @@ export const ROUTES = {
   QUIZ: '/quiz',
   QUIZ_QUESTIONS: '/quiz-questions',
   AI_CHAT: '/ai',
-  FAQ: '/faq'
+  FAQ: '/faq',
+  LUMI_1: '/lumi_1',
+  LUMI_1_KNOWLEDGE: '/lumi_1/knowledge',
+  LUMI_1_CHAT: '/lumi_1/chat',
+  LUMI_1_APPROVALS: '/lumi_1/approvals',
+  LUMI_1_SETTINGS: '/lumi_1/settings'
 } as const;
 
 
