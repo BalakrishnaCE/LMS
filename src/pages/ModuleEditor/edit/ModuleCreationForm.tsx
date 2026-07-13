@@ -40,7 +40,7 @@ export default function ModuleCreationForm() {
   });
 
   const { data: existingModules } = useFrappeGetDocList("LMS Module", {
-    fields: ["name1"],
+    fields: ["name1", "department", "assignment_based"],
     limit: 1000,
   });
 
@@ -55,8 +55,28 @@ export default function ModuleCreationForm() {
       return;
     }
 
-    if (existingModules && existingModules.some((mod: any) => mod.name1?.toLowerCase() === moduleName.trim().toLowerCase())) {
-      toast.error("A module with this name already exists. Please choose a different name.");
+    const isDuplicate = existingModules?.some((mod: any) => {
+      // If names don't match, not a duplicate
+      if (mod.name1?.trim().toLowerCase() !== moduleName.trim().toLowerCase()) {
+        return false;
+      }
+
+      // If assignment bases are different, allow it
+      if (mod.assignment_based !== assignmentBased) {
+        return false;
+      }
+      
+      // If they have the SAME assignment base, check department if applicable
+      if (assignmentBased === "Department") {
+        return mod.department === departmentSelected;
+      }
+      
+      // For "Everyone" or "Manual", same name and same assignment base is a duplicate
+      return true;
+    });
+
+    if (isDuplicate) {
+      toast.error("A module with this name already exists for the selected assignment/department.");
       return;
     }
     if (assignmentBased === "Department" && !departmentSelected) {
