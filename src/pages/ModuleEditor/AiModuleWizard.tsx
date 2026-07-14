@@ -584,6 +584,7 @@ function StepCustomize({
                 <SelectItem value="Professional & Formal">Professional &amp; Formal</SelectItem>
                 <SelectItem value="Technical & Academic">Technical &amp; Academic</SelectItem>
                 <SelectItem value="Casual & Upbeat">Casual &amp; Upbeat</SelectItem>
+                <SelectItem value="No Audio (Silent Slides)">No Audio (Silent Slides)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -655,9 +656,28 @@ function StepProcessing({
     let isMounted = true;
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
+    // Counters for resilient failure detection
+    let notFoundCount = 0;       // consecutive not_found responses
+    const NOT_FOUND_LIMIT = 5;   // ~10s at 2s interval → worker never wrote to Redis
+    const POLL_INTERVAL_MS = 2000;
+    // Hard timeout: if job sits in "queued" state too long the worker silently crashed
+    const QUEUE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+    let queueStartTime: number | null = null;
+
+    const failJob = (message: string) => {
+      if (!isMounted) return;
+      activeJobPromise = null;
+      if (pollInterval) clearInterval(pollInterval);
+      localStorage.removeItem("active_ai_job_id");
+      localStorage.removeItem("active_ai_job_progress");
+      toast.error(message);
+      onFailed();
+    };
+
     const runBackendWorker = async () => {
       try {
         let currentJobId: string = resumedJobId || "";
+        const hasConfigureStep = /video|slide|ppt|powerpoint|presentation|slideshow/i.test(instructions);
 
         if (!currentJobId) {
           // If no active submission promise exists, create one
@@ -690,13 +710,14 @@ function StepProcessing({
                   instructions: instructions,
                   department: department,
                   assignment_based: assignmentBased,
-                  slide_theme: slideTheme,
-                  slide_transition: slideTransition,
-                  element_entrance: elementEntrance,
-                  narration_tone: narrationTone,
-                  target_audience: targetAudience,
-                  learning_goal: learningGoal,
-                  slide_count: slideCount,
+                  generate_slides: hasConfigureStep,
+                  slide_theme: hasConfigureStep ? slideTheme : null,
+                  slide_transition: hasConfigureStep ? slideTransition : null,
+                  element_entrance: hasConfigureStep ? elementEntrance : null,
+                  narration_tone: hasConfigureStep ? narrationTone : null,
+                  target_audience: hasConfigureStep ? targetAudience : null,
+                  learning_goal: hasConfigureStep ? learningGoal : null,
+                  slide_count: hasConfigureStep ? slideCount : null,
                 }),
                 credentials: "include",
               });
@@ -733,6 +754,7 @@ function StepProcessing({
         if (!resumedJobId) {
           if (!isMounted) return;
           setProgressMsg("Waiting in task queue...");
+          queueStartTime = Date.now(); // start the queue timeout clock
         }
 
         // Poll status
@@ -750,44 +772,73 @@ function StepProcessing({
             });
 
             if (!statusResponse.ok) {
-              // Ignore single query failure to be resilient
+              // Ignore single network failure to be resilient
               return;
             }
 
             const statusResult = await statusResponse.json();
             const statusData = statusResult.message;
 
-            if (!statusData || !isMounted) return;
+            if (!isMounted) return;
 
+            // ── Case 1: job not found in Redis (worker crashed before writing anything) ──
+            if (!statusData || statusData.status === "not_found") {
+              notFoundCount++;
+              if (notFoundCount >= NOT_FOUND_LIMIT) {
+                failJob("The background worker crashed before processing could begin. Please try again.");
+              }
+              return;
+            }
+
+            // Reset not_found counter once we get a real response
+            notFoundCount = 0;
+
+            // ── Case 2: explicit failure from server ──
+            if (statusData.status === "failed") {
+              if (pollInterval) clearInterval(pollInterval);
+              localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_progress");
+              activeJobPromise = null;
+              throw new Error(statusData.error || statusData.progress || "Generation job failed on server.");
+            }
+
+            // ── Case 3: success ──
             if (statusData.status === "finished") {
               if (pollInterval) clearInterval(pollInterval);
               localStorage.removeItem("active_ai_job_id");
               localStorage.removeItem("active_ai_job_progress");
-              activeJobPromise = null; // Reset
+              activeJobPromise = null;
               onDone(statusData.module_id);
-            } else if (statusData.status === "failed") {
-              if (pollInterval) clearInterval(pollInterval);
-              localStorage.removeItem("active_ai_job_id");
-              localStorage.removeItem("active_ai_job_progress");
-              activeJobPromise = null; // Reset
-              throw new Error(statusData.error || statusData.progress || "Generation job failed on server.");
-            } else {
-              // Update progress message from server
-              if (statusData.progress) {
-                setProgressMsg(statusData.progress);
-                localStorage.setItem("active_ai_job_progress", statusData.progress);
+              return;
+            }
+
+            // ── Case 4: still queued — check hard timeout ──
+            if (statusData.status === "queued" && queueStartTime) {
+              if (Date.now() - queueStartTime > QUEUE_TIMEOUT_MS) {
+                failJob("The background worker did not pick up the job in time. It may have crashed. Please try again.");
+                return;
+              }
+            }
+
+            // ── Case 5: in progress — update progress label ──
+            if (statusData.progress) {
+              setProgressMsg(statusData.progress);
+              localStorage.setItem("active_ai_job_progress", statusData.progress);
+              // Once the job has started, reset the queue timeout clock
+              if (statusData.status === "started") {
+                queueStartTime = null;
               }
             }
           } catch (pollErr) {
             console.error("Polling error:", pollErr);
-            activeJobPromise = null; // Reset
+            activeJobPromise = null;
             if (pollInterval) clearInterval(pollInterval);
             toast.error(pollErr instanceof Error ? pollErr.message : "Generation failed.");
             localStorage.removeItem("active_ai_job_id");
             localStorage.removeItem("active_ai_job_progress");
             onFailed();
           }
-        }, 2000);
+        }, POLL_INTERVAL_MS);
 
       } catch (err) {
         console.error("AI Wizard Error:", err);
@@ -809,6 +860,9 @@ function StepProcessing({
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [files, instructions, onDone, onFailed, resumedJobId]);
+
+
+
 
   // Pick a file icon colour based on the first file type
   const firstType = files[0]?.file.type ?? "";

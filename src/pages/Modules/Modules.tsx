@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/pagination"
 import { useState, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import {
@@ -638,7 +638,7 @@ function Modules({
                                         </button>
 
                                         {/* Bot Icon Button - Positioned exactly to the left of Duplicate Icon */}
-                                        {(!module.is_injest || module.is_injest === 0) && (
+                                        {module.status === "Published" && (!module.is_injest || module.is_injest === 0) && (
                                             <button
                                                 onClick={(e) => {
                                                     e.preventDefault();

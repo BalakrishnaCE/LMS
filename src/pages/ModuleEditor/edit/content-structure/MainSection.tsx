@@ -686,33 +686,35 @@ export default function MainSection({
                       <ExternalLink className="w-4 h-4" />
                       Preview Module
                     </Button>
-                    <div className="flex flex-col items-end gap-0.5">
-                      <Button
-                        type="button"
-                        variant={needsIngestion ? "default" : "outline"}
-                        size="sm"
-                        disabled={!needsIngestion}
-                        onClick={() => setShowIngestConfirm(true)}
-                        className="flex items-center justify-center gap-2 transition-all"
-                      >
-                        <RefreshCw className={`w-4 h-4 ${needsIngestion ? 'animate-pulse' : ''}`} />
-                        Ingest to AI
-                      </Button>
-                      {moduleDocData?.last_injetion && (
-                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                          Last Injested:{" "}
-                          {(() => {
-                            const d = new Date(moduleDocData.last_injetion);
-                            const date = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
-                            let hours = d.getHours();
-                            const minutes = d.getMinutes().toString().padStart(2, "0");
-                            const ampm = hours >= 12 ? "PM" : "AM";
-                            hours = hours % 12 || 12;
-                            return `${date} ${hours}:${minutes}${ampm}`;
-                          })()}
-                        </span>
-                      )}
-                    </div>
+                    {moduleDocData?.status === "Published" && (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <Button
+                          type="button"
+                          variant={needsIngestion ? "default" : "outline"}
+                          size="sm"
+                          disabled={!needsIngestion}
+                          onClick={() => setShowIngestConfirm(true)}
+                          className="flex items-center justify-center gap-2 transition-all"
+                        >
+                          <RefreshCw className={`w-4 h-4 ${needsIngestion ? 'animate-pulse' : ''}`} />
+                          Ingest to AI
+                        </Button>
+                        {moduleDocData?.last_injetion && (
+                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                            Last Injested:{" "}
+                            {(() => {
+                              const d = new Date(moduleDocData.last_injetion);
+                              const date = `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+                              let hours = d.getHours();
+                              const minutes = d.getMinutes().toString().padStart(2, "0");
+                              const ampm = hours >= 12 ? "PM" : "AM";
+                              hours = hours % 12 || 12;
+                              return `${date} ${hours}:${minutes}${ampm}`;
+                            })()}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               )}

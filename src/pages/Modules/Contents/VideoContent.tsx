@@ -2,6 +2,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRef, useEffect, useState } from 'react';
 import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes';
 import { useMediaManager } from '@/contexts/MediaManagerContext';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // Color themes mapping
 const getThemeColors = (themeName: string) => {
@@ -353,11 +364,245 @@ export default function VideoContent({
   // Interactive slide states
   const [presentationData, setPresentationData] = useState<any>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
+  const [currentVideo, setCurrentVideo] = useState<string>('');
+
+  useEffect(() => {
+    setCurrentVideo(content?.video || '');
+  }, [content]);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
   const [showScript, setShowScript] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  // Custom slide editor states
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editSlides, setEditSlides] = useState<any[]>([]);
+  const [editBackgroundHtml, setEditBackgroundHtml] = useState<string>('');
+  const [editCssStyles, setEditCssStyles] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'content' | 'visuals'>('content');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [activeSlideIdx, setActiveSlideIdx] = useState<number>(0);
+
+  // AI assistant slide co-pilot states
+  const [aiInstruction, setAiInstruction] = useState<string>('');
+  const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
+  const [slideIndexToDelete, setSlideIndexToDelete] = useState<number | null>(null);
+
+  const handleAiEnhance = async () => {
+    if (!aiInstruction.trim()) return;
+    const toastId = "ai-slide-edit";
+    try {
+      setIsEnhancing(true);
+      toast.loading("Queued for AI slide edits...", { id: toastId });
+
+      const currentMetadata = {
+        ...presentationData,
+        slides: editSlides,
+        visuals: {
+          ...presentationData.visuals,
+          background_html: editBackgroundHtml,
+          css_styles: editCssStyles
+        }
+      };
+
+      const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
+      const response = await fetch(
+        `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.edit_presentation_with_ai`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            presentation_metadata: JSON.stringify(currentMetadata),
+            instruction: aiInstruction
+          }),
+          credentials: 'include'
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to apply AI edit. Server returned status: ${response.status}`);
+      }
+
+      const resData = await response.json();
+      if (resData.exc) {
+        throw new Error(resData.exc);
+      }
+
+      const responseMessage = resData.message;
+      if (!responseMessage || !responseMessage.success || !responseMessage.job_id) {
+        throw new Error(responseMessage?.error || "Failed to start AI slide edit background task.");
+      }
+
+      const jobId = responseMessage.job_id;
+
+      // Poll status API
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await fetch(
+            `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.get_status?ai_job_id=${jobId}`,
+            {
+              method: "GET",
+              headers: {
+                "Accept": "application/json",
+              },
+              credentials: "include",
+            }
+          );
+
+          if (!statusRes.ok) return;
+
+          const statusResult = await statusRes.json();
+          const statusData = statusResult.message;
+
+          if (!statusData) return;
+
+          if (statusData.status === "finished") {
+            clearInterval(pollInterval);
+            setIsEnhancing(false);
+            
+            const updated = statusData.presentation_metadata;
+            if (updated) {
+              setEditSlides(updated.slides || []);
+              setEditBackgroundHtml(updated.visuals?.background_html || '');
+              setEditCssStyles(updated.visuals?.css_styles || '');
+              setAiInstruction('');
+              setActiveSlideIdx(0);
+            }
+            
+            toast.success("AI edits applied successfully!", { id: toastId });
+          } else if (statusData.status === "failed") {
+            clearInterval(pollInterval);
+            setIsEnhancing(false);
+            toast.error(statusData.progress || statusData.error || "AI enhancement failed.", { id: toastId });
+          } else {
+            // Still running or queued, update the loader message
+            if (statusData.progress) {
+              toast.loading(statusData.progress, { id: toastId });
+            }
+          }
+        } catch (pollErr: any) {
+          console.error("Error polling AI slide edit job status:", pollErr);
+        }
+      }, 2000);
+
+    } catch (error: any) {
+      console.error("AI enhancement failed:", error);
+      toast.error(error.message || "AI enhancement failed.", { id: toastId });
+      setIsEnhancing(false);
+    }
+  };
+
+  const openEditor = () => {
+    if (presentationData) {
+      setEditSlides(JSON.parse(JSON.stringify(presentationData.slides || [])));
+      setEditBackgroundHtml(presentationData.visuals?.background_html || '');
+      setEditCssStyles(presentationData.visuals?.css_styles || '');
+      setIsEditing(true);
+      setActiveTab('content');
+      setActiveSlideIdx(0);
+    }
+  };
+
+  const handleAddSlide = () => {
+    const newSlide = {
+      title: "New Slide",
+      bullets: ["New bullet point"],
+      narration: "Slide narration notes...",
+      start_time: editSlides.length > 0 ? editSlides[editSlides.length - 1].end_time : 0.0,
+      end_time: editSlides.length > 0 ? editSlides[editSlides.length - 1].end_time + 10.0 : 10.0,
+      duration: 10.0
+    };
+    setEditSlides([...editSlides, newSlide]);
+    setActiveSlideIdx(editSlides.length);
+  };
+
+  const handleDeleteSlide = (index: number) => {
+    if (editSlides.length <= 1) {
+      toast.warning("Presentation must have at least one slide.");
+      return;
+    }
+    setSlideIndexToDelete(index);
+  };
+
+  const confirmDeleteSlide = () => {
+    if (slideIndexToDelete !== null) {
+      const updated = editSlides.filter((_, idx) => idx !== slideIndexToDelete);
+      setEditSlides(updated);
+      setActiveSlideIdx(Math.max(0, slideIndexToDelete - 1));
+      setSlideIndexToDelete(null);
+    }
+  };
+
+  const handleBulletsChange = (index: number, text: string) => {
+    const updated = [...editSlides];
+    updated[index].bullets = text.split('\n').map(line => line.trim()).filter(line => line !== '');
+    setEditSlides(updated);
+  };
+
+  const handleSaveChanges = async () => {
+    try {
+      setIsSaving(true);
+      const updatedMetadata = {
+        ...presentationData,
+        slides: editSlides,
+        visuals: {
+          ...presentationData.visuals,
+          background_html: editBackgroundHtml,
+          css_styles: editCssStyles
+        }
+      };
+
+      const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
+      const response = await fetch(
+        `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.save_presentation_changes`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            video_content_name: contentReference,
+            updated_metadata: JSON.stringify(updatedMetadata)
+          }),
+          credentials: 'include'
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to save. Server returned status: ${response.status}`);
+      }
+
+      const resData = await response.json();
+      if (resData.exc) {
+        throw new Error(resData.exc);
+      }
+
+      if (resData.message && resData.message.status === 'success') {
+        const savedMetadata = resData.message.presentation_metadata;
+        setPresentationData(savedMetadata);
+        
+        if (resData.message.video) {
+          setCurrentVideo(resData.message.video);
+          if (audioRef.current) {
+            audioRef.current.load();
+          }
+        }
+        
+        setIsEditing(false);
+        toast.success("Presentation slides and narration audio updated successfully!");
+      } else {
+        throw new Error("Invalid response from server.");
+      }
+    } catch (error: any) {
+      console.error("Failed to save presentation changes:", error);
+      toast.error(error.message || "Failed to save presentation changes.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Try parsing presentation JSON on mount/update
   useEffect(() => {
@@ -460,22 +705,22 @@ export default function VideoContent({
   const handlePrev = () => {
     if (currentSlideIndex > 0 && presentationData?.slides) {
       const prevSlide = presentationData.slides[currentSlideIndex - 1];
-      if (audioRef.current) {
+      if (audioRef.current && currentVideo) {
         audioRef.current.currentTime = prevSlide.start_time;
         setCurrentTime(prevSlide.start_time);
-        setCurrentSlideIndex(currentSlideIndex - 1);
       }
+      setCurrentSlideIndex(currentSlideIndex - 1);
     }
   };
 
   const handleNext = () => {
     if (presentationData?.slides && currentSlideIndex < presentationData.slides.length - 1) {
       const nextSlide = presentationData.slides[currentSlideIndex + 1];
-      if (audioRef.current) {
+      if (audioRef.current && currentVideo) {
         audioRef.current.currentTime = nextSlide.start_time;
         setCurrentTime(nextSlide.start_time);
-        setCurrentSlideIndex(currentSlideIndex + 1);
       }
+      setCurrentSlideIndex(currentSlideIndex + 1);
     }
   };
 
@@ -531,17 +776,17 @@ export default function VideoContent({
         try {
           const parsedExc = JSON.parse(resData.exc);
           if (Array.isArray(parsedExc) && parsedExc.length > 0) {
-            alert(parsedExc[0]);
+            toast.error(parsedExc[0]);
             return;
           }
         } catch (_) {}
-        alert(resData.exc || "Export failed.");
+        toast.error(resData.exc || "Export failed.");
       } else {
-        alert("Failed to export: empty response from server.");
+        toast.error("Failed to export: empty response from server.");
       }
     } catch (error: any) {
       console.error("Failed to export PowerPoint presentation:", error);
-      alert(error.message || "Failed to export PowerPoint presentation.");
+      toast.error(error.message || "Failed to export PowerPoint presentation.");
     } finally {
       setIsExporting(false);
     }
@@ -558,7 +803,7 @@ export default function VideoContent({
     );
   }
 
-  if (!content.video) {
+  if (!currentVideo && !presentationData) {
     return (
       <div className="video-content-container">
         <div className="error-message">
@@ -574,6 +819,7 @@ export default function VideoContent({
     const currentSlide = presentationData.slides[currentSlideIndex] || { title: '', bullets: [], narration: '' };
     const visuals = presentationData.visuals || {};
     const isLegacy = !!(visuals.background_html || visuals.css_styles);
+    const hasAudio = !!currentVideo;
 
     // Extraction of custom theme settings
     const theme = presentationData.theme || 'general';
@@ -594,7 +840,7 @@ export default function VideoContent({
           theme === 'dark' || theme === 'tech dark' 
             ? 'bg-slate-950 border-slate-900 text-slate-100' 
             : 'bg-slate-50 border-slate-200/80'
-        } border flex flex-col justify-between p-4 md:p-6 select-none`}>
+        } border flex flex-col justify-between p-4 md:p-6 select-none slide-active-${currentSlideIndex}`}>
           
           {/* Inject Dynamic CSS/Background styles for Legacy or custom items */}
           {isLegacy && (
@@ -771,28 +1017,30 @@ export default function VideoContent({
           } backdrop-blur-md border mt-auto`}>
             
             {/* Timeline slider */}
-            <div className="flex items-center space-x-3 w-full">
-              <span className={`text-xs font-mono font-medium ${
-                theme === 'dark' || theme === 'tech dark' ? 'text-slate-400' : 'text-slate-500'
-              } shrink-0`}>
-                {formatTime(currentTime)}
-              </span>
-              <input
-                type="range"
-                min="0"
-                max={duration || 100}
-                value={currentTime}
-                onChange={handleSeek}
-                className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer ${
-                  theme === 'dark' || theme === 'tech dark' ? 'bg-slate-800' : 'bg-slate-200'
-                } ${themeColors.timelineSliderAccent} outline-none transition-all`}
-              />
-              <span className={`text-xs font-mono font-medium ${
-                theme === 'dark' || theme === 'tech dark' ? 'text-slate-400' : 'text-slate-500'
-              } shrink-0`}>
-                {formatTime(duration)}
-              </span>
-            </div>
+            {hasAudio && (
+              <div className="flex items-center space-x-3 w-full">
+                <span className={`text-xs font-mono font-medium ${
+                  theme === 'dark' || theme === 'tech dark' ? 'text-slate-400' : 'text-slate-500'
+                } shrink-0`}>
+                  {formatTime(currentTime)}
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max={duration || 100}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer ${
+                    theme === 'dark' || theme === 'tech dark' ? 'bg-slate-800' : 'bg-slate-200'
+                  } ${themeColors.timelineSliderAccent} outline-none transition-all`}
+                />
+                <span className={`text-xs font-mono font-medium ${
+                  theme === 'dark' || theme === 'tech dark' ? 'text-slate-400' : 'text-slate-500'
+                } shrink-0`}>
+                  {formatTime(duration)}
+                </span>
+              </div>
+            )}
 
             {/* Buttons Row */}
             <div className="flex justify-between items-center w-full">
@@ -813,22 +1061,24 @@ export default function VideoContent({
                   </svg>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  className={`p-3 rounded-full ${themeColors.playBtnBg} text-white active:scale-95 transition-all`}
-                  title={isPlaying ? "Pause Narration" : "Play Narration"}
-                >
-                  {isPlaying ? (
-                    <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-5 w-5 fill-current ml-0.5" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  )}
-                </button>
+                {hasAudio && (
+                  <button
+                    type="button"
+                    onClick={togglePlay}
+                    className={`p-3 rounded-full ${themeColors.playBtnBg} text-white active:scale-95 transition-all`}
+                    title={isPlaying ? "Pause Narration" : "Play Narration"}
+                  >
+                    {isPlaying ? (
+                      <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5 fill-current ml-0.5" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    )}
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -848,6 +1098,23 @@ export default function VideoContent({
               </div>
 
               <div className="flex items-center space-x-2">
+                {/* Edit Slides button */}
+                <button
+                  type="button"
+                  onClick={openEditor}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    theme === 'dark' || theme === 'tech dark' 
+                      ? 'text-slate-300 border-slate-800 hover:text-slate-100 hover:bg-slate-800' 
+                      : 'text-slate-500 border-slate-200 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                  title="Edit Presentation Slides and Visuals"
+                >
+                  <svg className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                  </svg>
+                  Edit Slides
+                </button>
+
                 {/* Export PPTX button */}
                 <button
                   type="button"
@@ -898,15 +1165,17 @@ export default function VideoContent({
         </div>
 
         {/* Hidden narration audio element */}
-        <audio
-          ref={audioRef}
-          src={getVideoUrl(content.video)}
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={handleLoadedMetadata}
-          onEnded={handleAudioEnded}
-          onPlay={handlePlay}
-          onPause={handlePause}
-        />
+        {hasAudio && (
+          <audio
+            ref={audioRef}
+            src={getVideoUrl(currentVideo)}
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={handleLoadedMetadata}
+            onEnded={handleAudioEnded}
+            onPlay={handlePlay}
+            onPause={handlePause}
+          />
+        )}
 
         {/* Narration Script Panel */}
         {showScript && currentSlide.narration && (
@@ -925,6 +1194,344 @@ export default function VideoContent({
             </div>
           </motion.div>
         )}
+
+        {/* Slide Editor Modal Overlay */}
+        {isEditing && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`w-full h-full flex flex-col ${
+                theme === 'dark' || theme === 'tech dark'
+                  ? 'bg-slate-900 text-slate-100'
+                  : 'bg-white text-slate-800'
+              } overflow-hidden`}
+            >
+              {/* Modal Header */}
+              <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200/60 dark:border-slate-800 shrink-0">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit Presentation Slides & Visuals
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Tabs Selector */}
+              <div className="flex border-b border-slate-200/60 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 px-6 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('content')}
+                  className={`py-3 px-4 text-sm font-semibold border-b-2 transition-all ${
+                    activeTab === 'content'
+                      ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  Slide Content & Script
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('visuals')}
+                  className={`py-3 px-4 text-sm font-semibold border-b-2 transition-all ${
+                    activeTab === 'visuals'
+                      ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  SVG Visuals & CSS Styles
+                </button>
+              </div>
+
+              {/* AI Copilot Input Panel */}
+              <div className="px-6 py-3 bg-blue-50/40 dark:bg-blue-950/15 border-b border-slate-200/60 dark:border-slate-800 flex flex-row gap-3 items-center justify-between shrink-0">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-blue-800 dark:text-blue-300 shrink-0">
+                  <svg className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>AI Copilot</span>
+                </div>
+                <div className="flex-1 w-full flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Ask AI: 'Change slide 1 title to Verbal Communication', 'Add slide about...', 'Change SVG colors to teal'..."
+                    value={aiInstruction}
+                    onChange={(e) => setAiInstruction(e.target.value)}
+                    className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={isEnhancing || !aiInstruction.trim()}
+                    onClick={handleAiEnhance}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-555 text-white rounded-lg text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5 shrink-0 transition-all shadow-md"
+                  >
+                    {isEnhancing ? (
+                      <>
+                        <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Applying...
+                      </>
+                    ) : (
+                      "Apply AI Edit"
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Content Area */}
+              <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                {activeTab === 'content' ? (
+                  <div className="flex-1 flex min-h-0 overflow-hidden">
+                    {/* Sidebar: Slide Outline */}
+                    <div className="w-[260px] border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 flex flex-col p-4 space-y-4 overflow-y-auto shrink-0 min-h-0">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Slides Outline</h4>
+                        <button
+                          type="button"
+                          onClick={handleAddSlide}
+                          className="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-55/70 dark:hover:bg-blue-900/30 rounded-md font-semibold"
+                        >
+                          + Add Slide
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 flex-1 overflow-y-auto pr-1">
+                        {editSlides.map((slide, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => setActiveSlideIdx(idx)}
+                            className={`group relative flex items-center justify-between p-3 rounded-lg border text-left cursor-pointer transition-all ${
+                              idx === activeSlideIdx
+                                ? 'bg-blue-50/70 border-blue-500 text-blue-955 dark:bg-blue-955/35 dark:border-blue-400 dark:text-blue-200 shadow-sm'
+                                : 'bg-white border-slate-200 hover:bg-slate-50/80 dark:bg-slate-900 dark:border-slate-800 hover:dark:bg-slate-850 text-slate-700 dark:text-slate-350'
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0 pr-6">
+                              <div className="text-[10px] font-bold opacity-60">Slide {idx + 1}</div>
+                              <div className="text-xs font-bold truncate leading-tight mt-0.5">
+                                {slide.title || '(Untitled)'}
+                              </div>
+                            </div>
+                            
+                            {/* Quick Actions inside sidebar item */}
+                            <div className="absolute right-2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const updated = [...editSlides];
+                                  const temp = updated[idx];
+                                  updated[idx] = updated[idx - 1];
+                                  updated[idx - 1] = temp;
+                                  setEditSlides(updated);
+                                  if (activeSlideIdx === idx) setActiveSlideIdx(idx - 1);
+                                  else if (activeSlideIdx === idx - 1) setActiveSlideIdx(idx);
+                                }}
+                                className="p-0.5 rounded hover:bg-slate-205 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-20"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === editSlides.length - 1}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const updated = [...editSlides];
+                                  const temp = updated[idx];
+                                  updated[idx] = updated[idx + 1];
+                                  updated[idx + 1] = temp;
+                                  setEditSlides(updated);
+                                  if (activeSlideIdx === idx) setActiveSlideIdx(idx + 1);
+                                  else if (activeSlideIdx === idx + 1) setActiveSlideIdx(idx);
+                                }}
+                                className="p-0.5 rounded hover:bg-slate-205 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 disabled:opacity-20"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSlide(idx);
+                                }}
+                                className="p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 hover:text-red-600"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Right Panel: Edit Active Slide Form */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                      {editSlides[activeSlideIdx] ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-808 pb-3">
+                            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                              Slide {activeSlideIdx + 1} Content Settings
+                            </h4>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              Duration: {editSlides[activeSlideIdx].duration}s
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-5">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                Slide Title
+                              </label>
+                              <input
+                                type="text"
+                                value={editSlides[activeSlideIdx].title || ''}
+                                onChange={(e) => {
+                                  const updated = [...editSlides];
+                                  updated[activeSlideIdx].title = e.target.value;
+                                  setEditSlides(updated);
+                                }}
+                                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                Bullet Points (One per line)
+                              </label>
+                              <textarea
+                                rows={5}
+                                value={editSlides[activeSlideIdx].bullets ? editSlides[activeSlideIdx].bullets.join('\n') : ''}
+                                onChange={(e) => handleBulletsChange(activeSlideIdx, e.target.value)}
+                                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none font-sans leading-relaxed"
+                                placeholder="Enter points here, one per line..."
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                                Narration Script / Speaker Notes
+                              </label>
+                              <textarea
+                                rows={7}
+                                value={editSlides[activeSlideIdx].narration || ''}
+                                onChange={(e) => {
+                                  const updated = [...editSlides];
+                                  updated[activeSlideIdx].narration = e.target.value;
+                                  setEditSlides(updated);
+                                }}
+                                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:ring-1 focus:ring-blue-500 outline-none font-sans leading-relaxed"
+                                placeholder="Enter narration notes for this slide..."
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                          <p>No slide selected or slide deck is empty.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      Customize the interactive visual diagrams and animations using inline SVG markup and matching CSS styles.
+                    </span>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* SVG Source Code */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                          Custom SVG Diagram (HTML Markup)
+                        </label>
+                        <div className="text-[10px] text-slate-400 mb-1 leading-normal">
+                          Must be wrapped in a <code>&lt;div class="custom-canvas"&gt;...&lt;/div&gt;</code> with an inline <code>&lt;svg&gt;</code> element inside.
+                        </div>
+                        <textarea
+                          rows={18}
+                          value={editBackgroundHtml}
+                          onChange={(e) => setEditBackgroundHtml(e.target.value)}
+                          className="w-full p-3 font-mono text-xs rounded-lg border border-slate-300 dark:border-slate-800 bg-slate-950 text-emerald-400 focus:ring-1 focus:ring-blue-500 outline-none leading-relaxed"
+                        />
+                      </div>
+
+                      {/* CSS Animations Stylesheet */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                          CSS Animations Stylesheet
+                        </label>
+                        <div className="text-[10px] text-slate-400 mb-1 leading-normal">
+                          Write standard CSS. Use class hooks like <code>.slide-active-0 .element-class</code> to animate elements when that slide index becomes active.
+                        </div>
+                        <textarea
+                          rows={18}
+                          value={editCssStyles}
+                          onChange={(e) => setEditCssStyles(e.target.value)}
+                          className="w-full p-3 font-mono text-xs rounded-lg border border-slate-300 dark:border-slate-800 bg-slate-950 text-blue-400 focus:ring-1 focus:ring-blue-500 outline-none leading-relaxed"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex justify-end items-center gap-3 px-6 py-4 border-t border-slate-200/60 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveChanges}
+                  disabled={isSaving}
+                  className="px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-550 text-white disabled:opacity-50 flex items-center gap-1.5 transition-all shadow-md"
+                >
+                  {isSaving ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving Changes...
+                    </>
+                  ) : (
+                    <>Save Changes</>
+                  )}
+                </button>
+              </div>
+              <AlertDialog open={slideIndexToDelete !== null} onOpenChange={(open) => { if (!open) setSlideIndexToDelete(null); }}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Slide</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete this slide? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={confirmDeleteSlide} className="bg-red-600 hover:bg-red-705 text-white">Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </motion.div>
+          </div>
+        )}
       </motion.div>
     );
   }
@@ -939,7 +1546,7 @@ export default function VideoContent({
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
         <video
           ref={videoRef}
-          src={getVideoUrl(content.video)}
+          src={getVideoUrl(currentVideo)}
           controls
           className="w-full h-full"
           onEnded={handleEnded}
