@@ -113,11 +113,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
-                className="data-[slot=sidebar-menu-button]:!p-1.5 hover:bg-transparent active:bg-transparent data-[active=true]:bg-transparent data-[state=open]:bg-transparent !h-auto"
+                size="lg"
+                className="hover:bg-transparent active:bg-transparent data-[active=true]:bg-transparent data-[state=open]:bg-transparent group-data-[collapsible=icon]:!p-0"
               >
-                <Link href={isLMSAdmin ? ROUTES.HOME : ROUTES.LEARNER_DASHBOARD} className="flex items-center">
-                  <img src={logoImage} alt="Novel LMS Logo" className="h-12 w-auto object-contain flex-shrink-0 -mr-3" />
-                  <span className="text-base font-semibold">Novel LMS</span>
+                <Link href={isLMSAdmin ? ROUTES.HOME : ROUTES.LEARNER_DASHBOARD} className="flex items-center overflow-hidden w-full group-data-[collapsible=icon]:justify-center">
+                  <img 
+                    src={logoImage} 
+                    alt="Novel LMS Logo" 
+                    className="shrink-0 object-contain h-12 w-auto -mr-3 group-data-[collapsible=icon]:mr-0 group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8" 
+                  />
+                  <span className="text-base font-semibold truncate group-data-[collapsible=icon]:hidden">Novel LMS</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
