@@ -15,6 +15,7 @@ export function AiJobTracker() {
     let isChecking = false;
     const checkJob = async () => {
       const jobId = localStorage.getItem("active_ai_job_id");
+      const jobType = localStorage.getItem("active_ai_job_type");
       if (!jobId || isChecking) return;
 
       isChecking = true;
@@ -34,35 +35,58 @@ export function AiJobTracker() {
           const statusData = data.message;
           if (statusData) {
             if (statusData.status === "finished") {
+              if (jobType === "draft") {
+                localStorage.setItem("completed_ai_draft_job_id", jobId);
+              }
               localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_type");
               localStorage.removeItem("active_ai_job_progress");
-              toast.success("Module Created Successfully!", {
-                description: "Luna has finished creating your new LMS module. Click here to review it.",
-                duration: 15000,
-                onClick: () => {
-                  if (statusData.module_id) {
-                    setLocation(`/modules/${statusData.module_id}`);
-                  } else {
-                    setLocation(`/modules`);
-                  }
-                },
-                action: {
-                  label: "Review",
-                  onClick: (e: any) => {
-                    e.stopPropagation();
+              
+              if (jobType === "draft") {
+                toast.success("Curriculum Plan Drafted!", {
+                  description: "Luna has drafted the curriculum plan. Click here to review and finalize it.",
+                  duration: 15000,
+                  onClick: () => {
+                    setLocation("/ai-module-wizard");
+                  },
+                  action: {
+                    label: "Review",
+                    onClick: (e: any) => {
+                      e.stopPropagation();
+                      setLocation("/ai-module-wizard");
+                    },
+                  },
+                } as any);
+              } else {
+                toast.success("Module Created Successfully!", {
+                  description: "Luna has finished creating your new LMS module. Click here to review it.",
+                  duration: 15000,
+                  onClick: () => {
                     if (statusData.module_id) {
                       setLocation(`/modules/${statusData.module_id}`);
                     } else {
                       setLocation(`/modules`);
                     }
                   },
-                },
-              } as any);
+                  action: {
+                    label: "Review",
+                    onClick: (e: any) => {
+                      e.stopPropagation();
+                      if (statusData.module_id) {
+                        setLocation(`/modules/${statusData.module_id}`);
+                      } else {
+                        setLocation(`/modules`);
+                      }
+                    },
+                  },
+                } as any);
+              }
             } else if (statusData.status === "failed") {
               localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_type");
               localStorage.removeItem("active_ai_job_progress");
-              toast.error("AI Generation Failed", {
-                description: statusData.error || "The background generation task encountered an error.",
+              toast.error(jobType === "draft" ? "Plan Drafting Failed" : "AI Generation Failed", {
+                description: statusData.error || "The background task encountered an error.",
                 duration: 8000,
               });
             } else {

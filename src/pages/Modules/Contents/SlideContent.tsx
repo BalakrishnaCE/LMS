@@ -34,28 +34,46 @@ function SlideItem({ item }: { item: any }) {
   const imageUrl = item.image ? getImageUrl(item.image) : '';
   console.log('Slide item image:', { original: item.image, constructed: imageUrl, heading: item.heading });
 
+  const renderDescription = (desc: string) => {
+    if (!desc) return null;
+    if (desc.includes(', ')) {
+      const parts = desc.split(', ');
+      return (
+        <ul className="list-disc list-inside text-left inline-block max-w-xl mx-auto my-3 text-gray-700">
+          {parts.map((part, index) => (
+            <li key={index} className="mb-2 text-base leading-relaxed">{part}</li>
+          ))}
+        </ul>
+      );
+    }
+    return <p className="text-gray-700 my-3 text-base leading-relaxed">{desc}</p>;
+  };
+
   return (
-    <CarouselItem className="flex flex-col items-center justify-center p-4">
-      <div className="text-center">
-        <h4 className="font-semibold">{item.heading}</h4>
-        {item.image && !imageLoadError ? (
-          <img
-            src={imageUrl}
-            alt={item.heading}
-            className="my-2 max-w-full"
-            onError={() => {
-              console.error('Image failed to load:', imageUrl);
-              setImageLoadError(true);
-            }}
-            loading="eager"
-          />
-        ) : (
-          <div className="my-2 p-4 bg-gray-100 rounded-lg border border-gray-300">
-            <p className="text-gray-600 font-medium">Image not present</p>
-            <p className="text-sm text-gray-500">Image file is not available for this slide.</p>
-          </div>
-        )}
-        <p>{item.description}</p>
+    <CarouselItem className="flex flex-col items-center justify-center p-6">
+      <div className="text-center w-full max-w-2xl">
+        <h4 className="text-lg font-bold text-gray-800 mb-4">{item.heading}</h4>
+        {item.image ? (
+          !imageLoadError ? (
+            <img
+              src={imageUrl}
+              alt={item.heading}
+              className="my-4 max-h-[300px] object-contain mx-auto rounded-lg shadow-sm border border-gray-100"
+              onError={() => {
+                console.error('Image failed to load:', imageUrl);
+                setImageLoadError(true);
+              }}
+              loading="eager"
+            />
+          ) : (
+            <div className="my-4 p-4 bg-red-50 rounded-lg border border-red-200 inline-block">
+              <p className="text-red-700 font-medium text-sm">Image failed to load</p>
+            </div>
+          )
+        ) : null}
+        <div className="w-full flex justify-center">
+          {renderDescription(item.description)}
+        </div>
         {item.url && (() => {
           // Normalize URL for links - use same logic as getImageUrl
           const getLinkUrl = (url: string) => {

@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { uploadFileToFrappe } from '@/lib/uploadFileToFrappe';
+import { toast } from 'sonner';
 import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes';
 import Lottie from 'lottie-react';
 import LoadingAnimation from '@/assets/Loading.json';
@@ -50,6 +51,10 @@ const AudioContentEditor: React.FC<AudioContentEditorProps> = ({ content, onSave
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error(`"${file.name}" exceeds the 20 MB audio file size limit.`);
+        return;
+      }
       try {
         setLoading(true);
         setError(false);
@@ -64,8 +69,10 @@ const AudioContentEditor: React.FC<AudioContentEditorProps> = ({ content, onSave
         setAttach(url);
         setFileName(file.name);
         setLoading(false);
-      } catch (err) {
+      } catch (err: any) {
         console.error('❌ Audio upload error:', err);
+        const errMsg = err?.message || 'Failed to upload audio.';
+        toast.error(errMsg);
         setLoading(false);
         setError(true);
       }

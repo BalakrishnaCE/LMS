@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { uploadFileToFrappe } from '@/lib/uploadFileToFrappe';
+import { toast } from 'sonner';
 import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from '@/config/routes';
 import Lottie from 'lottie-react';
 import LoadingAnimation from '@/assets/Loading.json';
@@ -49,9 +50,14 @@ const VideoContentEditor: React.FC<VideoContentEditorProps> = ({ content, onSave
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 35 * 1024 * 1024) {
+        toast.error(`"${file.name}" exceeds the 35 MB video file size limit.`);
+        return;
+      }
       try {
         // set loading to true
         setLoading(true);
+        setError(false);
         const url = await uploadFileToFrappe(file);
         // Create full URL for preview using the same logic
         const fullUrl = getPreviewUrl(url);
@@ -61,8 +67,10 @@ const VideoContentEditor: React.FC<VideoContentEditorProps> = ({ content, onSave
         setFileName(file.name);
         // set loading to false
         setLoading(false);
-      } catch (err) {
+      } catch (err: any) {
         // handle error, e.g. show toast
+        const errMsg = err?.message || 'Failed to upload video.';
+        toast.error(errMsg);
         setLoading(false);
         setError(true);
       }

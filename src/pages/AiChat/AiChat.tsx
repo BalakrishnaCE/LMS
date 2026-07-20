@@ -483,7 +483,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                                 sender: 'ai',
                                 timestamp: new Date(qr.time_stamp || qr.modified), // or add small offset?
                                 source: qr.source,
-                                sourceContent: qr.source_content
+                                sourceContent: qr.source_content,
                                 backend_id: qr.name,
                                 feedback: feedback
                             });

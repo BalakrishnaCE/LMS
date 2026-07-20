@@ -10,14 +10,17 @@ import { useUser } from "@/hooks/use-user"
 
 function AiProgressHeaderWidget() {
   const [jobId, setJobId] = useState<string | null>(null)
+  const [jobType, setJobType] = useState<string | null>(null)
   const [progress, setProgress] = useState<string>("Generating...")
   const [, setLocation] = useLocation()
 
   useEffect(() => {
     const checkStorage = () => {
       const id = localStorage.getItem("active_ai_job_id")
+      const type = localStorage.getItem("active_ai_job_type")
       const prog = localStorage.getItem("active_ai_job_progress")
       setJobId(id)
+      setJobType(type)
       setProgress(prog || "Generating...")
     }
 
@@ -40,7 +43,9 @@ function AiProgressHeaderWidget() {
         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
       </span>
       <Sparkles className="size-3.5 text-primary shrink-0 animate-spin-slow" />
-      <span className="truncate max-w-[150px] md:max-w-[250px]">AI Creating: {progress}</span>
+      <span className="truncate max-w-[150px] md:max-w-[250px]">
+        {jobType === "draft" ? "AI Drafting: " : "AI Creating: "}{progress}
+      </span>
     </div>
   )
 }

@@ -301,11 +301,59 @@ function VisualLayoutDispatcher({ visuals, currentSlideIndex, themeColors }: { v
   // Backwards compatibility fallback for raw HTML/SVG
   if (visuals.background_html || visuals.css_styles) {
     return (
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 z-0 overflow-hidden flex items-center justify-center pointer-events-none">
         {visuals.css_styles && (
           <style dangerouslySetInnerHTML={{ __html: visuals.css_styles }} />
         )}
-        <div dangerouslySetInnerHTML={{ __html: visuals.background_html || '' }} />
+        <style>{`
+          .custom-svg-wrapper,
+          .custom-svg-wrapper div,
+          .custom-svg-wrapper svg {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+          }
+          @keyframes slide-fade-in {
+            from {
+              opacity: 0;
+              transform: translateY(15px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          /* Override specificity conflicts in AI-generated animations and ensure clean fade-in */
+          .slide-active-0 .slide0,
+          .slide-active-1 .slide1,
+          .slide-active-2 .slide2,
+          .slide-active-3 .slide3,
+          .slide-active-4 .slide4,
+          .slide-active-5 .slide5,
+          .slide-active-6 .slide6,
+          .slide-active-7 .slide7,
+          .slide-active-8 .slide8,
+          .slide-active-9 .slide9,
+          .slide-active-10 .slide10,
+          .slide-active-11 .slide11,
+          .slide-active-12 .slide12,
+          .slide-active-13 .slide13,
+          .slide-active-14 .slide14,
+          .slide-active-15 .slide15,
+          .slide-active-16 .slide16,
+          .slide-active-17 .slide17,
+          .slide-active-18 .slide18,
+          .slide-active-19 .slide19 {
+            animation: slide-fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+            display: block !important;
+          }
+        `}</style>
+        <div 
+          className={`custom-canvas custom-svg-wrapper slide-active-${currentSlideIndex}`}
+          style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          dangerouslySetInnerHTML={{ __html: visuals.background_html || '' }} 
+        />
       </div>
     );
   }
@@ -374,6 +422,8 @@ export default function VideoContent({
   const [duration, setDuration] = useState<number>(0);
   const [showScript, setShowScript] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [fullVisual, setFullVisual] = useState<boolean>(false);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
 
   // Custom slide editor states
   const [isEditing, setIsEditing] = useState<boolean>(false);
@@ -636,6 +686,14 @@ export default function VideoContent({
     };
   }, [mediaId, registerMedia, unregisterMedia, presentationData, content]);
 
+  // Sync playback rate with audio/video elements
+  useEffect(() => {
+    const activeMediaElement = presentationData ? audioRef.current : videoRef.current;
+    if (activeMediaElement) {
+      activeMediaElement.playbackRate = playbackRate;
+    }
+  }, [playbackRate, presentationData, currentVideo]);
+
   // Pause other media when playback starts
   const handlePlay = () => {
     pauseAllExcept(mediaId);
@@ -818,7 +876,7 @@ export default function VideoContent({
   if (presentationData) {
     const currentSlide = presentationData.slides[currentSlideIndex] || { title: '', bullets: [], narration: '' };
     const visuals = presentationData.visuals || {};
-    const isLegacy = !!(visuals.background_html || visuals.css_styles);
+    const isLegacy = false; // Always use split layout for custom SVGs to support side-by-side or theater mode
     const hasAudio = !!currentVideo;
 
     // Extraction of custom theme settings
@@ -876,64 +934,19 @@ export default function VideoContent({
             </span>
           </div>
 
-          {isLegacy ? (
-            /* Legacy Centered Slide Layout */
-            <div className={`relative z-20 m-auto max-w-2xl w-full p-6 md:p-8 rounded-xl ${
-              theme === 'dark' || theme === 'tech dark' 
-                ? 'bg-slate-900/90 border-slate-800' 
-                : 'bg-white/80 border-slate-200/50'
-            } backdrop-blur-md border shadow-lg flex flex-col justify-center text-left`}>
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentSlideIndex}
-                  variants={slideVariants}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  className="w-full"
-                >
-                  {currentSlide.title && (
-                    <h3 className={`text-xl md:text-3xl font-extrabold ${
-                      theme === 'dark' || theme === 'tech dark' ? 'text-slate-100' : 'text-slate-900'
-                    } mb-4 leading-tight`}>
-                      {currentSlide.title}
-                    </h3>
-                  )}
-
-                  {currentSlide.bullets && Array.isArray(currentSlide.bullets) && (
-                    <ul className="space-y-3">
-                      {currentSlide.bullets.map((bullet: string, bIdx: number) => (
-                        <motion.li
-                          key={bIdx}
-                          initial={
-                            elementEntrance === 'bounce'
-                              ? { opacity: 0, scale: 0.8 }
-                              : { opacity: 0, x: -10 }
-                          }
-                          animate={
-                            elementEntrance === 'bounce'
-                              ? { opacity: 1, scale: 1 }
-                              : { opacity: 1, x: 0 }
-                          }
-                          transition={{
-                            delay: elementEntrance === 'stagger' ? bIdx * 0.25 : bIdx * 0.08,
-                            type: elementEntrance === 'bounce' ? 'spring' : 'tween',
-                            stiffness: 260,
-                            damping: 20,
-                            duration: 0.3
-                          }}
-                          className={`flex items-start text-sm md:text-base ${
-                            theme === 'dark' || theme === 'tech dark' ? 'text-slate-200 font-medium' : 'text-slate-700 font-medium'
-                          }`}
-                        >
-                          <span className={`mr-2.5 mt-1.5 flex h-1.5 w-1.5 shrink-0 rounded-full ${themeColors.bulletActiveColor}`} />
-                          <span className="leading-relaxed">{bullet}</span>
-                        </motion.li>
-                      ))}
-                    </ul>
-                  )}
-                </motion.div>
-              </AnimatePresence>
+          {fullVisual ? (
+            /* Theater Mode - Visual Only Layout */
+            <div className="flex-1 flex min-h-0 overflow-hidden my-3 relative z-20">
+              <div 
+                key={currentSlideIndex}
+                className={`w-full h-full flex items-center justify-center ${
+                  theme === 'dark' || theme === 'tech dark' 
+                    ? 'bg-slate-900/50 border-slate-800' 
+                    : 'bg-white/70 border-slate-200/60 shadow-inner'
+                } rounded-xl p-4 border overflow-hidden relative`}
+              >
+                <VisualLayoutDispatcher visuals={visuals} currentSlideIndex={currentSlideIndex} themeColors={themeColors} />
+              </div>
             </div>
           ) : (
             /* Modern Side-by-Side Split Slide Layout */
@@ -999,11 +1012,14 @@ export default function VideoContent({
               </div>
 
               {/* Right Panel: Declarative visual widgets */}
-              <div className={`w-[58%] h-full flex items-center justify-center ${
-                theme === 'dark' || theme === 'tech dark' 
-                  ? 'bg-slate-900/50 border-slate-800' 
-                  : 'bg-white/70 border-slate-200/60 shadow-inner'
-              } rounded-xl p-4 border overflow-hidden relative`}>
+              <div 
+                key={currentSlideIndex}
+                className={`w-[58%] h-full flex items-center justify-center ${
+                  theme === 'dark' || theme === 'tech dark' 
+                    ? 'bg-slate-900/50 border-slate-800' 
+                    : 'bg-white/70 border-slate-200/60 shadow-inner'
+                } rounded-xl p-4 border overflow-hidden relative`}
+              >
                 <VisualLayoutDispatcher visuals={visuals} currentSlideIndex={currentSlideIndex} themeColors={themeColors} />
               </div>
             </div>
@@ -1143,6 +1159,47 @@ export default function VideoContent({
                       Export PPTX
                     </>
                   )}
+                </button>
+
+                {/* Toggle Theater Mode / Full Visuals */}
+                <button
+                  type="button"
+                  onClick={() => setFullVisual(!fullVisual)}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all ${fullVisual
+                      ? "bg-blue-50 text-blue-600 border-blue-200"
+                      : "text-slate-500 border-slate-200 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                  title="Toggle between full width visual mode and split screen mode"
+                >
+                  <svg className="h-4 w-4 fill-none stroke-current" strokeWidth="2" viewBox="0 0 24 24">
+                    {fullVisual ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 9h6m-6 4h6m2 5H7a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2z" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v16.5h16.5V3.75H3.75zm1.5 1.5h13.5v13.5H5.25V5.25z" />
+                    )}
+                  </svg>
+                  {fullVisual ? "Show Text" : "Visual Only"}
+                </button>
+
+                {/* Toggle Playback Speed */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const speeds = [1, 1.25, 1.5, 2];
+                    const nextIdx = (speeds.indexOf(playbackRate) + 1) % speeds.length;
+                    setPlaybackRate(speeds[nextIdx]);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all ${
+                    playbackRate > 1
+                      ? "bg-blue-50 text-blue-600 border-blue-200"
+                      : "text-slate-500 border-slate-200 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
+                  title={`Speed: ${playbackRate}x`}
+                >
+                  <svg className="h-4 w-4 fill-none stroke-current" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {playbackRate}x
                 </button>
 
                 {/* Toggle narration script drawer */}

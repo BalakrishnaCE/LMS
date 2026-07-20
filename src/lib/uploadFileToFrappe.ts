@@ -1,12 +1,22 @@
 import { LMS_API_BASE_URL } from "@/config/routes";
 
 export async function uploadFileToFrappe(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', file);
+  // Check if it's a video file and exceeds 35 MB
+  const isVideoFile = file.type.startsWith('video/') || 
+    /\.(mp4|mov|mkv|webm|avi|flv|wmv)$/i.test(file.name);
+  if (isVideoFile && file.size > 35 * 1024 * 1024) {
+    throw new Error(`Video file "${file.name}" exceeds the 35 MB size limit.`);
+  }
 
-  // Check if it's an audio file
+  // Check if it's an audio file and exceeds 20 MB
   const isAudioFile = file.type.startsWith('audio/') || 
     /\.(mp3|wav|ogg|m4a|aac|flac|wma)$/i.test(file.name);
+  if (isAudioFile && file.size > 20 * 1024 * 1024) {
+    throw new Error(`Audio file "${file.name}" exceeds the 20 MB size limit.`);
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
 
   // Determine base URL
   // In production: use LMS_API_BASE_URL (https://lms.noveloffice.org)
