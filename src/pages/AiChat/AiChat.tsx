@@ -812,9 +812,16 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
 
     const createChatSession = async (): Promise<string | null> => {
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+            const csrfToken = (window as any).frappe?.csrf_token;
+            if (csrfToken) {
+                headers['X-Frappe-CSRF-Token'] = csrfToken;
+            }
             const response = await fetch('/api/method/novel_lms.novel_lms.api.Chat.create_chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     department: context.department?.id === 'faq' ? context.department?.id : (context.department?.id !== 'all' ? context.department?.id : undefined),
                     module: (context.module?.id !== 'all' && context.department?.id !== 'faq') ? context.module?.id : undefined,
@@ -829,24 +836,34 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                 return data.message.chat_id;
             }
         } catch (error) {
-            // console.error("Failed to create chat session:", error);
+            console.error("Failed to create chat session:", error);
         }
         return null;
     };
 
     const saveQueryResponse = async (cId: string, query: string, responseVal: string) => {
         try {
-            await fetch('/api/method/novel_lms.novel_lms.api.Chat.add_query_response', {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+            const csrfToken = (window as any).frappe?.csrf_token;
+            if (csrfToken) {
+                headers['X-Frappe-CSRF-Token'] = csrfToken;
+            }
+            const res = await fetch('/api/method/novel_lms.novel_lms.api.Chat.add_query_response', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     chat_id: cId,
                     query: query,
                     response: responseVal
                 })
             });
+            if (!res.ok) {
+                console.error("Failed to save query response, HTTP status:", res.status);
+            }
         } catch (error) {
-            // console.error("Failed to save query response:", error);
+            console.error("Failed to save query response:", error);
         }
     };
 
@@ -957,15 +974,23 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             }
 
             if (currentChatId) {
-                saveQueryResponse(currentChatId, userQuery, chatStreamStore.getState().accumulatedText);
+                const finalResponseText = chatStreamStore.getState().accumulatedText;
+                await saveQueryResponse(currentChatId, userQuery, finalResponseText);
 
                 if (isFirstMessage && suggestedTitle) {
                     localStorage.setItem(`novel_lms_chat_title_${currentChatId}`, suggestedTitle);
+                    const updateHeaders: Record<string, string> = {
+                        'Content-Type': 'application/json'
+                    };
+                    const csrfToken = (window as any).frappe?.csrf_token;
+                    if (csrfToken) {
+                        updateHeaders['X-Frappe-CSRF-Token'] = csrfToken;
+                    }
                     fetch('/api/method/novel_lms.novel_lms.api.Chat.update_chat_title', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: updateHeaders,
                         body: JSON.stringify({ chat_id: currentChatId, title: suggestedTitle })
-                    }).catch(_err => { /* console.error('[NIA] Failed to save title:', _err); */ });
+                    }).catch(_err => { console.error('[NIA] Failed to save title:', _err); });
                 }
             }
 
