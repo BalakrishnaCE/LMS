@@ -37,6 +37,10 @@ export function AiJobTracker() {
             if (statusData.status === "finished") {
               if (jobType === "draft") {
                 localStorage.setItem("completed_ai_draft_job_id", jobId);
+              } else if (jobType === "blueprint") {
+                if (statusData.blueprint) {
+                  localStorage.setItem("debug_cached_blueprint", JSON.stringify(statusData.blueprint));
+                }
               }
               localStorage.removeItem("active_ai_job_id");
               localStorage.removeItem("active_ai_job_type");
@@ -44,7 +48,22 @@ export function AiJobTracker() {
               
               if (jobType === "draft") {
                 toast.success("Curriculum Plan Drafted!", {
-                  description: "Luna has drafted the curriculum plan. Click here to review and finalize it.",
+                  description: "Lumi has drafted the curriculum plan. Click here to review and finalize it.",
+                  duration: 15000,
+                  onClick: () => {
+                    setLocation("/ai-module-wizard");
+                  },
+                  action: {
+                    label: "Review",
+                    onClick: (e: any) => {
+                      e.stopPropagation();
+                      setLocation("/ai-module-wizard");
+                    },
+                  },
+                } as any);
+              } else if (jobType === "blueprint") {
+                toast.success("Curriculum Blueprint Generated!", {
+                  description: "Lumi has generated the curriculum blueprint. Click here to review it.",
                   duration: 15000,
                   onClick: () => {
                     setLocation("/ai-module-wizard");
@@ -59,7 +78,7 @@ export function AiJobTracker() {
                 } as any);
               } else {
                 toast.success("Module Created Successfully!", {
-                  description: "Luna has finished creating your new LMS module. Click here to review it.",
+                  description: "Lumi has finished creating your new LMS module. Click here to review it.",
                   duration: 15000,
                   onClick: () => {
                     if (statusData.module_id) {
@@ -85,10 +104,32 @@ export function AiJobTracker() {
               localStorage.removeItem("active_ai_job_id");
               localStorage.removeItem("active_ai_job_type");
               localStorage.removeItem("active_ai_job_progress");
-              toast.error(jobType === "draft" ? "Plan Drafting Failed" : "AI Generation Failed", {
-                description: statusData.error || "The background task encountered an error.",
-                duration: 8000,
-              });
+              toast.error(
+                jobType === "blueprint"
+                  ? "Blueprint Generation Failed"
+                  : jobType === "draft"
+                  ? "Plan Drafting Failed"
+                  : "AI Generation Failed",
+                {
+                  description: statusData.error || "The background task encountered an error.",
+                  duration: 8000,
+                }
+              );
+            } else if (statusData.status === "cancelled" || statusData.status === "stopped") {
+              localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_type");
+              localStorage.removeItem("active_ai_job_progress");
+              toast.info(
+                jobType === "blueprint"
+                  ? "Blueprint Generation Cancelled"
+                  : jobType === "draft"
+                  ? "Plan Drafting Cancelled"
+                  : "AI Generation Cancelled",
+                {
+                  description: statusData.progress || "The process was stopped or cancelled.",
+                  duration: 6000,
+                }
+              );
             } else {
               if (statusData.progress) {
                 localStorage.setItem("active_ai_job_progress", statusData.progress);

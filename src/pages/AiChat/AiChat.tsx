@@ -129,7 +129,6 @@ const formatMessageText = (text: string | any, isAi: boolean) => {
 };
 
 const MessageBubble = memo(({ message, onCopy, copiedId, onFeedback, isStreaming, onMandatoryFeedbackChange }: { message: Message, onCopy: (text: string, id: string) => void, copiedId: string | null, onFeedback?: (msgId: string, rating: 'up' | 'down', text?: string) => Promise<void> | void, isStreaming?: boolean, onMandatoryFeedbackChange?: (isMandatory: boolean) => void }) => {
-    const [showCitations, setShowCitations] = useState(false);
     const [showFeedbackInput, setShowFeedbackInput] = useState(false);
     const [pendingRating, setPendingRating] = useState<'up' | 'down' | null>(null);
     const [feedbackText, setFeedbackText] = useState("");
@@ -189,40 +188,6 @@ const MessageBubble = memo(({ message, onCopy, copiedId, onFeedback, isStreaming
                     </div>
                 </div>
 
-                {/* message.sender === 'ai' && message.citations && message.citations.length > 0 && (
-                    <div className="mt-0 w-full max-w-[100%]">
-                        <button
-                            onClick={() => setShowCitations(!showCitations)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#018790]/20 dark:border-teal-500/20 bg-teal-50/50 dark:bg-teal-950/20 text-xs font-semibold text-[#018790] dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-all duration-200"
-                        >
-                            <BookOpen className="h-3.5 w-3.5" />
-                            <span>Sources ({message.citations.length})</span>
-                            <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${showCitations ? 'rotate-90' : ''}`} />
-                        </button>
-                        {showCitations && (
-                            <div className="mt-2 grid grid-cols-1 gap-2 border-l-2 border-teal-500/40 pl-3 py-1 animate-in fade-in slide-in-from-left-2 duration-200">
-                                {message.citations.map((citation, index) => (
-                                    <div key={index} className="flex flex-col gap-0.5 p-2 rounded-lg bg-teal-500/5 dark:bg-teal-500/10 border border-teal-500/10 text-xs">
-                                        <div className="flex items-center gap-1.5 font-bold text-[#018790] dark:text-teal-200">
-                                            <span className="bg-teal-500/20 text-teal-800 dark:text-teal-200 px-1.5 py-0.5 rounded text-[10px] font-mono leading-none">Source {index + 1}</span>
-                                            {citation.module && <span className="truncate max-w-[200px]">{citation.module}</span>}
-                                        </div>
-                                        <div className="text-muted-foreground dark:text-gray-400 font-medium pl-1">
-                                            {citation.lesson && <span>{citation.lesson}</span>}
-                                            {citation.chapter && <span> › {citation.chapter}</span>}
-                                            {citation.start_line !== undefined && (
-                                                <span className="ml-2 bg-[#018790]/10 dark:bg-teal-500/20 text-[#018790] dark:text-teal-300 px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                                                    Line {citation.start_line}{citation.end_line && citation.end_line !== citation.start_line ? ` - ${citation.end_line}` : ''}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                ) */}
-
                 {message.sender === 'ai' && !isStreaming && (
                     <div className="flex flex-col gap-2 mt-1 px-1">
                         <div className="flex items-center gap-1">
@@ -254,8 +219,8 @@ const MessageBubble = memo(({ message, onCopy, copiedId, onFeedback, isStreaming
                                 <ThumbsDown className="h-3.5 w-3.5" />
                             </button>
                         </div>
-                        <Dialog 
-                            open={showFeedbackInput && !message.feedback} 
+                        <Dialog
+                            open={showFeedbackInput && !message.feedback}
                             onOpenChange={(open) => {
                                 if (!open && !isSubmitting) {
                                     if (pendingRating === 'up' && message.backend_id && onFeedback) {
@@ -267,7 +232,7 @@ const MessageBubble = memo(({ message, onCopy, copiedId, onFeedback, isStreaming
                                 }
                             }}
                         >
-                            <DialogContent 
+                            <DialogContent
                                 className="sm:max-w-[425px]"
                                 hideClose={pendingRating === 'down'}
                                 onInteractOutside={(e) => {
@@ -280,8 +245,8 @@ const MessageBubble = memo(({ message, onCopy, copiedId, onFeedback, isStreaming
                                 <DialogHeader>
                                     <DialogTitle>{pendingRating === 'down' ? 'Provide Feedback' : 'Thank you for your feedback!'}</DialogTitle>
                                     <DialogDescription>
-                                        {pendingRating === 'down' 
-                                            ? "Please let us know why this wasn't helpful so we can improve." 
+                                        {pendingRating === 'down'
+                                            ? "Please let us know why this wasn't helpful so we can improve."
                                             : "Any additional comments you'd like to share?"}
                                     </DialogDescription>
                                 </DialogHeader>
@@ -295,8 +260,8 @@ const MessageBubble = memo(({ message, onCopy, copiedId, onFeedback, isStreaming
                                 </div>
                                 <DialogFooter>
                                     {pendingRating === 'down' && (
-                                        <Button 
-                                            variant="ghost" 
+                                        <Button
+                                            variant="ghost"
                                             onClick={() => {
                                                 setShowFeedbackInput(false);
                                                 setPendingRating(null);
@@ -307,7 +272,7 @@ const MessageBubble = memo(({ message, onCopy, copiedId, onFeedback, isStreaming
                                             Cancel
                                         </Button>
                                     )}
-                                    <Button 
+                                    <Button
                                         onClick={submitFeedback}
                                         disabled={isSubmitting || (pendingRating === 'down' && !feedbackText.trim())}
                                     >
@@ -1025,7 +990,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         return null;
     };
 
-    const saveQueryResponse = async (cId: string, query: string, responseVal: string): Promise<string | null> => {
+    const saveQueryResponse = async (cId: string, query: string, responseVal: string, sourceVal?: string, sourceContentVal?: string): Promise<string | null> => {
         try {
             const response = await fetch('/api/method/novel_lms.novel_lms.api.Chat.add_query_response', {
                 method: 'POST',
@@ -1088,7 +1053,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
         }
 
         setIsLoading(true);
-        
+
         // Add the empty streaming bubble immediately
         setMessages(prev => [...prev, {
             id: streamingMessageId,
@@ -1171,13 +1136,13 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         setMessages(prev => {
                             const s = chatStreamStore.getState();
                             return prev.map(m =>
-                                m.id === streamingMessageId 
-                                    ? { 
-                                        ...m, 
+                                m.id === streamingMessageId
+                                    ? {
+                                        ...m,
                                         text: s.accumulatedText,
                                         source: citationsList.join(' | '),
                                         sourceContent: contentsList.join('\n\n')
-                                      } 
+                                    }
                                     : m
                             );
                         });
@@ -1193,7 +1158,13 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             }
 
             if (currentChatId) {
-                const backendId = await saveQueryResponse(currentChatId, userQuery, chatStreamStore.getState().accumulatedText);
+                const backendId = await saveQueryResponse(
+                    currentChatId,
+                    userQuery,
+                    chatStreamStore.getState().accumulatedText,
+                    citationsList.join(' | '),
+                    contentsList.join('\n\n')
+                );
                 if (backendId) {
                     setMessages(prev => prev.map(m => m.id === streamingMessageId ? { ...m, backend_id: backendId } : m));
                 }

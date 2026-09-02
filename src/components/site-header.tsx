@@ -44,7 +44,7 @@ function AiProgressHeaderWidget() {
       </span>
       <Sparkles className="size-3.5 text-primary shrink-0 animate-spin-slow" />
       <span className="truncate max-w-[150px] md:max-w-[250px]">
-        {jobType === "draft" ? "AI Drafting: " : "AI Creating: "}{progress}
+        {jobType === "blueprint" ? "AI Blueprint: " : jobType === "draft" ? "AI Drafting: " : "AI Creating: "}{progress}
       </span>
     </div>
   )

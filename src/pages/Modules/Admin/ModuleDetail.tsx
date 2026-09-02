@@ -225,7 +225,7 @@ function AiChatSidebar({
     const isSendingRef = useRef(false);
     const [chatInput, setChatInput] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
-    const [generatingProgress, setGeneratingProgress] = useState("Luna is thinking...");
+    const [generatingProgress, setGeneratingProgress] = useState("Lumi is thinking...");
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const [chatMessages, setChatMessages] = useState<Array<{ 
         role: 'system' | 'user' | 'assistant', 
@@ -468,7 +468,7 @@ function AiChatSidebar({
                 {chatMessages.map((msg, idx) => (
                     <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                         <div className="text-xs text-muted-foreground mb-1">
-                            {msg.role === 'user' ? 'You' : 'Luna'}
+                            {msg.role === 'user' ? 'You' : 'Lumi'}
                         </div>
                         <div className={`p-3 rounded-xl max-w-[90%] text-sm ${msg.role === 'user' ? 'bg-[#00c8b6]/20 text-foreground' : 'bg-muted text-foreground'}`}>
                             {msg.role === 'system' ? (
@@ -478,7 +478,7 @@ function AiChatSidebar({
                                             <BookOpen className="w-5 h-5 text-[#00c8b6]" />
                                         </div>
                                         <div>
-                                            <h4 className="font-bold text-foreground">Luna's Generation Complete!</h4>
+                                            <h4 className="font-bold text-foreground">Lumi's Generation Complete!</h4>
                                             <p className="text-xs text-muted-foreground leading-relaxed mt-1">
                                                 Hi,I've successfully structured your course module with
                                             </p>
@@ -558,7 +558,7 @@ function AiChatSidebar({
                 
                 {isGenerating && (
                     <div className="flex flex-col items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="text-xs text-muted-foreground mb-1">Luna</div>
+                        <div className="text-xs text-muted-foreground mb-1">Lumi</div>
                         <div className="flex items-center gap-2.5 p-3 rounded-xl bg-muted max-w-[90%] text-sm">
                             <div className="flex gap-1 shrink-0">
                                 <span className="h-1.5 w-1.5 bg-[#00c8b6] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -1012,6 +1012,18 @@ export default function AdminModuleDetail() {
                                     )}
                                 </div>
                                 <div className="flex items-center gap-3">
+                                    {localStorage.getItem("debug_cached_curriculum_plan") && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-xs gap-1.5 border-teal-500/40 text-teal-700 bg-teal-50 hover:bg-teal-100"
+                                            onClick={() => setLocation("/ai-module-wizard")}
+                                        >
+                                            <ArrowLeft className="w-3.5 h-3.5" />
+                                            <span>Back to Curriculum Plan</span>
+                                        </Button>
+                                    )}
                                     {!isAiChatOpen && (
                                         <div
                                             className="flex items-center gap-2 text-sm text-foreground bg-muted/50 px-4 py-2 rounded-md cursor-pointer hover:bg-muted/80 transition-colors border border-border"

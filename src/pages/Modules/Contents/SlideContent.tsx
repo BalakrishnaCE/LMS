@@ -183,23 +183,74 @@ function SlideContent({ slideContentId }: { slideContentId: string }) {
   if (!slideContentData) return null;
 
   // Display slide content regardless of is_active status
+  let parsedMetadata: any[] | null = null;
+  if (slideContentData.presentation_metadata) {
+    try {
+      parsedMetadata = typeof slideContentData.presentation_metadata === 'string'
+        ? JSON.parse(slideContentData.presentation_metadata)
+        : slideContentData.presentation_metadata;
+    } catch (e) {
+      console.error("Failed to parse presentation_metadata:", e);
+    }
+  }
+
+  const hasHtmlSlides = Array.isArray(parsedMetadata) && parsedMetadata.length > 0 && parsedMetadata.some((s: any) => s.slide_html);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
       <h2 className="text-xl font-bold mb-2">{slideContentData.title}</h2>
       <div className="mb-4" dangerouslySetInnerHTML={{ __html: slideContentData.description || "" }} />
       <div className="relative">
-        <Carousel className="w-full">
-          <CarouselContent>
-            {slideContentData.slide_show_items?.map((item: any) => (
-              <SlideItem key={item.name} item={item} />
-            ))}
-          </CarouselContent>
-          <CarouselPrevious className="absolute left-0 top-1/2 transform -translate-y-1/2" />
-          <CarouselNext className="absolute right-0 top-1/2 transform -translate-y-1/2" />
-        </Carousel>
+        {hasHtmlSlides ? (
+          <Carousel className="w-full">
+            <CarouselContent>
+              {parsedMetadata!.map((slide: any, idx: number) => (
+                <SlideIframeItem key={idx} slide={slide} />
+              ))}
+            </CarouselContent>
+            <CarouselPrevious className="absolute left-0 top-1/2 transform -translate-y-1/2" />
+            <CarouselNext className="absolute right-0 top-1/2 transform -translate-y-1/2" />
+          </Carousel>
+        ) : (
+          <Carousel className="w-full">
+            <CarouselContent>
+              {slideContentData.slide_show_items?.map((item: any) => (
+                <SlideItem key={item.name} item={item} />
+              ))}
+            </CarouselContent>
+            <CarouselPrevious className="absolute left-0 top-1/2 transform -translate-y-1/2" />
+            <CarouselNext className="absolute right-0 top-1/2 transform -translate-y-1/2" />
+          </Carousel>
+        )}
       </div>
     </div>
+  );
+}
+
+function SlideIframeItem({ slide }: { slide: any }) {
+  const [iframeKey, setIframeKey] = useState(0);
+
+  return (
+    <CarouselItem className="flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-4xl flex flex-col items-center">
+        {slide.title && <h4 className="text-lg font-bold text-gray-800 mb-3">{slide.title}</h4>}
+        <div className="relative w-full aspect-video rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 bg-slate-950">
+          <iframe
+            key={iframeKey}
+            srcDoc={slide.slide_html}
+            title={slide.title || "Slide"}
+            className="w-full h-full border-0"
+            sandbox="allow-scripts allow-same-origin"
+          />
+          <button
+            onClick={() => setIframeKey(prev => prev + 1)}
+            className="absolute bottom-3 right-3 px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-xs text-white rounded-lg backdrop-blur border border-slate-700 transition"
+          >
+            🔄 Replay Motion
+          </button>
+        </div>
+      </div>
+    </CarouselItem>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -16,18 +16,21 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 import { LMS_API_BASE_URL, LMS_FILE_BASE_URL } from "@/config/routes";
-import { X, Upload, CheckCircle2, FileText, Image as ImageIcon, Video, Music, Table, Sparkles, Settings, Check, RefreshCw, BookOpen, PlayCircle, ClipboardList, Send, Paperclip, Presentation, Plus, Trash2, ChevronUp, ChevronDown, Code2 } from "lucide-react";
+import { X, Upload, CheckCircle2, FileText, Image as ImageIcon, Video, Music, Table, Sparkles, Settings, Check, RefreshCw, BookOpen, PlayCircle, ClipboardList, Send, Paperclip, Presentation, Plus, Trash2, ChevronUp, ChevronDown, Code2, Eye, Loader2, RotateCcw } from "lucide-react";
 import { uploadFileToFrappe } from "@/lib/uploadFileToFrappe";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PresentationPreviewEditor } from "./PresentationPreviewEditor";
 
-type Step = 1 | 2 | 3;
+
+type Step = 1 | 2 | 3 | 4;
 
 // Global promise to prevent duplicate API submissions on React StrictMode remounts
 let activeJobPromise: Promise<string> | null = null;
 let activeDraftPromise: Promise<string> | null = null;
+let activeBlueprintPromise: Promise<string> | null = null;
 
 interface UploadedFile {
   file: File;
@@ -64,8 +67,9 @@ const ACCEPTED_EXT = ".pdf,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.gif,.mp4,.mov,.mkv,
 function StepIndicator({ current }: { current: Step }) {
   const steps = [
     { num: 1, label: "Upload Sources" },
-    { num: 2, label: "Curriculum Plan" },
-    { num: 3, label: "Creating Assets" },
+    { num: 2, label: "Curriculum Blueprint" },
+    { num: 3, label: "Curriculum Plan" },
+    { num: 4, label: "Creating Assets" },
   ];
 
   return (
@@ -435,13 +439,838 @@ function StepUpload({
 }
 
 
+// ─── Content Type Config for Blueprint ──────────────────────────────────────────
+
+const CONTENT_TYPE_CONFIG: Record<string, { icon: any; color: string; bgColor: string; borderColor: string; label: string }> = {
+  "Text Content": { icon: BookOpen, color: "text-blue-600", bgColor: "bg-blue-50", borderColor: "border-blue-200", label: "Text" },
+  "Video Content": { icon: PlayCircle, color: "text-purple-600", bgColor: "bg-purple-50", borderColor: "border-purple-200", label: "Video" },
+  "Slide Content": { icon: Presentation, color: "text-teal-600", bgColor: "bg-teal-50", borderColor: "border-teal-200", label: "Slides" },
+  "Quiz": { icon: ClipboardList, color: "text-orange-600", bgColor: "bg-orange-50", borderColor: "border-orange-200", label: "Quiz" },
+  "Question Answer": { icon: Send, color: "text-indigo-600", bgColor: "bg-indigo-50", borderColor: "border-indigo-200", label: "Q&A" },
+  "Check List": { icon: CheckCircle2, color: "text-green-600", bgColor: "bg-green-50", borderColor: "border-green-200", label: "Checklist" },
+  "Steps": { icon: ClipboardList, color: "text-cyan-600", bgColor: "bg-cyan-50", borderColor: "border-cyan-200", label: "Steps" },
+  "Accordion Content": { icon: ChevronDown, color: "text-amber-600", bgColor: "bg-amber-50", borderColor: "border-amber-200", label: "Accordion" },
+  "Iframe Content": { icon: Code2, color: "text-gray-600", bgColor: "bg-gray-50", borderColor: "border-gray-200", label: "Iframe" },
+};
+
+const ALL_CONTENT_TYPES = Object.keys(CONTENT_TYPE_CONFIG);
+
+// ─── Blueprint Interfaces ───────────────────────────────────────────────────────
+
+interface BlueprintChapter {
+  title: string;
+  content_type: string;
+  summary: string;
+  estimated_duration?: string;
+}
+
+interface BlueprintLesson {
+  lesson_name: string;
+  description: string;
+  chapters: BlueprintChapter[];
+}
+
+interface CreativeDesignPreview {
+  slide_design?: {
+    color_palette?: string;
+    animation_style?: string;
+    slide_layout_theme?: string;
+    icon_style?: string;
+    illustration_style?: string;
+    transition_effect?: string;
+  };
+  video_design?: {
+    background_style?: string;
+    narration_voice?: string;
+    narration_tone?: string;
+    speaking_speed?: string;
+    background_music?: string;
+    animation_style?: string;
+  };
+  audio_design?: {
+    voice_selection?: string;
+    tone?: string;
+    speed?: string;
+    accent?: string;
+    background_music?: string;
+  };
+  template?: string;
+}
+
+interface BlueprintJSON {
+  module_name: string;
+  description: string;
+  lessons: BlueprintLesson[];
+  creative_design_preview?: CreativeDesignPreview;
+  source_job_id?: string;
+  user_instructions?: string;
+}
+
+// ─── Step 2: Blueprint Preview & Approve ──────────────────────────────────────
+
+function StepBlueprintPreview({
+  files,
+  instructions,
+  department,
+  targetAudience,
+  learningGoal,
+  blueprint,
+  setBlueprint,
+  onApprove,
+  onBack,
+  onCancelProcess,
+}: {
+  files: UploadedFile[];
+  instructions: string;
+  department: string;
+  targetAudience: string;
+  learningGoal: string;
+  blueprint: BlueprintJSON | null;
+  setBlueprint: (b: BlueprintJSON | null) => void;
+  onApprove: () => void;
+  onBack: () => void;
+  onCancelProcess?: () => void;
+}) {
+  const [, setLocation] = useLocation();
+  const [isDrafting, setIsDrafting] = useState(() => !blueprint);
+  const [draftProgress, setDraftProgress] = useState("Uploading file attachments...");
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [refinePrompt, setRefinePrompt] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
+  const [refineProgress, setRefineProgress] = useState("Refining blueprint...");
+  const [activeDesignTab, setActiveDesignTab] = useState<"slide" | "audio">("slide");
+
+  // Fetch slide design dropdown options from DocTypes
+  const [designOptions, setDesignOptions] = useState<{ palettes: string[]; layouts: string[]; animations: string[] }>({ palettes: [], layouts: [], animations: [] });
+  useEffect(() => {
+    const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
+    fetch(`${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.get_slide_design_options`, { credentials: "include" })
+      .then(r => r.json())
+      .then(res => {
+        const d = res.message || res;
+        if (d && d.success) setDesignOptions({ palettes: d.palettes || [], layouts: d.layouts || [], animations: d.animations || [] });
+      })
+      .catch(() => {});
+  }, []);
+
+  // Run blueprint generation on mount if no blueprint exists
+  useEffect(() => {
+    let isMounted = true;
+    let pollInterval: any = null;
+
+    if (blueprint) return;
+
+    const runBlueprintGeneration = async () => {
+      try {
+        setIsDrafting(true);
+        const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
+
+        const activeJobId = localStorage.getItem("active_ai_job_id");
+        const activeJobType = localStorage.getItem("active_ai_job_type");
+        const activeJobProgress = localStorage.getItem("active_ai_job_progress");
+
+        let currentJobId = "";
+
+        if (activeJobId && activeJobType === "blueprint") {
+          currentJobId = activeJobId;
+          if (isMounted) {
+            setJobId(currentJobId);
+            if (activeJobProgress) setDraftProgress(activeJobProgress);
+          }
+        } else {
+          // Upload files first
+          setDraftProgress("Uploading file attachments...");
+          const fileUrls: string[] = [];
+          for (let i = 0; i < files.length; i++) {
+            const ufile = files[i];
+            setDraftProgress(`Uploading file ${i + 1} of ${files.length}: ${ufile.file.name}...`);
+            const fileUrl = await uploadFileToFrappe(ufile.file);
+            fileUrls.push(fileUrl);
+          }
+
+          setDraftProgress("Starting blueprint generation...");
+          const generateUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.generate_blueprint`;
+
+          if (!activeBlueprintPromise) {
+            activeBlueprintPromise = (async () => {
+              const response = await fetch(generateUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                body: JSON.stringify({
+                  file_urls: fileUrls,
+                  instructions: instructions,
+                  department: department,
+                  target_audience: targetAudience,
+                  learning_goal: learningGoal,
+                }),
+                credentials: "include"
+              });
+
+              if (!response.ok) throw new Error("Failed to start blueprint generation");
+              const genResult = await response.json();
+              const job = genResult.message;
+              if (!job || !job.success || !job.job_id) throw new Error(job?.error || "Job start failed.");
+              return job.job_id;
+            })();
+          }
+
+          try {
+            currentJobId = await activeBlueprintPromise;
+          } catch (err) {
+            activeBlueprintPromise = null;
+            throw err;
+          }
+
+          if (isMounted) setJobId(currentJobId);
+          localStorage.setItem("active_ai_job_id", currentJobId);
+          localStorage.setItem("active_ai_job_type", "blueprint");
+          localStorage.setItem("active_ai_job_progress", "Starting blueprint generation...");
+        }
+
+        // Poll for completion
+        const pollUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.get_blueprint_status?ai_job_id=${currentJobId}`;
+        let notFoundCount = 0;
+        const NOT_FOUND_LIMIT = 5;
+
+        pollInterval = setInterval(async () => {
+          try {
+            const statusResponse = await fetch(pollUrl, { credentials: "include" });
+            if (!statusResponse.ok) return;
+
+            const statusResult = await statusResponse.json();
+            const statusData = statusResult.message;
+            if (!isMounted) return;
+
+            if (!statusData || statusData.status === "not_found") {
+              notFoundCount++;
+              if (notFoundCount >= NOT_FOUND_LIMIT) {
+                clearInterval(pollInterval);
+                activeBlueprintPromise = null;
+                setIsDrafting(false);
+                localStorage.removeItem("active_ai_job_id");
+                localStorage.removeItem("active_ai_job_type");
+                localStorage.removeItem("active_ai_job_progress");
+                toast.error("Blueprint worker crashed or job expired. Please try again.");
+                onBack();
+              }
+              return;
+            }
+
+            notFoundCount = 0;
+
+            if (statusData.status === "finished") {
+              clearInterval(pollInterval);
+              activeBlueprintPromise = null;
+              setIsDrafting(false);
+              setBlueprint(statusData.blueprint);
+              localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_type");
+              localStorage.removeItem("active_ai_job_progress");
+            } else if (statusData.status === "failed") {
+              clearInterval(pollInterval);
+              activeBlueprintPromise = null;
+              setIsDrafting(false);
+              localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_type");
+              localStorage.removeItem("active_ai_job_progress");
+              toast.error(statusData.error || "Failed to generate blueprint.");
+              onBack();
+            } else if (statusData.progress) {
+              setDraftProgress(statusData.progress);
+              localStorage.setItem("active_ai_job_progress", statusData.progress);
+            }
+          } catch (pollErr) {
+            console.error("Blueprint polling error", pollErr);
+          }
+        }, 2000);
+
+      } catch (err: any) {
+        console.error("Blueprint error", err);
+        activeBlueprintPromise = null;
+        if (isMounted) {
+          localStorage.removeItem("active_ai_job_id");
+          localStorage.removeItem("active_ai_job_type");
+          localStorage.removeItem("active_ai_job_progress");
+          toast.error(err.message || "An error occurred.");
+          setIsDrafting(false);
+          onBack();
+        }
+      }
+    };
+
+    runBlueprintGeneration();
+
+    return () => {
+      isMounted = false;
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [blueprint]);
+
+  // Refine blueprint via Lumi AI
+  const handleRefinePlan = async () => {
+    if (!refinePrompt.trim()) return;
+    try {
+      setIsRefining(true);
+      setRefineProgress("Enqueuing blueprint refinement...");
+      const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
+      const refineUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.refine_blueprint`;
+
+      const response = await fetch(refineUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          blueprint_json: blueprint,
+          instructions: refinePrompt,
+        }),
+        credentials: "include"
+      });
+
+      if (!response.ok) throw new Error("Blueprint refinement failed to start");
+      const resData = await response.json();
+      const job = resData.message;
+      if (!job || !job.success || !job.job_id) {
+        throw new Error(job?.error || "Failed to start refinement job.");
+      }
+
+      const pollJobId = job.job_id;
+      localStorage.setItem("active_ai_job_id", pollJobId);
+      localStorage.setItem("active_ai_job_type", "blueprint");
+      localStorage.setItem("active_ai_job_progress", "Enqueuing blueprint refinement...");
+      const pollUrl = `${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.get_blueprint_status?ai_job_id=${pollJobId}`;
+      let notFoundCount = 0;
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await fetch(pollUrl, { credentials: "include" });
+          if (!statusResponse.ok) return;
+
+          const statusResult = await statusResponse.json();
+          const statusData = statusResult.message;
+
+          if (!statusData || statusData.status === "not_found") {
+            notFoundCount++;
+            if (notFoundCount >= 5) {
+              clearInterval(pollInterval);
+              setIsRefining(false);
+              localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_type");
+              localStorage.removeItem("active_ai_job_progress");
+              toast.error("Refinement worker crashed. Please try again.");
+            }
+            return;
+          }
+
+          notFoundCount = 0;
+
+          if (statusData.status === "finished") {
+            clearInterval(pollInterval);
+            setBlueprint(statusData.blueprint);
+            setRefinePrompt("");
+            setIsRefining(false);
+            localStorage.removeItem("active_ai_job_id");
+            localStorage.removeItem("active_ai_job_type");
+            localStorage.removeItem("active_ai_job_progress");
+            toast.success("Blueprint updated successfully!");
+          } else if (statusData.status === "failed") {
+            clearInterval(pollInterval);
+            setIsRefining(false);
+            localStorage.removeItem("active_ai_job_id");
+            localStorage.removeItem("active_ai_job_type");
+            localStorage.removeItem("active_ai_job_progress");
+            toast.error(statusData.error || "Failed to refine blueprint.");
+          } else if (statusData.progress) {
+            setRefineProgress(statusData.progress);
+            localStorage.setItem("active_ai_job_progress", statusData.progress);
+          }
+        } catch (pollErr) {
+          console.error("Blueprint refinement polling error", pollErr);
+        }
+      }, 2000);
+
+    } catch (err: any) {
+      localStorage.removeItem("active_ai_job_id");
+      localStorage.removeItem("active_ai_job_type");
+      localStorage.removeItem("active_ai_job_progress");
+      toast.error(err.message || "An error occurred during refinement.");
+      setIsRefining(false);
+    }
+  };
+
+  // Update chapter content type
+  const handleChangeContentType = (lessonIdx: number, chapterIdx: number, newType: string) => {
+    if (!blueprint) return;
+    const updated = JSON.parse(JSON.stringify(blueprint));
+    updated.lessons[lessonIdx].chapters[chapterIdx].content_type = newType;
+    setBlueprint(updated);
+  };
+
+  // Delete chapter
+  const handleDeleteChapter = (lessonIdx: number, chapterIdx: number) => {
+    if (!blueprint) return;
+    const updated = JSON.parse(JSON.stringify(blueprint));
+    updated.lessons[lessonIdx].chapters.splice(chapterIdx, 1);
+    setBlueprint(updated);
+    toast.success("Chapter removed from blueprint");
+  };
+
+  // Delete lesson
+  const handleDeleteLesson = (lessonIdx: number) => {
+    if (!blueprint) return;
+    const updated = JSON.parse(JSON.stringify(blueprint));
+    updated.lessons.splice(lessonIdx, 1);
+    setBlueprint(updated);
+    toast.success("Lesson removed from blueprint");
+  };
+
+  // Update creative design settings
+  const updateDesignSetting = (category: "slide_design" | "video_design" | "audio_design", key: string, value: string) => {
+    if (!blueprint) return;
+    const updated = JSON.parse(JSON.stringify(blueprint));
+    if (!updated.creative_design_preview) updated.creative_design_preview = {};
+    if (!updated.creative_design_preview[category]) updated.creative_design_preview[category] = {};
+    updated.creative_design_preview[category][key] = value;
+    setBlueprint(updated);
+  };
+
+  // ── Drafting Loading State ──
+  if (isDrafting) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-8 h-full py-10">
+        <style>{`
+          @keyframes blueprint-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.06); opacity: 1; }
+          }
+          @keyframes blueprint-line {
+            0% { width: 0; }
+            100% { width: 100%; }
+          }
+        `}</style>
+
+        <div className="relative flex items-center justify-center w-48 h-48">
+          <div
+            className="relative z-10 flex items-center justify-center w-24 h-24 rounded-2xl bg-primary/10 border-2 border-primary/20 shadow-lg"
+            style={{ animation: "blueprint-pulse 2.5s ease-in-out infinite" }}
+          >
+            <Sparkles className="w-10 h-10 text-primary" />
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-40 h-40 rounded-full border-2 border-dashed border-primary/15 animate-spin" style={{ animationDuration: "12s" }} />
+          </div>
+        </div>
+
+        <div className="text-center space-y-3 max-w-md px-4">
+          <h3 className="text-base font-bold text-foreground tracking-tight">Generating Curriculum Blueprint</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed h-8">{draftProgress}</p>
+
+          <div className="flex items-center justify-center gap-3 mt-6">
+            {jobId && (
+              <Button
+                variant="outline"
+                className="font-semibold border-primary/30 hover:border-primary text-primary hover:bg-primary/5 transition-all duration-300 shadow-sm"
+                onClick={() => setLocation("/")}
+              >
+                Run in Background
+              </Button>
+            )}
+            {onCancelProcess && (
+              <Button
+                variant="outline"
+                className="font-semibold border-red-200 hover:border-red-400 text-red-600 hover:bg-red-50 transition-all duration-300 shadow-sm gap-1.5"
+                onClick={onCancelProcess}
+              >
+                <X className="w-4 h-4" />
+                Cancel Process
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!blueprint) return null;
+
+  const cdp = blueprint.creative_design_preview || {};
+  const slideDesign = cdp.slide_design || {};
+  const videoDesign = cdp.video_design || {};
+  const audioDesign = cdp.audio_design || {};
+
+  const effectiveColorPalette = slideDesign.color_palette || (designOptions.palettes.length > 0 ? designOptions.palettes[0] : "Ocean Blue");
+  const effectiveLayoutTheme = slideDesign.slide_layout_theme || "Modern Minimalist";
+  const effectiveAnimationStyle = slideDesign.animation_style || "Subtle Fade";
+
+  const effectiveVoiceSelection = audioDesign.voice_selection || "Male - Deep";
+  const effectiveTone = audioDesign.tone || "Professional";
+  const effectiveSpeed = audioDesign.speed || "Normal";
+  const effectiveAccent = audioDesign.accent || "Neutral American";
+
+  // Count content types for summary bar
+  const typeCounts: Record<string, number> = {};
+  blueprint.lessons.forEach(l => l.chapters.forEach(c => {
+    typeCounts[c.content_type] = (typeCounts[c.content_type] || 0) + 1;
+  }));
+  const totalChapters = Object.values(typeCounts).reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="flex flex-col gap-4 text-left w-full">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            {blueprint.module_name}
+          </h2>
+          <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">{blueprint.description}</p>
+        </div>
+        {onCancelProcess && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCancelProcess}
+            className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300 gap-1.5 font-semibold text-xs shrink-0"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Clear & Start Over</span>
+          </Button>
+        )}
+      </div>
+
+      {/* Content Type Summary Bar */}
+      <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/30 border border-border rounded-xl">
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">Blueprint Summary:</span>
+        <Badge variant="outline" className="text-[10px] font-bold">
+          {blueprint.lessons.length} Lessons · {totalChapters} Chapters
+        </Badge>
+        {Object.entries(typeCounts).map(([type, count]) => {
+          const cfg = CONTENT_TYPE_CONFIG[type];
+          if (!cfg) return null;
+          const Icon = cfg.icon;
+          return (
+            <Badge key={type} variant="secondary" className={`text-[9px] font-bold gap-1 ${cfg.color} ${cfg.bgColor} border ${cfg.borderColor}`}>
+              <Icon className="w-3 h-3" />
+              {cfg.label} ({count})
+            </Badge>
+          );
+        })}
+      </div>
+
+      {/* Main Content: Skeleton Tree + Design Preview Side Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full items-start">
+        {/* Left: Skeleton Tree */}
+        <div className="lg:col-span-2 space-y-3">
+          <Accordion type="multiple" defaultValue={blueprint.lessons.map((_, i) => `bp-lesson-${i}`)} className="space-y-3">
+            {blueprint.lessons.map((lesson, lIdx) => (
+              <AccordionItem
+                key={lIdx}
+                value={`bp-lesson-${lIdx}`}
+                className="border border-border rounded-xl px-4 bg-muted/20 hover:bg-muted/30 transition-all duration-200"
+              >
+                <div className="flex items-center justify-between w-full gap-2">
+                  <AccordionTrigger className="hover:no-underline py-3 flex-1">
+                    <div className="flex flex-col items-start text-left gap-0.5">
+                      <span className="text-sm font-bold text-foreground flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
+                          {lIdx + 1}
+                        </span>
+                        {lesson.lesson_name}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">{lesson.description}</span>
+                    </div>
+                  </AccordionTrigger>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0 ml-2 text-rose-600 border-rose-200 hover:bg-rose-50 shrink-0 flex items-center justify-center"
+                    title="Delete Lesson"
+                    onClick={(e) => { e.stopPropagation(); handleDeleteLesson(lIdx); }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+
+                <AccordionContent className="pt-1 pb-4 space-y-2">
+                  {lesson.chapters.map((chapter, cIdx) => {
+                    const cfg = CONTENT_TYPE_CONFIG[chapter.content_type] || CONTENT_TYPE_CONFIG["Text Content"];
+                    const Icon = cfg.icon;
+                    return (
+                      <div key={cIdx} className="bg-background border rounded-lg p-3 space-y-2 shadow-sm hover:border-muted-foreground/30 transition-all duration-200">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex gap-2.5 items-start flex-1 min-w-0">
+                            <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${cfg.bgColor} ${cfg.color}`}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div className="space-y-0.5 min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-foreground">{chapter.title}</span>
+                                {chapter.estimated_duration && (
+                                  <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{chapter.estimated_duration}</span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-normal line-clamp-2">{chapter.summary}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Content Type Selector */}
+                            <Select
+                              value={chapter.content_type}
+                              onValueChange={(val) => handleChangeContentType(lIdx, cIdx, val)}
+                            >
+                              <SelectTrigger className={`h-7 w-auto min-w-[100px] text-[10px] font-bold gap-1 px-2 border ${cfg.borderColor} ${cfg.bgColor} ${cfg.color}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ALL_CONTENT_TYPES.map((ct) => {
+                                  const ctCfg = CONTENT_TYPE_CONFIG[ct];
+                                  const CtIcon = ctCfg.icon;
+                                  return (
+                                    <SelectItem key={ct} value={ct} className="text-[11px]">
+                                      <div className="flex items-center gap-1.5">
+                                        <CtIcon className={`w-3 h-3 ${ctCfg.color}`} />
+                                        <span>{ct}</span>
+                                      </div>
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-rose-500 border-rose-200 hover:bg-rose-50 shrink-0 flex items-center justify-center"
+                              title="Remove Chapter"
+                              onClick={() => handleDeleteChapter(lIdx, cIdx)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
+
+        {/* Right: AI Design Preview + Refine Panel */}
+        <div className="lg:col-span-1 lg:sticky lg:top-6 space-y-4 h-fit">
+          {/* AI Design Preview Card */}
+          <div className="bg-card border border-border rounded-2xl p-4 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between border-b pb-2">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-primary" />
+                <h3 className="text-xs font-bold text-foreground">AI Design Preview</h3>
+              </div>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">
+                <Sparkles className="w-3 h-3" /> Agent Suggested
+              </span>
+            </div>
+
+            {/* Agent Selections Summary Card */}
+            <div className="bg-primary/5 border border-primary/10 rounded-xl p-2.5 space-y-1.5 text-[11px]">
+              <div className="font-bold text-foreground text-[10px] uppercase tracking-wider flex items-center justify-between">
+                <span>Agent Selection (Based on Prompt)</span>
+                <span className="text-primary font-normal text-[9px] lowercase">editable below</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                <div className="bg-background/80 p-1.5 rounded border border-border/40">
+                  <span className="text-muted-foreground block text-[9px]">Palette</span>
+                  <span className="font-bold text-foreground truncate block">{effectiveColorPalette}</span>
+                </div>
+                <div className="bg-background/80 p-1.5 rounded border border-border/40">
+                  <span className="text-muted-foreground block text-[9px]">Layout</span>
+                  <span className="font-bold text-foreground truncate block">{effectiveLayoutTheme}</span>
+                </div>
+                <div className="bg-background/80 p-1.5 rounded border border-border/40">
+                  <span className="text-muted-foreground block text-[9px]">Animation</span>
+                  <span className="font-bold text-foreground truncate block">{effectiveAnimationStyle}</span>
+                </div>
+                <div className="bg-background/80 p-1.5 rounded border border-border/40">
+                  <span className="text-muted-foreground block text-[9px]">Audio Voice</span>
+                  <span className="font-bold text-primary truncate block">{effectiveVoiceSelection}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Design Tab Switcher */}
+            <div className="flex gap-1 bg-muted/40 p-1 rounded-lg">
+              {(["slide", "audio"] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveDesignTab(tab)}
+                  className={`flex-1 px-2 py-1.5 rounded-md text-[10px] font-bold transition-all capitalize
+                    ${activeDesignTab === tab
+                      ? "bg-background text-foreground shadow-sm border border-border"
+                      : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                  {tab === "slide" ? "🎨 Slides" : "🎧 Audio"}
+                </button>
+              ))}
+            </div>
+
+            {/* Slide Design Settings */}
+            {activeDesignTab === "slide" && (
+              <div className="space-y-3">
+                {[
+                  { label: "Color Palette", key: "color_palette", value: slideDesign.color_palette || effectiveColorPalette,
+                    options: designOptions.palettes.length > 0 ? designOptions.palettes : undefined },
+                  { label: "Layout Theme", key: "slide_layout_theme", value: slideDesign.slide_layout_theme || effectiveLayoutTheme,
+                    options: designOptions.layouts.length > 0 ? designOptions.layouts : ["Modern Minimalist", "Corporate Professional", "Creative Bold", "Academic Clean", "Tech Dark", "Nature Organic"] },
+                  { label: "Animation Style", key: "animation_style", value: slideDesign.animation_style || effectiveAnimationStyle,
+                    options: designOptions.animations.length > 0 ? designOptions.animations : ["Subtle Fade", "Smooth Slide", "Dynamic Pop", "Elegant Zoom", "Professional Wipe", "Minimal"] },
+                ].map(field => (
+                  <div key={field.key} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{field.label}</Label>
+                      <span className="text-[9px] text-primary font-medium flex items-center gap-0.5">
+                        <Sparkles className="w-2.5 h-2.5" /> Agent Choice
+                      </span>
+                    </div>
+                    {field.options ? (
+                      <Select value={field.value} onValueChange={(val) => updateDesignSetting("slide_design", field.key, val)}>
+                        <SelectTrigger className="h-8 text-[11px]">
+                          <SelectValue placeholder={`Select ${field.label}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {field.options.map(opt => (
+                            <SelectItem key={opt} value={opt} className="text-[11px]">{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={field.value}
+                        onChange={(e) => updateDesignSetting("slide_design", field.key, e.target.value)}
+                        className="h-8 text-[11px]"
+                        placeholder={`Enter ${field.label}`}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Audio Design Settings */}
+            {activeDesignTab === "audio" && (
+              <div className="space-y-3">
+                {[
+                  { label: "Voice Selection", key: "voice_selection", value: audioDesign.voice_selection || effectiveVoiceSelection,
+                    options: ["Female - Warm", "Female - Clear", "Male - Deep", "Male - Warm", "Female - Energetic", "Male - Energetic"] },
+                  { label: "Tone", key: "tone", value: audioDesign.tone || effectiveTone,
+                    options: ["Professional", "Conversational", "Academic", "Storytelling", "Motivational"] },
+                  { label: "Speed", key: "speed", value: audioDesign.speed || effectiveSpeed,
+                    options: ["Slow", "Normal", "Fast"] },
+                  { label: "Accent", key: "accent", value: audioDesign.accent || effectiveAccent,
+                    options: ["Neutral American", "British", "Australian", "Indian", "Neutral International"] },
+                ].map(field => (
+                  <div key={field.key} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{field.label}</Label>
+                      <span className="text-[9px] text-primary font-medium flex items-center gap-0.5">
+                        <Sparkles className="w-2.5 h-2.5" /> Agent Choice
+                      </span>
+                    </div>
+                    <Select value={field.value} onValueChange={(val) => updateDesignSetting("audio_design", field.key, val)}>
+                      <SelectTrigger className="h-8 text-[11px]">
+                        <SelectValue placeholder={`Select ${field.label}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {field.options.map(opt => (
+                          <SelectItem key={opt} value={opt} className="text-[11px]">{opt}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Lumi AI Refinement Panel */}
+          <div className="bg-muted/20 border border-border rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-2 border-b pb-2">
+              <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+              <h3 className="text-xs font-bold text-foreground">Refine with Lumi AI</h3>
+            </div>
+
+            {/* Prompt Input */}
+            <div className="flex gap-2">
+              <Textarea
+                placeholder="E.g., 'Add a quiz after every lesson', 'Use more video content', 'Change the narration voice to male'"
+                value={refinePrompt}
+                onChange={(e) => setRefinePrompt(e.target.value)}
+                className="text-xs min-h-[60px] resize-none flex-1"
+                disabled={isRefining}
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={handleRefinePlan}
+              disabled={isRefining || !refinePrompt.trim()}
+              className="w-full gap-1.5 h-8 text-xs"
+            >
+              {isRefining ? (
+                <><RefreshCw className="w-3 h-3 animate-spin" /><span>{refineProgress}</span></>
+              ) : (
+                <><Send className="w-3 h-3" /><span>Refine Blueprint</span></>
+              )}
+            </Button>
+
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { label: "Add Quiz", text: "Add a quiz chapter at the end of every lesson.", icon: ClipboardList, cls: "text-orange-600" },
+                { label: "More Videos", text: "Convert more chapters to Video Content for visual learners.", icon: PlayCircle, cls: "text-purple-600" },
+                { label: "Add Checklist", text: "Add a checklist summary chapter at the end of the module.", icon: CheckCircle2, cls: "text-green-600" },
+                { label: "Add Steps", text: "Add step-by-step how-to chapters where applicable.", icon: ClipboardList, cls: "text-cyan-600" },
+              ].map((action, idx) => {
+                const AIcon = action.icon;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setRefinePrompt(action.text)}
+                    className="flex items-center gap-1.5 p-2 rounded-lg border hover:border-primary/20 bg-background text-left transition-all text-[10px] font-semibold hover:bg-muted/40"
+                  >
+                    <AIcon className={`w-3 h-3 shrink-0 ${action.cls}`} />
+                    <span className="text-foreground">{action.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between border-t pt-4 mt-2">
+        <Button variant="outline" onClick={onBack}>
+          Back
+        </Button>
+        <Button onClick={onApprove} className="px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold flex items-center gap-1.5">
+          <Check className="w-4 h-4" />
+          <span>Approve Blueprint & Continue</span>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 
 // ─── Step 3: Curriculum Plan Preview & Refine ──────────────────────────────────
 
 interface SlideData {
   title: string;
   bullets: string[];
-  narration: string;
+  narration?: string;
+  layout_type?: string;
+  animation?: any;
 }
 
 interface VideoDetails {
@@ -491,6 +1320,7 @@ interface PlanJSON {
   module_name: string;
   description: string;
   lessons: PlanLesson[];
+  creative_design_preview?: CreativeDesignPreview;
 }
 
 const fixPreviewImages = (htmlContent: string) => {
@@ -597,6 +1427,8 @@ function StepPlanPreview({
   onBack,
   resumedDraftJobId,
   setIsEditingChapter,
+  onCancelProcess,
+  blueprintJson,
 }: {
   files: UploadedFile[];
   instructions: string;
@@ -615,6 +1447,8 @@ function StepPlanPreview({
   onBack: () => void;
   resumedDraftJobId: string | null;
   setIsEditingChapter?: (val: boolean) => void;
+  onCancelProcess?: () => void;
+  blueprintJson?: BlueprintJSON | null;
 }) {
   const [, setLocation] = useLocation();
   const [draftProgress, setDraftProgress] = useState(() => {
@@ -627,7 +1461,7 @@ function StepPlanPreview({
   const [jobId, setJobId] = useState<string | null>(resumedDraftJobId || null);
   const [refinePrompt, setRefinePrompt] = useState("");
   const [isRefining, setIsRefining] = useState(false);
-  const [refineProgress, setRefineProgress] = useState("Luna is rewriting the curriculum plan...");
+  const [refineProgress, setRefineProgress] = useState("Lumi is rewriting the curriculum plan...");
   const [refineFiles, setRefineFiles] = useState<{ name: string; url: string; isUploading: boolean }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -672,10 +1506,22 @@ function StepPlanPreview({
   const [predefinedAssets, setPredefinedAssets] = useState<{ templates: any[]; palettes: any[] }>({ templates: [], palettes: [] });
   const [editingChapterPath, setEditingChapterPath] = useState<{ lessonIdx: number; chapterIdx: number } | null>(null);
   const [editingChapter, setEditingChapter] = useState<PlanChapter | null>(null);
+  const [previewModalChapter, setPreviewModalChapter] = useState<{ chapter: PlanChapter; lessonIdx: number; chapterIdx: number } | null>(null);
   const [activeSlideIdx, setActiveSlideIdx] = useState(0);
   const [lunaPrompt, setLunaPrompt] = useState("");
   const [isLunaLoading, setIsLunaLoading] = useState(false);
   const [lunaUpdateTrigger, setLunaUpdateTrigger] = useState(0);
+
+  // Delete confirmation modal state
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    type: "lesson" | "chapter";
+    lessonIdx: number;
+    chapterIdx?: number;
+    title: string;
+    details: string;
+  } | null>(null);
+
+
 
   // Fetch extracted files/images from the background generation job
   const effectiveJobId = jobId || (plan as any)?.source_job_id;
@@ -927,7 +1773,7 @@ function StepPlanPreview({
                 headers: { "Content-Type": "application/json", "Accept": "application/json" },
                 body: JSON.stringify({
                   file_urls: fileUrls,
-                  instructions: instructions,
+                  instructions: instructions || blueprintJson?.user_instructions || "Generate full curriculum plan from approved blueprint structure.",
                   department: department,
                   assignment_based: assignmentBased,
                   generate_slides: true,
@@ -938,6 +1784,7 @@ function StepPlanPreview({
                   target_audience: targetAudience,
                   learning_goal: learningGoal,
                   slide_count: slideCount,
+                  blueprint_json: blueprintJson || null,
                 }),
                 credentials: "include"
               });
@@ -1011,6 +1858,16 @@ function StepPlanPreview({
               localStorage.removeItem("active_ai_job_progress");
               localStorage.removeItem("completed_ai_draft_job_id");
               toast.error(statusData.error || "Failed to generate plan.");
+              activeDraftPromise = null;
+              onBack();
+              return true;
+            } else if (statusData.status === "cancelled" || statusData.status === "stopped") {
+              setIsDrafting(false);
+              localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_type");
+              localStorage.removeItem("active_ai_job_progress");
+              localStorage.removeItem("completed_ai_draft_job_id");
+              toast.info(statusData.progress || "Process was cancelled.");
               activeDraftPromise = null;
               onBack();
               return true;
@@ -1152,10 +2009,61 @@ function StepPlanPreview({
     toast.success("Chapter details updated!");
   };
 
+  const handleDeleteLesson = (lessonIdx: number) => {
+    if (!plan) return;
+    const lessonName = plan.lessons[lessonIdx]?.lesson_name || `Lesson ${lessonIdx + 1}`;
+    setDeleteConfirmState({
+      type: "lesson",
+      lessonIdx,
+      title: lessonName,
+      details: `Are you sure you want to delete "${lessonName}" and all of its chapters? This action cannot be undone.`,
+    });
+  };
+
+  const handleDeleteChapter = (lessonIdx: number, chapterIdx: number) => {
+    if (!plan) return;
+    const chapterName = plan.lessons[lessonIdx]?.chapters[chapterIdx]?.title || `Chapter ${chapterIdx + 1}`;
+    setDeleteConfirmState({
+      type: "chapter",
+      lessonIdx,
+      chapterIdx,
+      title: chapterName,
+      details: `Are you sure you want to delete chapter "${chapterName}"?`,
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmState || !plan) return;
+
+    if (deleteConfirmState.type === "lesson") {
+      const updatedLessons = plan.lessons.filter((_, idx) => idx !== deleteConfirmState.lessonIdx);
+      setPlan({
+        ...plan,
+        lessons: updatedLessons,
+      });
+      toast.success(`Deleted "${deleteConfirmState.title}"`);
+    } else if (deleteConfirmState.type === "chapter" && deleteConfirmState.chapterIdx !== undefined) {
+      const { lessonIdx, chapterIdx } = deleteConfirmState;
+      const updatedLessons = [...plan.lessons];
+      const updatedChapters = updatedLessons[lessonIdx].chapters.filter((_, idx) => idx !== chapterIdx);
+      updatedLessons[lessonIdx] = {
+        ...updatedLessons[lessonIdx],
+        chapters: updatedChapters,
+      };
+      setPlan({
+        ...plan,
+        lessons: updatedLessons,
+      });
+      toast.success(`Deleted chapter "${deleteConfirmState.title}"`);
+    }
+
+    setDeleteConfirmState(null);
+  };
+
   const handleLunaRefine = async () => {
     if (!lunaPrompt.trim() || !editingChapter) return;
     setIsLunaLoading(true);
-    const toastId = toast.loading("Luna AI is refining this chapter...");
+    const toastId = toast.loading("Lumi AI is refining this chapter...");
     try {
       const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
       const response = await fetch(
@@ -1192,7 +2100,7 @@ function StepPlanPreview({
       setLunaUpdateTrigger(prev => prev + 1);
       toast.success("Chapter refined successfully!", { id: toastId });
     } catch (err: any) {
-      toast.error(`Error asking Luna: ${err.message || err}`, { id: toastId });
+      toast.error(`Error asking Lumi: ${err.message || err}`, { id: toastId });
     } finally {
       setIsLunaLoading(false);
     }
@@ -1313,15 +2221,27 @@ function StepPlanPreview({
           <h3 className="text-base font-bold text-foreground tracking-tight">Drafting Curriculum Plan</h3>
           <p className="text-xs text-muted-foreground leading-relaxed h-8">{draftProgress}</p>
 
-          {jobId && (
-            <Button
-              variant="outline"
-              className="mt-6 font-semibold border-primary/30 hover:border-primary text-primary hover:bg-primary/5 transition-all duration-300 shadow-sm"
-              onClick={() => setLocation("/")}
-            >
-              Run in Background
-            </Button>
-          )}
+          <div className="flex items-center justify-center gap-3 mt-6">
+            {jobId && (
+              <Button
+                variant="outline"
+                className="font-semibold border-primary/30 hover:border-primary text-primary hover:bg-primary/5 transition-all duration-300 shadow-sm"
+                onClick={() => setLocation("/")}
+              >
+                Run in Background
+              </Button>
+            )}
+            {onCancelProcess && (
+              <Button
+                variant="outline"
+                className="font-semibold border-red-200 hover:border-red-400 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/50 transition-all duration-300 shadow-sm gap-1.5"
+                onClick={onCancelProcess}
+              >
+                <X className="w-4 h-4" />
+                Cancel Process
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -1342,57 +2262,55 @@ function StepPlanPreview({
           </Badge>
         </div>
 
-        {/* Luna AI Refinement Box (Fixed at top & Compact) */}
-        {(editingChapter.content_type === "Text Content" ||
-          editingChapter.content_type === "Video Content" ||
-          editingChapter.content_type === "Slide Content") && (
-            <div className="shrink-0 pt-2 pb-1.5 border-b space-y-1.5">
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-2 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-primary text-xs font-bold">
-                  <Sparkles className="w-3 h-3 text-primary animate-pulse" />
-                  <span>Luna AI Assistant</span>
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Refine this chapter (e.g. 'summarise this', 'make it simpler', 'add slide')"
-                    value={lunaPrompt}
-                    onChange={(e) => setLunaPrompt(e.target.value)}
-                    disabled={isLunaLoading}
-                    className="text-xs h-8 bg-background flex-1"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !isLunaLoading) {
-                        e.preventDefault();
-                        handleLunaRefine();
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleLunaRefine}
-                    disabled={isLunaLoading || !lunaPrompt.trim()}
-                    className="h-8 shrink-0 gap-1 text-xs"
-                  >
-                    {isLunaLoading ? (
-                      <>
-                        <RefreshCw className="w-3 h-3 animate-spin" />
-                        <span>Asking...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3 h-3" />
-                        <span>Ask Luna</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
+        {/* Lumi AI Refinement Box (Fixed at top & Compact) */}
+        <div className="shrink-0 pt-2 pb-1.5 border-b space-y-1.5">
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-2 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-primary text-xs font-bold">
+              <Sparkles className="w-3 h-3 text-primary animate-pulse" />
+              <span>Lumi AI Assistant</span>
             </div>
-          )}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Refine this chapter (e.g. 'summarise this', 'make it simpler', 'add section')"
+                value={lunaPrompt}
+                onChange={(e) => setLunaPrompt(e.target.value)}
+                disabled={isLunaLoading}
+                className="text-xs h-8 bg-background flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isLunaLoading) {
+                    e.preventDefault();
+                    handleLunaRefine();
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                onClick={handleLunaRefine}
+                disabled={isLunaLoading || !lunaPrompt.trim()}
+                className="h-8 shrink-0 gap-1 text-xs"
+              >
+                {isLunaLoading ? (
+                  <>
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <span>Asking...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3" />
+                    <span>Ask Lumi</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
 
         {/* Scrollable Form Body */}
         <div className="flex-1 overflow-y-auto py-4 pr-1 space-y-4 scrollbar-thin text-left min-h-0">
-          {/* Type 1: Text Content Editor */}
-          {editingChapter.content_type === "Text Content" && (
+          {/* Text Content & General Body Content Editor (Steps, Check List, Accordion Content, Question Answer, Iframe Content, Text Content) */}
+          {editingChapter.content_type !== "Quiz" &&
+           editingChapter.content_type !== "Video Content" &&
+           editingChapter.content_type !== "Slide Content" && (
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label className="text-sm font-bold">Chapter Title</Label>
@@ -1999,82 +2917,199 @@ function StepPlanPreview({
     );
   }
 
+  // Count content types for summary bar in plan
+  const planTypeCounts: Record<string, number> = {};
+  if (plan?.lessons) {
+    plan.lessons.forEach(l => l.chapters?.forEach(c => {
+      if (c?.content_type) {
+        planTypeCounts[c.content_type] = (planTypeCounts[c.content_type] || 0) + 1;
+      }
+    }));
+  }
+  const totalPlanChapters = Object.values(planTypeCounts).reduce((a, b) => a + b, 0);
+
   return (
     <div className="flex flex-col text-left animate-fade-in w-full">
       {/* Header Info */}
-      <div className="shrink-0 pb-4 border-b">
-        <h2 className="text-xl font-bold text-foreground tracking-tight">Review Curriculum Plan: {plan.module_name}</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">{plan.description}</p>
+      <div className="shrink-0 pb-4 border-b flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
+            <span>Review Curriculum Plan: {plan.module_name}</span>
+            <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300">
+              ⚡ Auto-Saved
+            </Badge>
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{plan.description}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50 h-8 shrink-0"
+            onClick={() => {
+              setPlan(null);
+              onBack();
+            }}
+          >
+            Clear & Go To BluePrint
+          </Button>
+        </div>
+      </div>
+
+      {/* Content Type Summary Bar */}
+      <div className="flex flex-wrap items-center gap-2 p-3 my-3 bg-muted/30 border border-border rounded-xl">
+        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">Plan Summary:</span>
+        <Badge variant="outline" className="text-[10px] font-bold">
+          {plan.lessons?.length || 0} Lessons · {totalPlanChapters} Chapters
+        </Badge>
+        {Object.entries(planTypeCounts).map(([type, count]) => {
+          const cfg = CONTENT_TYPE_CONFIG[type] || CONTENT_TYPE_CONFIG["Text Content"];
+          const Icon = cfg.icon;
+          return (
+            <Badge key={type} variant="secondary" className={`text-[9px] font-bold gap-1 ${cfg.color} ${cfg.bgColor} border ${cfg.borderColor}`}>
+              <Icon className="w-3 h-3" />
+              {cfg.label || type} ({count})
+            </Badge>
+          );
+        })}
       </div>
 
       {/* Main split view */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-4 w-full">
         {/* Left/Center: Timeline of Lessons */}
         <div className="lg:col-span-2 space-y-4 w-full">
-          <Accordion type="multiple" defaultValue={["lesson-0"]} className="w-full space-y-3">
-            {plan.lessons.map((lesson, lIdx) => (
-              <AccordionItem
-                key={lIdx}
-                value={`lesson-${lIdx}`}
-                className="border border-border rounded-xl px-4 bg-muted/20 hover:bg-muted/30 transition-all duration-200"
-              >
-                <AccordionTrigger className="hover:no-underline py-3">
-                  <div className="flex flex-col items-start text-left gap-1">
-                    <span className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
-                        {lIdx + 1}
-                      </span>
-                      Lesson {lIdx + 1}: {lesson.lesson_name}
-                    </span>
-                    <span className="text-xs text-muted-foreground font-normal leading-normal">{lesson.description}</span>
+          {(!plan.lessons || plan.lessons.length === 0) ? (
+            <div className="p-8 text-center border border-dashed rounded-xl bg-muted/10 space-y-2">
+              <p className="text-sm font-semibold text-foreground">No lessons remaining in curriculum plan.</p>
+              <p className="text-xs text-muted-foreground">Use Lumi AI on the right to refine or generate new lessons for this module.</p>
+            </div>
+          ) : (
+            <Accordion type="multiple" defaultValue={["lesson-0"]} className="w-full space-y-3">
+              {plan.lessons.map((lesson, lIdx) => (
+                <AccordionItem
+                  key={lIdx}
+                  value={`lesson-${lIdx}`}
+                  className="border border-border rounded-xl px-4 bg-muted/20 hover:bg-muted/30 transition-all duration-200"
+                >
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <AccordionTrigger className="hover:no-underline py-3 flex-1">
+                      <div className="flex flex-col items-start text-left gap-1">
+                        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
+                            {lIdx + 1}
+                          </span>
+                          Lesson {lIdx + 1}: {lesson.lesson_name}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-normal leading-normal">{lesson.description}</span>
+                      </div>
+                    </AccordionTrigger>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 ml-2 text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 shrink-0 flex items-center justify-center"
+                      title="Delete Lesson"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteLesson(lIdx);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-2 pb-4 space-y-3">
-                  {lesson.chapters.map((chapter, cIdx) => {
-                    const isText = chapter.content_type === "Text Content";
-                    const isVideo = chapter.content_type === "Video Content";
-                    const isSlide = chapter.content_type === "Slide Content";
-                    const isQuiz = chapter.content_type === "Quiz";
+                  <AccordionContent className="pt-2 pb-4 space-y-3">
+                    {(!lesson.chapters || lesson.chapters.length === 0) && (
+                      <div className="text-xs text-muted-foreground italic py-3 text-center border border-dashed rounded-lg bg-background/50">
+                        No chapters in this lesson.
+                      </div>
+                    )}
+                    {lesson.chapters?.map((chapter, cIdx) => {
+                      const cfg = CONTENT_TYPE_CONFIG[chapter.content_type] || CONTENT_TYPE_CONFIG["Text Content"];
+                      const Icon = cfg.icon;
+                      const isText = chapter.content_type === "Text Content";
+                      const isVideo = chapter.content_type === "Video Content";
+                      const isSlide = chapter.content_type === "Slide Content";
+                      const isQuiz = chapter.content_type === "Quiz";
 
-                    return (
-                      <div
-                        key={cIdx}
-                        className="bg-background border rounded-lg p-3.5 space-y-3 shadow-sm hover:border-muted-foreground/30 transition-all duration-200"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex gap-3 items-start">
-                            <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${isText ? "bg-blue-50 text-blue-600" :
-                              isVideo ? "bg-purple-50 text-purple-600" :
-                                isSlide ? "bg-teal-50 text-teal-600" :
-                                  "bg-orange-50 text-orange-600"
-                              }`}>
-                              {isText && <BookOpen className="w-4 h-4" />}
-                              {isVideo && <PlayCircle className="w-4 h-4" />}
-                              {isSlide && <Presentation className="w-4 h-4" />}
-                              {isQuiz && <ClipboardList className="w-4 h-4" />}
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-bold text-foreground">{chapter.title}</span>
-                                <Badge variant="secondary" className="text-[9px] uppercase tracking-wider font-bold">
-                                  {chapter.content_type}
-                                </Badge>
+                      return (
+                        <div
+                          key={cIdx}
+                          className="bg-background border rounded-lg p-3.5 space-y-3 shadow-sm hover:border-muted-foreground/30 transition-all duration-200"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex gap-3 items-start flex-1 min-w-0">
+                              <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${cfg.bgColor} ${cfg.color}`}>
+                                <Icon className="w-4 h-4" />
                               </div>
-                              <p className="text-xs text-muted-foreground leading-normal">{chapter.summary}</p>
+                              <div className="space-y-1 min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-foreground">{chapter.title}</span>
+                                  <Badge variant="outline" className={`text-[10px] font-bold gap-1 px-2 py-0.5 border ${cfg.borderColor} ${cfg.bgColor} ${cfg.color} inline-flex items-center`}>
+                                    <Icon className={`w-3 h-3 ${cfg.color}`} />
+                                    <span>{chapter.content_type}</span>
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-normal">{chapter.summary}</p>
+                                { (isSlide || isVideo) && (
+                                  <label className="flex items-center gap-2 mt-1.5 cursor-pointer group">
+                                    <input
+                                      type="checkbox"
+                                      checked={(chapter as any).convert_to_mp4 !== undefined ? !!(chapter as any).convert_to_mp4 : isVideo}
+                                      onChange={(e) => {
+                                        const updatedPlan = JSON.parse(JSON.stringify(plan));
+                                        updatedPlan.lessons[lIdx].chapters[cIdx].convert_to_mp4 = e.target.checked;
+                                        setPlan(updatedPlan);
+                                      }}
+                                      className="rounded border-[#008b99] text-[#008b99] focus:ring-[#008b99] w-3.5 h-3.5"
+                                    />
+                                    <span className="text-[10px] font-semibold text-[#008b99] group-hover:text-[#006d78] transition-colors">
+                                      Convert to MP4 video
+                                    </span>
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {/* Edit / Preview Trigger */}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1 hover:bg-primary/10 hover:text-primary transition-colors shrink-0 text-xs font-medium border-primary/20 text-primary"
+                                onClick={() => {
+                                  if (isVideo || isSlide) {
+                                    setPreviewModalChapter({ chapter, lessonIdx: lIdx, chapterIdx: cIdx });
+                                  } else {
+                                    handleOpenEditChapter(lIdx, cIdx);
+                                  }
+                                }}
+                              >
+                                {isVideo || isSlide ? (
+                                  <>
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>Preview</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Settings className="w-3.5 h-3.5" />
+                                    <span>Edit</span>
+                                  </>
+                                )}
+                              </Button>
+
+                              {/* Delete Chapter Trigger */}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 shrink-0 flex items-center justify-center"
+                                title="Delete Chapter"
+                                onClick={() => handleDeleteChapter(lIdx, cIdx)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </div>
-
-                          {/* Edit Trigger for all chapter types */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1 hover:bg-primary/10 hover:text-primary transition-colors shrink-0 text-xs font-medium border-primary/20 text-primary"
-                            onClick={() => handleOpenEditChapter(lIdx, cIdx)}
-                          >
-                            <Settings className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                          </Button>
-                        </div>
 
                         {/* Predefined text body preview */}
                         {isText && chapter.body && (
@@ -2135,26 +3170,58 @@ function StepPlanPreview({
                           </div>
                         )}
 
-                        {/* Predefined video specs preview */}
-                        {isVideo && chapter.video_details && (
+                        {/* Predefined video & slide specs preview without raw Speech Script Outline */}
+                        {(isVideo || isSlide) && chapter.video_details && (
                           <div className="bg-muted/40 p-3 rounded-lg border text-xs space-y-2">
                             <div className="flex items-center gap-4 text-[10px] font-semibold text-muted-foreground flex-wrap">
-                              <span>Style: <strong className="text-foreground">{chapter.video_details.template}</strong></span>
-                              <span>Palette: <strong className="text-foreground">{chapter.video_details.color_palette}</strong></span>
-                              <span>Tone: <strong className="text-foreground">{chapter.video_details.voice_tone}</strong></span>
+                              <span>Style: <strong className="text-foreground">{chapter.video_details.template || "Interactive Motion"}</strong></span>
+                              <span>Palette: <strong className="text-foreground">{chapter.video_details.color_palette || "Modern Professional"}</strong></span>
+                              {chapter.video_details.supervisor_info?.supervised && (
+                                <Badge variant="outline" className="text-[9px] bg-purple-50 text-purple-700 border-purple-200 font-bold">
+                                  ✓ Multi-Agent Supervised
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="text-[9px] bg-teal-50 text-teal-700 border-teal-200 font-bold">
+                                Motion Graphics & Animations
+                              </Badge>
                             </div>
-                            <div className="text-[11px] font-normal leading-relaxed text-muted-foreground">
-                              <strong className="text-foreground font-semibold">Speech Script Outline:</strong> {chapter.video_details.script}
-                            </div>
+
+                            {/* Planner learning objective if present */}
+                            {chapter.video_details.planner_info?.learning_objective && (
+                              <div className="text-[10px] text-muted-foreground bg-background/60 p-1.5 rounded border italic">
+                                <span className="font-semibold not-italic text-foreground">Planner Objective: </span>
+                                {chapter.video_details.planner_info.learning_objective}
+                              </div>
+                            )}
 
                             {/* Slides preview list */}
                             {chapter.video_details.slides && chapter.video_details.slides.length > 0 && (
                               <div className="pt-2 border-t mt-1 space-y-2">
-                                <span className="text-[10px] font-bold text-foreground block">Slide Deck Outline ({chapter.video_details.slides.length} slides):</span>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-bold text-foreground block">
+                                    Animated Presentation Slides ({chapter.video_details.slides.length} slides):
+                                  </span>
+                                  <span
+                                    className="text-[10px] text-primary font-bold cursor-pointer hover:underline flex items-center gap-1"
+                                    onClick={() => setPreviewModalChapter({ chapter, lessonIdx: lIdx, chapterIdx: cIdx })}
+                                  >
+                                    {/* <Eye className="w-3 h-3" /> Click Preview to Edit & Animate */}
+                                  </span>
+                                </div>
                                 <div className="flex gap-2.5 overflow-x-auto pb-1.5 scrollbar-thin">
                                   {chapter.video_details.slides.map((slide, sIdx) => (
-                                    <div key={sIdx} className="bg-background border rounded-md p-2 w-48 shrink-0 text-[10px] space-y-1.5 shadow-sm">
-                                      <div className="font-bold truncate text-foreground border-b pb-0.5">Slide {sIdx + 1}: {slide.title}</div>
+                                    <div key={sIdx} className="bg-background border rounded-md p-2 w-48 shrink-0 text-[10px] space-y-1.5 shadow-sm hover:border-primary/40 transition-colors">
+                                      <div className="flex items-center justify-between border-b pb-0.5">
+                                        <span className="font-bold truncate text-foreground">Slide {sIdx + 1}: {slide.title}</span>
+                                        <div className="flex items-center gap-1">
+                                          {slide.critic_evaluation?.scorePercentage && (
+                                            <Badge variant="outline" className="text-[7px] px-1 py-0 bg-emerald-50 text-emerald-700 border-emerald-200">
+                                              {slide.critic_evaluation.scorePercentage}%
+                                            </Badge>
+                                          )}
+                                          <Badge variant="secondary" className="text-[8px] px-1 py-0 uppercase">{slide.layout_type || "bullets"}</Badge>
+                                        </div>
+                                      </div>
                                       <ul className="list-disc pl-3 text-muted-foreground space-y-0.5 truncate">
                                         {slide.bullets?.map((b, bIdx) => (
                                           <li key={bIdx} className="truncate">{b}</li>
@@ -2168,29 +3235,6 @@ function StepPlanPreview({
                           </div>
                         )}
 
-                        {/* Predefined slide specs preview */}
-                        {isSlide && chapter.video_details && (
-                          <div className="bg-muted/40 p-3 rounded-lg border text-xs space-y-2">
-                            {/* Slides preview list */}
-                            {chapter.video_details.slides && chapter.video_details.slides.length > 0 && (
-                              <div className="space-y-2">
-                                <span className="text-[10px] font-bold text-foreground block">Slide Deck Outline ({chapter.video_details.slides.length} slides):</span>
-                                <div className="flex gap-2.5 overflow-x-auto pb-1.5 scrollbar-thin">
-                                  {chapter.video_details.slides.map((slide, sIdx) => (
-                                    <div key={sIdx} className="bg-background border rounded-md p-2 w-48 shrink-0 text-[10px] space-y-1.5 shadow-sm">
-                                      <div className="font-bold truncate text-foreground border-b pb-0.5">Slide {sIdx + 1}: {slide.title}</div>
-                                      <ul className="list-disc pl-3 text-muted-foreground space-y-0.5 truncate">
-                                        {slide.bullets?.map((b, bIdx) => (
-                                          <li key={bIdx} className="truncate">{b}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -2198,6 +3242,7 @@ function StepPlanPreview({
               </AccordionItem>
             ))}
           </Accordion>
+          )}
         </div>
 
         {/* Right column container */}
@@ -2215,7 +3260,7 @@ function StepPlanPreview({
               <div className="flex items-center justify-between border-b pb-2 shrink-0">
                 <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-                  Luna Ai
+                  Lumi Ai
                 </h3>
                 <Badge variant="outline" className="text-[9px] uppercase font-bold text-primary border-primary/20 bg-primary/5 px-2 py-0.5">
                   Refine
@@ -2263,7 +3308,7 @@ function StepPlanPreview({
                     id="refinePrompt"
                     value={refinePrompt}
                     onChange={(e) => setRefinePrompt(e.target.value)}
-                    placeholder="Tell Luna what to modify, add, or reorganize (e.g. Combine lesson 1 and 2, add quiz for chapter 1...)"
+                    placeholder="Tell Lumi what to modify, add, or reorganize (e.g. Combine lesson 1 and 2, add quiz for chapter 1...)"
                     className="w-full min-h-[110px] text-xs resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-3.5 py-3 scrollbar-thin bg-transparent"
                     disabled={isRefining}
                     onKeyDown={(e) => {
@@ -2355,6 +3400,44 @@ function StepPlanPreview({
         </Button>
       </div>
 
+      {/* Custom Delete Confirmation Modal */}
+      <Dialog open={!!deleteConfirmState} onOpenChange={(open) => !open && setDeleteConfirmState(null)}>
+        <DialogContent className="max-w-md bg-background rounded-2xl p-6 shadow-xl border border-border">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <span>Confirm Deletion</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-relaxed">
+              {deleteConfirmState?.details}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex items-center justify-end gap-2 pt-4 border-t border-border mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-medium"
+              onClick={() => setDeleteConfirmState(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white gap-1.5 shadow-sm"
+              onClick={handleConfirmDelete}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete {deleteConfirmState?.type === "lesson" ? "Lesson" : "Chapter"}</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Expanded Image Preview Dialog */}
       <Dialog open={!!activePreviewImage} onOpenChange={(open) => !open && setActivePreviewImage(null)}>
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-6 overflow-hidden bg-background">
@@ -2399,6 +3482,24 @@ function StepPlanPreview({
         </DialogContent>
       </Dialog>
 
+      {/* Presentation Preview & Animation Full-Screen Editor */}
+      {previewModalChapter && (
+        <PresentationPreviewEditor
+          isOpen={!!previewModalChapter}
+          onClose={() => setPreviewModalChapter(null)}
+          chapter={previewModalChapter.chapter}
+          onSaveAndApprove={(updatedChapter) => {
+            const { lessonIdx, chapterIdx } = previewModalChapter;
+            const updatedPlan = JSON.parse(JSON.stringify(plan));
+            updatedPlan.lessons[lessonIdx].chapters[chapterIdx] = updatedChapter;
+            setPlan(updatedPlan);
+            setPreviewModalChapter(null);
+            toast.success("Presentation slides updated & approved!");
+          }}
+        />
+      )}
+
+
     </div>
   );
 }
@@ -2413,6 +3514,7 @@ function StepProcessing({
   resumedJobId,
   department,
   assignmentBased,
+  onCancelProcess,
 }: {
   plan: PlanJSON | null;
   onDone: (moduleId: string) => void;
@@ -2420,6 +3522,7 @@ function StepProcessing({
   resumedJobId?: string | null;
   department: string;
   assignmentBased: string;
+  onCancelProcess?: () => void;
 }) {
   const [progressMsg, setProgressMsg] = useState(() => {
     if (resumedJobId) {
@@ -2476,6 +3579,7 @@ function StepProcessing({
                   plan_json: plan,
                   department: department,
                   assignment_based: assignmentBased,
+                  voice_settings: plan?.creative_design_preview?.audio_design || null,
                 }),
                 credentials: "include",
               });
@@ -2539,6 +3643,16 @@ function StepProcessing({
               localStorage.removeItem("active_ai_job_progress");
               activeJobPromise = null;
               throw new Error(statusData.error || statusData.progress || "Generation job failed on server.");
+            }
+
+            if (statusData.status === "cancelled" || statusData.status === "stopped") {
+              if (pollInterval) clearInterval(pollInterval);
+              localStorage.removeItem("active_ai_job_id");
+              localStorage.removeItem("active_ai_job_progress");
+              activeJobPromise = null;
+              toast.info(statusData.progress || "Process was cancelled.");
+              onFailed();
+              return;
             }
 
             if (statusData.status === "finished") {
@@ -2688,16 +3802,27 @@ function StepProcessing({
 
       <div className="flex flex-col items-center gap-3 w-full max-w-md">
         <p className="text-sm font-medium text-foreground text-center animate-pulse">{progressMsg}</p>
-        <AnimatedProgressBar label="" />
-        {jobId && (
-          <Button
-            variant="outline"
-            className="mt-6 font-semibold border-primary/30 hover:border-primary text-primary hover:bg-primary/5 transition-all duration-300 shadow-sm"
-            onClick={() => setLocation("/")}
-          >
-            Run in Background
-          </Button>
-        )}
+        <div className="flex items-center justify-center gap-3 mt-6">
+          {jobId && (
+            <Button
+              variant="outline"
+              className="font-semibold border-primary/30 hover:border-primary text-primary hover:bg-primary/5 transition-all duration-300 shadow-sm"
+              onClick={() => setLocation("/")}
+            >
+              Run in Background
+            </Button>
+          )}
+          {onCancelProcess && (
+            <Button
+              variant="outline"
+              className="font-semibold border-red-200 hover:border-red-400 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/50 transition-all duration-300 shadow-sm gap-1.5"
+              onClick={onCancelProcess}
+            >
+              <X className="w-4 h-4" />
+              Cancel Process
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2717,13 +3842,58 @@ export default function AiModuleWizard() {
     return localStorage.getItem("active_ai_job_type");
   });
 
+  const [plan, setPlanState] = useState<PlanJSON | null>(() => {
+    const cached = localStorage.getItem("debug_cached_curriculum_plan");
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (_) { }
+    }
+    return null;
+  });
+
+  const setPlan = (p: PlanJSON | null) => {
+    setPlanState(p);
+    if (p) {
+      localStorage.setItem("debug_cached_curriculum_plan", JSON.stringify(p));
+    } else {
+      localStorage.removeItem("debug_cached_curriculum_plan");
+    }
+  };
+
+  const [blueprint, setBlueprintState] = useState<BlueprintJSON | null>(() => {
+    const cached = localStorage.getItem("debug_cached_blueprint");
+    if (cached) {
+      try { return JSON.parse(cached); } catch (_) { }
+    }
+    return null;
+  });
+
+  const setBlueprint = (b: BlueprintJSON | null) => {
+    setBlueprintState(b);
+    if (b) {
+      localStorage.setItem("debug_cached_blueprint", JSON.stringify(b));
+    } else {
+      localStorage.removeItem("debug_cached_blueprint");
+    }
+  };
+
   const [step, setStep] = useState<Step>(() => {
     const id = localStorage.getItem("active_ai_job_id") || localStorage.getItem("completed_ai_draft_job_id");
     const type = localStorage.getItem("completed_ai_draft_job_id") ? "draft" : localStorage.getItem("active_ai_job_type");
+
     if (id) {
-      if (type === "draft") return 2;
-      return 3;
+      if (type === "blueprint") return 2;
+      if (type === "draft") return 3;
+      return 4;
     }
+
+    const cachedPlan = localStorage.getItem("debug_cached_curriculum_plan");
+    if (cachedPlan) return 3;
+
+    const cachedBlueprint = localStorage.getItem("debug_cached_blueprint");
+    if (cachedBlueprint) return 2;
+
     return 1;
   });
 
@@ -2740,8 +3910,6 @@ export default function AiModuleWizard() {
   const [targetAudience, setTargetAudience] = useState("");
   const [learningGoal, setLearningGoal] = useState("");
   const [slideCount, setSlideCount] = useState("Standard");
-
-  const [plan, setPlan] = useState<PlanJSON | null>(null);
 
   const { data: departments } = useFrappeGetDocList("Department", {
     fields: ["name", "department"],
@@ -2764,8 +3932,12 @@ export default function AiModuleWizard() {
     setStep(2);
   };
 
-  const handleStep2Next = () => {
+  const handleBlueprintApprove = () => {
     setStep(3);
+  };
+
+  const handleStep3Next = () => {
+    setStep(4);
   };
 
   const handleProcessingDone = (moduleId: string) => {
@@ -2787,20 +3959,79 @@ export default function AiModuleWizard() {
     setStep(1);
   };
 
-  const isFitToScreen = step === 3 || (step === 2 && !plan) || (step === 2 && isEditingChapter);
+  const handleCancelProcess = async () => {
+    const activeJobId = localStorage.getItem("active_ai_job_id") || resumedJobId;
+    if (activeJobId) {
+      try {
+        const cleanBaseUrl = LMS_API_BASE_URL ? LMS_API_BASE_URL.replace(/\/$/, '') : '';
+        await fetch(`${cleanBaseUrl}/api/method/novel_lms.lms_ai_module_creation.api.generator.cancel_job`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify({ ai_job_id: activeJobId }),
+          credentials: "include",
+        });
+      } catch (err) {
+        console.error("Failed to trigger cancel API:", err);
+      }
+    }
+
+    activeJobPromise = null;
+    activeDraftPromise = null;
+    activeBlueprintPromise = null;
+    localStorage.removeItem("active_ai_job_id");
+    localStorage.removeItem("active_ai_job_type");
+    localStorage.removeItem("active_ai_job_progress");
+    localStorage.removeItem("completed_ai_draft_job_id");
+    localStorage.removeItem("debug_cached_curriculum_plan");
+    localStorage.removeItem("debug_cached_blueprint");
+
+    setResumedJobId(null);
+    setResumedJobType(null);
+    setPlan(null);
+    setBlueprint(null);
+    setFiles([]);
+    setInstructions("");
+    setTargetAudience("");
+    setLearningGoal("");
+    setDepartment("");
+    setIsEditingChapter(false);
+    setStep(1);
+    toast.info("Cleared blueprint cache & reset to Upload Sources.");
+  };
+
+  const isFitToScreen = step === 4 || (step === 2 && !blueprint) || (step === 3 && !plan) || (step === 3 && isEditingChapter);
+  const isJobActive = step === 4 || (step === 2 && !blueprint) || (step === 3 && !plan) || !!resumedJobId || !!localStorage.getItem("active_ai_job_id");
 
   return (
     <div className={isFitToScreen ? "h-screen bg-muted/30 flex flex-col overflow-hidden" : "min-h-screen bg-muted/30 flex flex-col"}>
-      <header className="flex items-center justify-end px-6 py-3.5 border-b border-border bg-background/90 backdrop-blur-sm shrink-0 z-10" />
+      <header className="flex items-center justify-between px-6 py-3 border-b border-border bg-background/90 backdrop-blur-sm shrink-0 z-10">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" />
+          <span className="text-sm font-bold text-foreground">AI Module Builder</span>
+        </div>
+        {isJobActive && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCancelProcess}
+            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:hover:bg-red-950/50 gap-1.5 font-semibold text-xs transition-all shadow-sm"
+          >
+            <X className="w-4 h-4" />
+            Cancel Process
+          </Button>
+        )}
+      </header>
 
-      <div className="flex justify-center py-5 shrink-0">
-        <StepIndicator current={step} />
-      </div>
+      {!isEditingChapter && (
+        <div className="flex justify-center py-5 shrink-0">
+          <StepIndicator current={step} />
+        </div>
+      )}
 
-      <div className={isFitToScreen ? "flex-1 flex items-stretch px-8 pb-6 overflow-hidden" : "flex-1 flex items-start px-8 pb-6"}>
-        <div className="w-full flex flex-col">
+      <div className={isFitToScreen ? `flex-1 flex items-stretch overflow-hidden ${isEditingChapter ? "px-6 py-4" : "px-8 pb-6"}` : "flex-1 flex items-start px-8 pb-6"}>
+        <div className="w-full flex flex-col h-full">
           <div className={isFitToScreen
-            ? "flex-1 flex flex-col bg-background border border-border rounded-2xl shadow-sm overflow-hidden p-8"
+            ? `flex-1 flex flex-col bg-background border border-border rounded-2xl shadow-sm overflow-hidden ${isEditingChapter ? "p-5" : "p-8"}`
             : "w-full flex flex-col bg-background border border-border rounded-2xl shadow-sm p-8"
           }>
             {step === 1 && (
@@ -2820,6 +4051,25 @@ export default function AiModuleWizard() {
             )}
 
             {step === 2 && (
+              <StepBlueprintPreview
+                files={files}
+                instructions={instructions}
+                department={department}
+                targetAudience={targetAudience}
+                learningGoal={learningGoal}
+                blueprint={blueprint}
+                setBlueprint={setBlueprint}
+                onApprove={handleBlueprintApprove}
+                onBack={() => {
+                  setBlueprint(null);
+                  localStorage.removeItem("debug_cached_blueprint");
+                  setStep(1);
+                }}
+                onCancelProcess={handleCancelProcess}
+              />
+            )}
+
+            {step === 3 && (
               <StepPlanPreview
                 files={files}
                 instructions={instructions}
@@ -2834,21 +4084,23 @@ export default function AiModuleWizard() {
                 slideCount={slideCount}
                 plan={plan}
                 setPlan={setPlan}
-                onNext={handleStep2Next}
+                onNext={handleStep3Next}
                 onBack={() => {
                   localStorage.removeItem("active_ai_job_id");
                   localStorage.removeItem("active_ai_job_type");
                   localStorage.removeItem("active_ai_job_progress");
                   setResumedJobId(null);
                   setResumedJobType(null);
-                  setStep(1);
+                  setStep(2);
                 }}
                 resumedDraftJobId={resumedJobType === "draft" ? resumedJobId : null}
                 setIsEditingChapter={setIsEditingChapter}
+                onCancelProcess={handleCancelProcess}
+                blueprintJson={blueprint}
               />
             )}
 
-            {step === 3 && (
+            {step === 4 && (
               <StepProcessing
                 plan={plan}
                 onDone={handleProcessingDone}
@@ -2856,6 +4108,7 @@ export default function AiModuleWizard() {
                 resumedJobId={resumedJobId}
                 department={department}
                 assignmentBased={assignmentBased}
+                onCancelProcess={handleCancelProcess}
               />
             )}
           </div>
