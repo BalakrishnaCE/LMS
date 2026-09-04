@@ -30,6 +30,7 @@ import { motion } from "framer-motion"
 import { Download, X, CopyPlus, Bot, Asterisk, Filter, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import { LMS_API_BASE_URL, ROUTES } from "@/config/routes"
+import { useUser } from "@/hooks/use-user"
 
 // Debounce utility function
 const debounce = (fn: Function, delay: number) => {
@@ -81,6 +82,7 @@ function downloadCSV(csv: string, filename: string) {
 function Modules({ 
     itemsPerPage, 
 }: ModulesProps) {
+    const { isLMSViewer } = useUser();
     const [page, setPage] = useState(1)
     // Initialize search query from localStorage
     const [searchQuery, setSearchQuery] = useState(() => {
@@ -624,32 +626,37 @@ function Modules({
                                                 <Asterisk className="h-5 w-5 text-amber-600 dark:text-[#f59e0b]" />
                                             </div>
                                         ) : null}
-                                        {/* Duplicate Icon Button - Positioned below status bar (h-8 = 2rem, so 2rem + 0.5rem = 2.5rem = top-10) */}
-                                        <button
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                handleDuplicateClick(module.name, module.name1);
-                                            }}
-                                            className="absolute top-10 right-2 z-20 p-2 rounded-full bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
-                                            title="Duplicate Module"
-                                        >
-                                            <CopyPlus className="h-4 w-4 text-primary" />
-                                        </button>
+                                        {/* Duplicate and Ingest Action Buttons - Only for non-viewers */}
+                                        {!isLMSViewer && (
+                                            <>
+                                                {/* Duplicate Icon Button - Positioned below status bar (h-8 = 2rem, so 2rem + 0.5rem = 2.5rem = top-10) */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleDuplicateClick(module.name, module.name1);
+                                                    }}
+                                                    className="absolute top-10 right-2 z-20 p-2 rounded-full bg-white/90 dark:bg-gray-800/90 hover:bg-white dark:hover:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
+                                                    title="Duplicate Module"
+                                                >
+                                                    <CopyPlus className="h-4 w-4 text-primary" />
+                                                </button>
 
-                                        {/* Bot Icon Button - Positioned exactly to the left of Duplicate Icon */}
-                                        {(!module.is_injest || module.is_injest === 0) && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    handleModuleIngest(module.name, module.name1);
-                                                }}
-                                                className="absolute top-10 right-12 z-20 p-2 rounded-full bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/80 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
-                                                title="Ingest to AI"
-                                            >
-                                                <Bot className="h-4 w-4 text-red-600 dark:text-red-400" />
-                                            </button>
+                                                {/* Bot Icon Button - Positioned exactly to the left of Duplicate Icon */}
+                                                {(!module.is_injest || module.is_injest === 0) && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            handleModuleIngest(module.name, module.name1);
+                                                        }}
+                                                        className="absolute top-10 right-12 z-20 p-2 rounded-full bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/80 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
+                                                        title="Ingest to AI"
+                                                    >
+                                                        <Bot className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                                    </button>
+                                                )}
+                                            </>
                                         )}
 
                                         {/* Image or Letter Avatar with fallback */}
