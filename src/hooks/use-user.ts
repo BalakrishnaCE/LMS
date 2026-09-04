@@ -20,6 +20,8 @@ interface UseUserReturn {
   isLoading: boolean;
   error: unknown;
   isLMSAdmin: boolean;
+  isLMSViewer: boolean;
+  canViewAdminPanel: boolean;
   isLMSStudent: boolean;
   isLMSContentEditor: boolean;
 }
@@ -28,11 +30,13 @@ export function useUser(): UseUserReturn {
   const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
   const [user, setUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error] = useState<unknown>(null);
+  const [error, setError] = useState<unknown>(null);
 
   // Get LMS permissions - only call once when user changes
   const {
     isLMSAdmin,
+    isLMSViewer,
+    canViewAdminPanel,
     isLMSStudent,
     isLMSContentEditor,
     isLoading: permissionsLoading
@@ -78,7 +82,9 @@ export function useUser(): UseUserReturn {
     isLoading: isLoading || isAuthLoading || permissionsLoading,
     error,
     isLMSAdmin,
+    isLMSViewer,
+    canViewAdminPanel,
     isLMSStudent,
     isLMSContentEditor,
   };
-} 
+}

@@ -22,6 +22,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import Lottie from 'lottie-react';
 import loadingAnimation from '@/assets/Loading.json';
 import { useEffect, useRef, useState } from "react";
+import { useUser } from "@/hooks/use-user";
 
 interface User {
   name: string;
@@ -401,6 +402,8 @@ function Filters({
 }
 
 export default function Learners() {
+  const { isLMSViewer } = useUser();
+  const [selectedTab, setSelectedTab] = useState<'all' | 'mandatory' | 'not-mandatory'>('all');
   const [searchName, setSearchName] = React.useState("");
   const [searchEmail, setSearchEmail] = React.useState("");
 
@@ -886,9 +889,11 @@ export default function Learners() {
     <div className="w-full p-4 lg:p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Learners</h1>
-        <div className="flex gap-2">
-          <Button onClick={() => setAddOpen(true)} variant="default">Add Learner</Button>
-        </div>
+        {!isLMSViewer && (
+          <div className="flex gap-2">
+            <Button onClick={() => setAddOpen(true)} variant="default">Add Learner</Button>
+          </div>
+        )}
       </div>
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">

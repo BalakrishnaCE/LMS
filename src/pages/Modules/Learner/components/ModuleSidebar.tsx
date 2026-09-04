@@ -6,6 +6,7 @@ import { CheckCircle, Circle, PlayCircle, ArrowLeft, ChevronDown, ChevronUp, Boo
 import { cn } from "@/lib/utils";
 import { ROUTES, getFullPath } from "@/config/routes";
 import { Link } from "wouter";
+import { useUser } from "@/hooks/use-user";
 
 
 interface ModuleSidebarProps {
@@ -37,6 +38,7 @@ export function ModuleSidebar({
   completionData,
   isAccessible
 }: ModuleSidebarProps) {
+  const { isLMSViewer } = useUser();
   const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false);
   const [expandedLessons, setExpandedLessons] = React.useState<Set<string>>(new Set());
   const chapterRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -264,7 +266,7 @@ export function ModuleSidebar({
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-md">
               <BookOpen className="h-4 w-4" />
               <span>Admin Preview Mode</span>
-              {module?.name && (
+              {module?.name && !isLMSViewer && (
                 <Link href={`/edit/${module?.name || module?.id}`}>
                   <Button variant="outline" size="sm" className="gap-2 ml-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2.828 2.828 0 00-4-4l-8 8v3zm0 0v3a2 2 0 002 2h3" /></svg>

@@ -81,7 +81,8 @@ const learnerNavItems: NavMainItem[] = [
 ];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user, isLMSAdmin } = useUser();
+  const { user, isLMSAdmin, isLMSViewer, canViewAdminPanel } = useUser();
+  const showAdminNav = isLMSAdmin || isLMSViewer || canViewAdminPanel;
   const [navData, setNavData] = React.useState<NavData>({
     user: {
       name: "User",
@@ -100,10 +101,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           email: user.email,
           avatar: user.image || "/avatars/shadcn.jpg",
         },
-        navMain: isLMSAdmin ? adminNavItems : learnerNavItems
+        navMain: showAdminNav ? adminNavItems : learnerNavItems
       }));
     }
-  }, [user, isLMSAdmin]);
+  }, [user, showAdminNav]);
 
   return (
     <div>
@@ -116,7 +117,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 size="lg"
                 className="hover:bg-transparent active:bg-transparent data-[active=true]:bg-transparent data-[state=open]:bg-transparent group-data-[collapsible=icon]:!p-0"
               >
-                <Link href={isLMSAdmin ? ROUTES.HOME : ROUTES.LEARNER_DASHBOARD} className="flex items-center overflow-hidden w-full group-data-[collapsible=icon]:justify-center">
+                <Link href={showAdminNav ? ROUTES.HOME : ROUTES.LEARNER_DASHBOARD} className="flex items-center overflow-hidden w-full group-data-[collapsible=icon]:justify-center">
                   <img 
                     src={logoImage} 
                     alt="Novel LMS Logo" 
