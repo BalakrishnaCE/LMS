@@ -425,7 +425,8 @@ export default function AdminModuleDetail() {
                                                 </div>
                                                 {moduleDocData?.is_injest === 1 ? "Re-ingest to AI" : "Ingest to AI"}
                                             </Button>
-                                            <Button
+                                            {/* Delete Module button hidden for now */}
+                                            {/* <Button
                                                 variant="destructive"
                                                 size="sm"
                                                 onClick={() => setShowDeleteDialog(true)}
@@ -433,7 +434,7 @@ export default function AdminModuleDetail() {
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                                 Delete Module
-                                            </Button>
+                                            </Button> */}
                                         </>
                                     )}
                                 </div>
