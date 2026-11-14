@@ -16,7 +16,7 @@ export function ProtectedRoute({
   component: Component,
   allowedRoles = [],
 }: ProtectedRouteProps) {
-  const { user, isLoading, isLMSAdmin, isLMSStudent, isLMSContentEditor } = useUser();
+  const { user, isLoading, isLMSAdmin, isLMSViewer, isLMSStudent, isLMSContentEditor } = useUser();
   const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
 
   // Show loading state while either auth or user data is loading
@@ -45,6 +45,7 @@ export function ProtectedRoute({
     //   path,
     //   allowedRoles,
     //   isLMSAdmin,
+    //   isLMSViewer,
     //   isLMSStudent,
     //   isLMSContentEditor,
     //   currentUser
@@ -54,6 +55,8 @@ export function ProtectedRoute({
       switch (role) {
         case "LMS Admin":
           return isLMSAdmin;
+        case "LMS Viewer":
+          return isLMSViewer;
         case "LMS Student":
           return isLMSStudent;
         case "LMS Content Editor":
@@ -67,7 +70,7 @@ export function ProtectedRoute({
 
     if (!hasAccess) {
       // Redirect based on role
-      const redirectPath = isLMSAdmin
+      const redirectPath = (isLMSAdmin || isLMSViewer)
         ? "/"
         : isLMSContentEditor
           ? "/modules"

@@ -8,6 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Building2, Users, Calendar, Search, X, User, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { useFrappeAuth } from 'frappe-react-sdk';
+import { useUser } from "@/hooks/use-user";
 import { useFrappeGetCall } from "frappe-react-sdk";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
@@ -41,6 +43,7 @@ interface DepartmentDetails {
 
 
 export default function DepartmentPage() {
+  const { isLMSViewer } = useUser();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState<DepartmentData | null>(null);
@@ -473,9 +476,11 @@ export default function DepartmentPage() {
             Manage and view all departments
           </p>
         </div>
-        <Button onClick={() => setShowAddDialog(true)} variant="default">
-          Add Department
-        </Button>
+        {!isLMSViewer && (
+          <Button onClick={() => setShowAddDialog(true)} variant="default">
+            Add Department
+          </Button>
+        )}
       </div>
 
       {/* Stats Card */}
@@ -790,15 +795,17 @@ export default function DepartmentPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="h-8"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
+                  {!isLMSViewer && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="h-8"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -882,14 +889,16 @@ export default function DepartmentPage() {
                           <Users className="h-4 w-4" />
                           Department Members ({departmentDetails?.members?.length || 0})
                         </h4>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => setShowAddMemberDialog(true)}
-                          className="h-8"
-                        >
-                          Add Member
-                        </Button>
+                        {!isLMSViewer && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => setShowAddMemberDialog(true)}
+                            className="h-8"
+                          >
+                            Add Member
+                          </Button>
+                        )}
                       </div>
                       
                       {/* Search Input for Members */}
@@ -925,7 +934,7 @@ export default function DepartmentPage() {
                                 <tr className="border-b bg-muted/50">
                                   <th className="text-left p-2 font-medium text-xs text-muted-foreground">Name</th>
                                   <th className="text-left p-2 font-medium text-xs text-muted-foreground">Email</th>
-                                  <th className="text-left p-2 font-medium text-xs text-muted-foreground">Action</th>
+                                  {!isLMSViewer && <th className="text-left p-2 font-medium text-xs text-muted-foreground">Action</th>}
                                 </tr>
                               </thead>
                               <tbody>
@@ -933,20 +942,22 @@ export default function DepartmentPage() {
                                   <tr key={member.name} className="border-b">
                                     <td className="p-2 text-xs font-medium">{member.full_name || member.name}</td>
                                     <td className="p-2 text-xs text-muted-foreground">{member.email}</td>
-                                    <td className="p-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          setMemberToDelete(member);
-                                          setShowDeleteMemberDialog(true);
-                                        }}
-                                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        title="Remove member from department"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </td>
+                                    {!isLMSViewer && (
+                                      <td className="p-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setMemberToDelete(member);
+                                            setShowDeleteMemberDialog(true);
+                                          }}
+                                          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                          title="Remove member from department"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </td>
+                                    )}
                                   </tr>
                                 ))}
                               </tbody>

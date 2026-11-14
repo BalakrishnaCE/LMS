@@ -17,6 +17,7 @@ import loadingAnimation from '@/assets/Loading.json';
 import { ROUTES } from "@/config/routes";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useUser } from "@/hooks/use-user";
 
 // TypeScript interfaces
 interface Content {
@@ -665,6 +666,7 @@ function AiChatSidebar({
 
 
 export default function AdminModuleDetail() {
+    const { isLMSViewer } = useUser();
     const params = useParams<{ moduleName: string }>();
     const [, setLocation] = useLocation();
     const moduleName = params.moduleName;
@@ -1075,6 +1077,53 @@ export default function AdminModuleDetail() {
                                         <Trash2 className="h-4 w-4" />
                                         Delete Module
                                     </Button>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-md">
+                                        <BookOpen className="h-4 w-4" />
+                                        <span>Admin Preview</span>
+                                    </div>
+                                    {!isLMSViewer && (
+                                        <>
+                                            {moduleDocData?.is_injest === 1 && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 flex items-center gap-2"
+                                                    onClick={() => setShowRemoveConfirm(true)}
+                                                    disabled={isRemoving}
+                                                >
+                                                    <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
+                                                        <Bot className={`${isRemoving ? "animate-spin" : ""}`} style={{ height: '10px', width: '10px' }} />
+                                                        <ArrowDown className="stroke-[3]" style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
+                                                    </div>
+                                                    Remove from AI
+                                                </Button>
+                                            )}
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                className="flex items-center gap-2"
+                                                onClick={() => setShowIngestConfirm(true)}
+                                                disabled={isIngesting}
+                                            >
+                                                <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
+                                                    <Bot className={`${isIngesting ? "animate-pulse" : ""}`} style={{ height: '10px', width: '10px' }} />
+                                                    <ArrowUp className={`stroke-[3] ${isIngesting ? "animate-bounce" : ""}`} style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
+                                                </div>
+                                                {moduleDocData?.is_injest === 1 ? "Re-ingest to AI" : "Ingest to AI"}
+                                            </Button>
+                                            {/* Delete Module button hidden for now */}
+                                            {/* <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                onClick={() => setShowDeleteDialog(true)}
+                                                className="gap-2"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                Delete Module
+                                            </Button> */}
+                                        </>
+                                    )}
                                 </div>
                             </div>
 

@@ -51,17 +51,17 @@ function AppContent() {
           <Layout>
             <AiChatPage />
           </Layout>
-        )} allowedRoles={["LMS Student", "LMS Content Editor", "LMS Admin"]} />
+        )} allowedRoles={["LMS Student", "LMS Content Editor", "LMS Admin", "LMS Viewer"]} />
         <ProtectedRoute path="/ai/:chatId" component={() => (
           <Layout>
             <AiChatPage />
           </Layout>
-        )} allowedRoles={["LMS Student", "LMS Content Editor", "LMS Admin"]} />
+        )} allowedRoles={["LMS Student", "LMS Content Editor", "LMS Admin", "LMS Viewer"]} />
         <ProtectedRoute path="/" component={() => (
           <Layout>
             <Admindashboard />
           </Layout>
-        )} allowedRoles={["LMS Admin"]} />
+        )} allowedRoles={["LMS Admin", "LMS Viewer"]} />
         <ProtectedRoute path="/learner-dashboard" component={() => (
           <Layout>
             <LearnerDashboard />
@@ -73,29 +73,29 @@ function AppContent() {
             <LearnerModulePage />
           </Layout>
         )} allowedRoles={["LMS Student"]} />
-        <ProtectedRoute path="/modules/learner/:moduleName" component={LearnerModuleDetail} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
+        <ProtectedRoute path="/modules/learner/:moduleName" component={LearnerModuleDetail} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor", "LMS Viewer"]} />
 
 
         <ProtectedRoute path="/modules" component={() => (
           <Layout>
             <Module />
           </Layout>
-        )} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
-        <ProtectedRoute path="/modules/:moduleName" component={AdminModuleDetail} allowedRoles={["LMS Admin", "LMS Content Editor"]} />
+        )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Viewer"]} />
+        <ProtectedRoute path="/modules/:moduleName" component={AdminModuleDetail} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Viewer"]} />
         <ProtectedRoute path="/module/:moduleName" component={() => (
           <ModuleDetail />
-        )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student"]} />
+        )} allowedRoles={["LMS Admin", "LMS Content Editor", "LMS Student", "LMS Viewer"]} />
 
         <ProtectedRoute path="/learners" component={() => (
           <Layout>
             <Learners />
           </Layout>
-        )} allowedRoles={["LMS Admin"]} />
+        )} allowedRoles={["LMS Admin", "LMS Viewer"]} />
         <ProtectedRoute path="/profile" component={() => (
           <Layout>
             <Profile />
           </Layout>
-        )} allowedRoles={["LMS Admin", "LMS Student", "LMS Content Editor"]} />
+        )} allowedRoles={["LMS Admin", "LMS Student", "LMS Content Editor", "LMS Viewer"]} />
         <ProtectedRoute path="/edit" component={() => (
           <Layout>
             <ModuleCreationForm />
@@ -110,18 +110,18 @@ function AppContent() {
           <Layout>
             <AnalyticsDashboard />
           </Layout>
-        )} allowedRoles={["LMS Admin"]} />
+        )} allowedRoles={["LMS Admin", "LMS Viewer"]} />
         <ProtectedRoute path="/department" component={() => (
           <Layout>
             <DepartmentPage />
           </Layout>
-        )} allowedRoles={["LMS Admin"]} />
+        )} allowedRoles={["LMS Admin", "LMS Viewer"]} />
 
         <ProtectedRoute path="/faq" component={() => (
           <Layout>
             <FAQPage />
           </Layout>
-        )} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor"]} />
+        )} allowedRoles={["LMS Student", "LMS Admin", "LMS Content Editor", "LMS Viewer"]} />
 
         <ProtectedRoute path="/ai-module-wizard" component={() => (
           <AiModuleWizard />

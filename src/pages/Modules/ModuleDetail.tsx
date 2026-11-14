@@ -77,11 +77,11 @@ export default function ModuleDetail() {
     const [location, setLocation] = useLocation();
     const { addToHistory } = useNavigation();
 
-    const { isLMSAdmin, isLMSContentEditor } = useUser();
+    const { isLMSAdmin, isLMSContentEditor, isLMSViewer } = useUser();
 
     useEffect(() => {
-        setEnableEditing(isLMSAdmin || isLMSContentEditor);
-    }, [isLMSAdmin, isLMSContentEditor]);
+        setEnableEditing((isLMSAdmin || isLMSContentEditor) && !isLMSViewer);
+    }, [isLMSAdmin, isLMSContentEditor, isLMSViewer]);
 
     // Track navigation history when module loads
     useEffect(() => {

@@ -129,14 +129,15 @@ export function LoginForm({
           const lmsUsersDoc = await lmsUsersRes.json();
           const lmsUsersData = lmsUsersDoc.data || lmsUsersDoc;
           
-          // Step 3: Check which child table the user exists in (priority: admin > content_editor > student)
+          // Step 3: Check which child table the user exists in (priority: admin > viewer > content_editor > student)
           const lmsAdmin = (lmsUsersData.lms_admin || []).some((row: any) => row.user === userName);
+          const lmsViewer = (lmsUsersData.lms_viewer || []).some((row: any) => row.user === userName);
           const lmsContentEditor = (lmsUsersData.lms_content_editor || []).some((row: any) => row.user === userName);
           const lmsStudent = (lmsUsersData.lms_student || []).some((row: any) => row.user === userName);
           
           // Determine redirect path based on LMS Users doctype roles
           let redirectPath = '';
-          if (lmsAdmin) {
+          if (lmsAdmin || lmsViewer) {
             redirectPath = ROUTES.HOME; // "/"
           } else if (lmsContentEditor) {
             redirectPath = ROUTES.MODULES; // "/modules"

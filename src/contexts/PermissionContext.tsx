@@ -3,7 +3,7 @@ import { useFrappeAuth, useFrappeGetCall } from "frappe-react-sdk";
 
 interface PermissionData {
   user: string;
-  userType: 'admin' | 'student' | 'content_editor' | 'tl';
+  userType: 'admin' | 'viewer' | 'student' | 'content_editor' | 'tl';
   timestamp: number;
 }
 
@@ -11,10 +11,12 @@ interface PermissionContextType {
   isLoading: boolean;
   error: unknown;
   isLMSAdmin: boolean;
+  isLMSViewer: boolean;
+  canViewAdminPanel: boolean;
   isLMSContentEditor: boolean;
   isLMSStudent: boolean;
   isLMSTL: boolean;
-  userType: 'admin' | 'student' | 'content_editor' | 'tl' | null;
+  userType: 'admin' | 'viewer' | 'student' | 'content_editor' | 'tl' | null;
   refreshPermissions: () => void;
 }
 
@@ -32,7 +34,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
   const { currentUser, isLoading: isAuthLoading } = useFrappeAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
-  const [userType, setUserType] = useState<'admin' | 'student' | 'content_editor' | 'tl' | null>(null);
+  const [userType, setUserType] = useState<'admin' | 'viewer' | 'student' | 'content_editor' | 'tl' | null>(null);
   const [forceRefresh, setForceRefresh] = useState(0);
 
   // Check if we have valid cached data
@@ -128,6 +130,8 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
   };
 
   const isLMSAdmin = userType === 'admin';
+  const isLMSViewer = userType === 'viewer';
+  const canViewAdminPanel = isLMSAdmin || isLMSViewer;
   const isLMSContentEditor = userType === 'content_editor';
   const isLMSStudent = userType === 'student';
   const isLMSTL = userType === 'tl';
@@ -136,6 +140,8 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
     isLoading: isLoading || isAuthLoading,
     error,
     isLMSAdmin,
+    isLMSViewer,
+    canViewAdminPanel,
     isLMSContentEditor,
     isLMSStudent,
     isLMSTL,
