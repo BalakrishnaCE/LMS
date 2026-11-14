@@ -1096,13 +1096,23 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
             if (!reader) throw new Error('No reader available');
 
             const decoder = new TextDecoder();
+            // Buffer partial SSE events across network chunks. The first event carries
+            // `citations`/`contents` (often 50-100KB), which is frequently split across
+            // multiple reads; parsing each read independently silently dropped it.
+            let sseBuffer = '';
 
             while (true) {
                 const { value, done } = await reader.read();
-                if (done) break;
+                if (done) {
+                    sseBuffer += decoder.decode();
+                } else {
+                    sseBuffer += decoder.decode(value, { stream: true });
+                }
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n\n');
+                const events = sseBuffer.split('\n\n');
+                // Keep the last (possibly incomplete) event in the buffer unless the stream ended
+                sseBuffer = done ? '' : (events.pop() ?? '');
+                const lines = events;
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
@@ -1148,6 +1158,7 @@ const AiChat = ({ initialModuleName, initialChatId, sidebarControl, isFloating =
                         });
                     }
                 }
+                if (done) break;
             }
 
             // Persist
