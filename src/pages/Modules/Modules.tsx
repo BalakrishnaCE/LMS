@@ -642,21 +642,8 @@ function Modules({
                                                     <CopyPlus className="h-4 w-4 text-primary" />
                                                 </button>
 
-                                        {/* Bot Icon Button - Positioned exactly to the left of Duplicate Icon */}
-                                        {module.status === "Published" && (!module.is_injest || module.is_injest === 0) && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    handleModuleIngest(module.name, module.name1);
-                                                }}
-                                                className="absolute top-10 right-12 z-20 p-2 rounded-full bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/80 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110 active:scale-95"
-                                                title="Ingest to AI"
-                                            >
-                                                <Bot className="h-4 w-4 text-red-600 dark:text-red-400" />
-                                            </button>
                                                 {/* Bot Icon Button - Positioned exactly to the left of Duplicate Icon */}
-                                                {(!module.is_injest || module.is_injest === 0) && (
+                                                {module.status === "Published" && (!module.is_injest || module.is_injest === 0) && (
                                                     <button
                                                         onClick={(e) => {
                                                             e.preventDefault();

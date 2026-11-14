@@ -1026,7 +1026,7 @@ export default function AdminModuleDetail() {
                                             <span>Back to Curriculum Plan</span>
                                         </Button>
                                     )}
-                                    {!isAiChatOpen && (
+                                    {!isLMSViewer && !isAiChatOpen && (
                                         <div
                                             className="flex items-center gap-2 text-sm text-foreground bg-muted/50 px-4 py-2 rounded-md cursor-pointer hover:bg-muted/80 transition-colors border border-border"
                                             onClick={() => setIsAiChatOpen(true)}
@@ -1035,83 +1035,45 @@ export default function AdminModuleDetail() {
                                             <span>Enhance with AI</span>
                                         </div>
                                     )}
-                                    {moduleDocData?.status === "Published" && (
-                                        <>
-                                            {moduleDocData?.is_injest === 1 && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 flex items-center gap-2"
-                                                    onClick={() => setShowRemoveConfirm(true)}
-                                                    disabled={isRemoving}
-                                                >
-                                                    <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
-                                                        <Bot className={`${isRemoving ? "animate-spin" : ""}`} style={{ height: '10px', width: '10px' }} />
-                                                        <ArrowDown className="stroke-[3]" style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
-                                                    </div>
-                                                    Remove from AI
-                                                </Button>
-                                            )}
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                className="flex items-center gap-2"
-                                                onClick={() => setShowIngestConfirm(true)}
-                                                disabled={isIngesting}
-                                            >
-                                                <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
-                                                    <Bot className={`${isIngesting ? "animate-pulse" : ""}`} style={{ height: '10px', width: '10px' }} />
-                                                    <ArrowUp className={`stroke-[3] ${isIngesting ? "animate-bounce" : ""}`} style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
-                                                </div>
-                                                {moduleDocData?.is_injest === 1 ? "Re-ingest to AI" : "Ingest to AI"}
-                                            </Button>
-                                        </>
-                                    )}
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => setShowDeleteDialog(true)}
-                                        className="gap-2"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                        Delete Module
-                                    </Button>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-md">
                                         <BookOpen className="h-4 w-4" />
                                         <span>Admin Preview</span>
                                     </div>
                                     {!isLMSViewer && (
                                         <>
-                                            {moduleDocData?.is_injest === 1 && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 flex items-center gap-2"
-                                                    onClick={() => setShowRemoveConfirm(true)}
-                                                    disabled={isRemoving}
-                                                >
-                                                    <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
-                                                        <Bot className={`${isRemoving ? "animate-spin" : ""}`} style={{ height: '10px', width: '10px' }} />
-                                                        <ArrowDown className="stroke-[3]" style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
-                                                    </div>
-                                                    Remove from AI
-                                                </Button>
+                                            {moduleDocData?.status === "Published" && (
+                                                <>
+                                                    {moduleDocData?.is_injest === 1 && (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 flex items-center gap-2"
+                                                            onClick={() => setShowRemoveConfirm(true)}
+                                                            disabled={isRemoving}
+                                                        >
+                                                            <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
+                                                                <Bot className={`${isRemoving ? "animate-spin" : ""}`} style={{ height: '10px', width: '10px' }} />
+                                                                <ArrowDown className="stroke-[3]" style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
+                                                            </div>
+                                                            Remove from AI
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        className="flex items-center gap-2"
+                                                        onClick={() => setShowIngestConfirm(true)}
+                                                        disabled={isIngesting}
+                                                    >
+                                                        <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
+                                                            <Bot className={`${isIngesting ? "animate-pulse" : ""}`} style={{ height: '10px', width: '10px' }} />
+                                                            <ArrowUp className={`stroke-[3] ${isIngesting ? "animate-bounce" : ""}`} style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
+                                                        </div>
+                                                        {moduleDocData?.is_injest === 1 ? "Re-ingest to AI" : "Ingest to AI"}
+                                                    </Button>
+                                                </>
                                             )}
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                className="flex items-center gap-2"
-                                                onClick={() => setShowIngestConfirm(true)}
-                                                disabled={isIngesting}
-                                            >
-                                                <div className="flex flex-col items-center justify-center leading-none" style={{ height: '14px', gap: '-2px' }}>
-                                                    <Bot className={`${isIngesting ? "animate-pulse" : ""}`} style={{ height: '10px', width: '10px' }} />
-                                                    <ArrowUp className={`stroke-[3] ${isIngesting ? "animate-bounce" : ""}`} style={{ height: '6px', width: '6px', marginTop: '-2px' }} />
-                                                </div>
-                                                {moduleDocData?.is_injest === 1 ? "Re-ingest to AI" : "Ingest to AI"}
-                                            </Button>
                                             {/* Delete Module button hidden for now */}
                                             {/* <Button
                                                 variant="destructive"
