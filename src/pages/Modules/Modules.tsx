@@ -643,7 +643,7 @@ function Modules({
                                                 </button>
 
                                                 {/* Bot Icon Button - Positioned exactly to the left of Duplicate Icon */}
-                                                {module.status === "Published" && (!module.is_injest || module.is_injest === 0) && (
+                                                {(!module.is_injest || module.is_injest === 0) && (
                                                     <button
                                                         onClick={(e) => {
                                                             e.preventDefault();
